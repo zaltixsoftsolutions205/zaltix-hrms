@@ -12,6 +12,11 @@ const taskSchema = new mongoose.Schema(
     remarks: { type: String, default: '' },
     proofUrl: { type: String, default: '' },
     completedDate: { type: Date, default: null },
+    // Duration-based reminder fields (admin self-tasks)
+    duration: { type: Number, default: null },          // minutes; null = no timer
+    startedAt: { type: Date, default: null },           // when moved to in-progress
+    lastReminderAt: { type: Date, default: null },      // last auto-reminder sent
+    isSelfTask: { type: Boolean, default: false },      // assignedBy === assignedTo
   },
   { timestamps: true }
 );

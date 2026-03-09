@@ -617,6 +617,64 @@ async function sendWeeklyReport() {
   }
 }
 
+// ─── TASK DURATION REMINDERS ─────────────────────────────────────────────────
+/**
+ * Runs every 15 minutes.
+ * - Duration ≤ 1 day (1440 min): sends ONE reminder when the timer expires.
+ * - Duration > 1 day            : sends a reminder every 3 hours (180 min).
+ */
+async function checkTaskDurationReminders() {
+  try {
+    const now = new Date();
+
+    const activeTasks = await Task.find({
+      isSelfTask: true,
+      status: 'in-progress',
+      duration: { $ne: null, $gt: 0 },
+      startedAt: { $ne: null },
+    }).populate('assignedTo', 'name _id').lean();
+
+    for (const task of activeTasks) {
+      const durationMs = task.duration * 60 * 1000;
+      const expiresAt  = new Date(task.startedAt.getTime() + durationMs);
+      const isExpired  = now >= expiresAt;
+      const lastRemind = task.lastReminderAt ? new Date(task.lastReminderAt) : null;
+
+      let shouldRemind = false;
+      let reminderMsg  = '';
+
+      if (task.duration <= 1440) {
+        // Short task (≤ 1 day): send once when expired, only if not reminded yet after start
+        if (isExpired && (!lastRemind || lastRemind < task.startedAt)) {
+          shouldRemind = true;
+          reminderMsg = `⏰ Time's up! Your task "${task.title}" timer (${task.duration < 60 ? task.duration + ' min' : Math.round(task.duration / 60) + ' hr'}) has expired. Please update its status.`;
+        }
+      } else {
+        // Long task (> 1 day): remind every 3 hours
+        const threeHoursAgo = new Date(now.getTime() - 180 * 60 * 1000);
+        if (!lastRemind || lastRemind < threeHoursAgo) {
+          shouldRemind = true;
+          const elapsed = Math.round((now - task.startedAt) / 3600000);
+          const days    = Math.floor(task.duration / 1440);
+          reminderMsg = `🔔 Progress check: "${task.title}" has been running for ${elapsed}h (target: ${days}d). Update your status if done.`;
+        }
+      }
+
+      if (shouldRemind) {
+        await notify(task.assignedTo._id, {
+          title: 'Task Reminder',
+          message: reminderMsg,
+          type: 'task',
+          link: '/admin/tasks',
+        });
+        await Task.findByIdAndUpdate(task._id, { lastReminderAt: now });
+      }
+    }
+  } catch (err) {
+    console.error('[Automation] checkTaskDurationReminders error:', err.message);
+  }
+}
+
 // ─── SCHEDULER ────────────────────────────────────────────────────────────────
 
 let started = false;
@@ -627,6 +685,9 @@ function startAutomation() {
 
   // Task monitoring — every hour
   cron.schedule('0 * * * *', checkTasks, { timezone: 'Asia/Kolkata' });
+
+  // Task duration reminders — every 15 minutes
+  cron.schedule('*/15 * * * *', checkTaskDurationReminders, { timezone: 'Asia/Kolkata' });
 
   // Morning summary — Mon–Sat at 08:30
   cron.schedule('30 8 * * 1-6', sendMorningSummary, { timezone: 'Asia/Kolkata' });
@@ -643,17 +704,17 @@ function startAutomation() {
   // Weekly report + productivity scores — every Monday at 09:00
   cron.schedule('0 9 * * 1', sendWeeklyReport, { timezone: 'Asia/Kolkata' });
 
-  console.log('[Automation] Scheduler started. 5 jobs active.');
+  console.log('[Automation] Scheduler started. 6 jobs active.');
 }
 
 module.exports = {
   startAutomation,
-  // Exported so controller can call them on-demand
   checkTasks,
   checkMissingCheckout,
   checkAttendancePatterns,
   checkCRMAlerts,
   checkDocumentCompliance,
+  checkTaskDurationReminders,
   sendMorningSummary,
   sendEveningSummary,
   calculateProductivityScores,

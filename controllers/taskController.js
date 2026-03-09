@@ -5,21 +5,73 @@ const moment = require('moment');
 
 // HR / Admin: Create task
 exports.createTask = async (req, res) => {
-  const { title, description, assignedTo, priority, deadline } = req.body;
+  const { title, description, assignedTo, priority, deadline, duration } = req.body;
   try {
+    const isSelf = assignedTo && assignedTo.toString() === req.user._id.toString();
+
+    // If self-task with duration: check for existing active timed task
+    if (isSelf && duration) {
+      const now = new Date();
+      const activeTimedTask = await Task.findOne({
+        assignedTo: req.user._id,
+        isSelfTask: true,
+        status: 'in-progress',
+        startedAt: { $ne: null },
+        $expr: { $gt: [{ $add: ['$startedAt', { $multiply: ['$duration', 60000] }] }, now] },
+      });
+      if (activeTimedTask) {
+        const endsAt = new Date(activeTimedTask.startedAt.getTime() + activeTimedTask.duration * 60000);
+        const minsLeft = Math.ceil((endsAt - now) / 60000);
+        return res.status(409).json({
+          message: `You have an active task "${activeTimedTask.title}" with ${minsLeft} min${minsLeft !== 1 ? 's' : ''} remaining. Complete or stop it before starting a new timed task.`,
+          activeTask: { _id: activeTimedTask._id, title: activeTimedTask.title, minsLeft },
+        });
+      }
+    }
+
     const task = await Task.create({
-      title, description, assignedTo, assignedBy: req.user._id, priority, deadline: new Date(deadline),
+      title, description, assignedTo, assignedBy: req.user._id, priority,
+      deadline: new Date(deadline),
+      duration: duration || null,
+      isSelfTask: isSelf,
+      status: isSelf && duration ? 'in-progress' : 'not-started',
+      startedAt: isSelf && duration ? new Date() : null,
     });
 
+    // Notify assignee (or admin themselves for self-tasks)
+    const notifLink = isSelf ? '/admin/tasks' : '/tasks';
+    const notifMsg = isSelf
+      ? `New task started: "${title}"${duration ? ` — ${duration < 60 ? duration + ' min' : duration < 1440 ? (duration / 60) + ' hr' : Math.round(duration / 1440) + ' day'} timer started` : ''}`
+      : `You have been assigned: "${title}" (Due: ${moment(deadline).format('DD MMM YYYY')})`;
+
     await notificationService.notify(assignedTo, {
-      title: 'New Task Assigned',
-      message: `You have been assigned: "${title}" (Due: ${moment(deadline).format('DD MMM YYYY')})`,
+      title: isSelf ? 'Task Timer Started' : 'New Task Assigned',
+      message: notifMsg,
       type: 'task',
-      link: '/tasks',
+      link: notifLink,
     });
 
     const populated = await Task.findById(task._id).populate('assignedTo', 'name employeeId').populate('assignedBy', 'name');
     res.status(201).json(populated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Admin: Get current active self-task (for focus-lock check)
+exports.getActiveSelfTask = async (req, res) => {
+  try {
+    const now = new Date();
+    const task = await Task.findOne({
+      assignedTo: req.user._id,
+      isSelfTask: true,
+      status: 'in-progress',
+      startedAt: { $ne: null },
+      $expr: { $gt: [{ $add: ['$startedAt', { $multiply: ['$duration', 60000] }] }, now] },
+    }).lean();
+    if (!task) return res.json({ active: null });
+    const endsAt = new Date(task.startedAt.getTime() + task.duration * 60000);
+    res.json({ active: { ...task, endsAt, minsLeft: Math.ceil((endsAt - now) / 60000) } });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -61,6 +113,7 @@ exports.updateTaskStatus = async (req, res) => {
     task.status = status;
     if (remarks) task.remarks = remarks;
     if (status === 'completed') task.completedDate = new Date();
+    if (status === 'in-progress' && !task.startedAt) task.startedAt = new Date();
     await task.save();
 
     // Notify the assigner (admin/HR) when an employee updates the task status
