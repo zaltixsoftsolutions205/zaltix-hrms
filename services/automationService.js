@@ -97,10 +97,11 @@ async function checkTasks() {
     const now = new Date();
     const in24h = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
-    // Overdue (deadline passed, not complete)
+    // Overdue (deadline passed, not complete) — exclude admin self-tasks
     const overdueTasks = await Task.find({
       deadline: { $lt: now },
       status: { $nin: ['completed'] },
+      isSelfTask: { $ne: true },
     }).populate('assignedTo assignedBy', '_id name');
 
     for (const task of overdueTasks) {
@@ -126,10 +127,11 @@ async function checkTasks() {
       }
     }
 
-    // Due in next 24h — reminder
+    // Due in next 24h — reminder (exclude admin self-tasks)
     const upcomingTasks = await Task.find({
       deadline: { $gte: now, $lte: in24h },
       status: { $nin: ['completed'] },
+      isSelfTask: { $ne: true },
     }).populate('assignedTo', '_id name');
 
     for (const task of upcomingTasks) {
@@ -370,17 +372,19 @@ async function sendMorningSummary() {
     const employees = await User.find({ isActive: true }, '_id name role');
 
     for (const emp of employees) {
-      // Pending + in-progress tasks
+      // Pending + in-progress tasks (exclude self-tasks)
       const pendingTasks = await Task.countDocuments({
         assignedTo: emp._id,
         status: { $nin: ['completed'] },
+        isSelfTask: { $ne: true },
       });
 
-      // Overdue tasks
+      // Overdue tasks (exclude self-tasks)
       const overdueTasks = await Task.countDocuments({
         assignedTo: emp._id,
         status: { $nin: ['completed'] },
         deadline: { $lt: now },
+        isSelfTask: { $ne: true },
       });
 
       // CRM: overdue follow-ups (for sales/admin)
@@ -429,12 +433,14 @@ async function sendEveningSummary() {
         assignedTo: emp._id,
         status: 'completed',
         completedDate: { $gte: dayStart, $lte: now },
+        isSelfTask: { $ne: true },
       });
 
       const stillPending = await Task.countDocuments({
         assignedTo: emp._id,
         status: { $nin: ['completed'] },
         deadline: { $lte: now },
+        isSelfTask: { $ne: true },
       });
 
       // Only notify if they have something to report
@@ -474,9 +480,10 @@ async function calculateProductivityScores(weekLabel) {
   const scores = [];
 
   for (const emp of employees) {
-    // ── Task Score ──
+    // ── Task Score (exclude self-tasks) ──
     const tasksTotal = await Task.countDocuments({
       assignedTo: emp._id,
+      isSelfTask: { $ne: true },
       $or: [
         { deadline: { $gte: start, $lte: end } },
         { createdAt: { $gte: start, $lte: end } },
@@ -484,6 +491,7 @@ async function calculateProductivityScores(weekLabel) {
     });
     const tasksCompleted = await Task.countDocuments({
       assignedTo: emp._id,
+      isSelfTask: { $ne: true },
       status: 'completed',
       $or: [
         { completedDate: { $gte: start, $lte: end } },
@@ -492,6 +500,7 @@ async function calculateProductivityScores(weekLabel) {
     });
     const tasksOverdue = await Task.countDocuments({
       assignedTo: emp._id,
+      isSelfTask: { $ne: true },
       status: { $nin: ['completed'] },
       deadline: { $gte: start, $lte: end },
     });

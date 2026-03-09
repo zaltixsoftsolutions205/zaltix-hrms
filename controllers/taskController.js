@@ -135,12 +135,18 @@ exports.updateTaskStatus = async (req, res) => {
   }
 };
 
-// HR / Admin: Get all tasks with employee filter
+// HR / Admin: Get all tasks with employee filter (excludes admin/hr self-tasks)
 exports.getAllTasks = async (req, res) => {
   const { employeeId, status } = req.query;
   try {
-    let filter = {};
-    if (employeeId) filter.assignedTo = employeeId;
+    let filter = { isSelfTask: { $ne: true } };
+    if (employeeId) {
+      filter.assignedTo = employeeId;
+    } else {
+      // Exclude tasks assigned to admin/hr users (their personal tasks)
+      const managerIds = await User.find({ role: { $in: ['admin', 'hr'] } }, '_id').lean();
+      filter.assignedTo = { $nin: managerIds.map(u => u._id) };
+    }
     if (status) filter.status = status;
     const tasks = await Task.find(filter).populate('assignedTo', 'name employeeId department').populate('assignedBy', 'name').sort({ createdAt: -1 });
     res.json(tasks);
@@ -149,16 +155,17 @@ exports.getAllTasks = async (req, res) => {
   }
 };
 
-// HR / Admin: Get KPI overview per employee
+// HR / Admin: Get KPI overview per employee (excludes admin self-tasks)
 exports.getKpiOverview = async (req, res) => {
   try {
     const employees = await User.find({ role: { $in: ['employee', 'sales'] }, isActive: true }).select('_id name employeeId department');
     const kpiData = await Promise.all(
       employees.map(async (emp) => {
-        const total = await Task.countDocuments({ assignedTo: emp._id });
-        const completed = await Task.countDocuments({ assignedTo: emp._id, status: 'completed' });
-        const inProgress = await Task.countDocuments({ assignedTo: emp._id, status: 'in-progress' });
-        const overdue = await Task.countDocuments({ assignedTo: emp._id, deadline: { $lt: new Date() }, status: { $ne: 'completed' } });
+        const base = { assignedTo: emp._id, isSelfTask: { $ne: true } };
+        const total = await Task.countDocuments(base);
+        const completed = await Task.countDocuments({ ...base, status: 'completed' });
+        const inProgress = await Task.countDocuments({ ...base, status: 'in-progress' });
+        const overdue = await Task.countDocuments({ ...base, deadline: { $lt: new Date() }, status: { $ne: 'completed' } });
         return { employee: emp, total, completed, inProgress, overdue, completionRate: total > 0 ? Math.round((completed / total) * 100) : 0 };
       })
     );
