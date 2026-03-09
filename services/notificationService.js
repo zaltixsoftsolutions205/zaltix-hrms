@@ -33,7 +33,10 @@ const notify = async (recipientId, { title, message, type = 'general', link = ''
   const notification = await Notification.create({ recipient: recipientId, title, message, type, link });
 
   // 2. FCM Push
-  const user = await User.findById(recipientId).select('pushTokens email name').lean();
+  const [user, unreadCount] = await Promise.all([
+    User.findById(recipientId).select('pushTokens email name').lean(),
+    Notification.countDocuments({ recipient: recipientId, isRead: false }),
+  ]);
   if (!user) return notification;
 
   const hasPushTokens = user.pushTokens && user.pushTokens.length > 0;
@@ -53,7 +56,7 @@ const notify = async (recipientId, { title, message, type = 'general', link = ''
             await messaging.send({
               token,
               notification: { title, body: message },
-              data: { link: link || '' },
+              data: { link: link || '', unreadCount: String(unreadCount) },
               webpush: {
                 notification: {
                   icon: `${FRONTEND_URL}/pwa-192x192.png`,

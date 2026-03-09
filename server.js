@@ -70,6 +70,7 @@ app.use('/api/quotations', require('./routes/quotations'));
 app.use('/api/purchase-orders', require('./routes/purchaseOrders'));
 app.use('/api/recruitment', require('./routes/recruitment'));
 app.use('/api/products',   require('./routes/products'));
+app.use('/api/automation', require('./routes/automation'));
 
 // =======================
 // ❤️ HEALTH CHECK
@@ -100,4 +101,7 @@ const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
+  // Start automation scheduler after DB is ready
+  const { startAutomation } = require('./services/automationService');
+  startAutomation();
 });

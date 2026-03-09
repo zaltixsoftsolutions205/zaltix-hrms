@@ -31,10 +31,16 @@ exports.markAllAsRead = async (req, res) => {
 
 // Save FCM push token for the logged-in user
 exports.savePushToken = async (req, res) => {
-  const { token } = req.body;
+  const { token, oldToken } = req.body;
   if (!token) return res.status(400).json({ message: 'Token required' });
   try {
-    // Add token if not already stored (prevent duplicates)
+    // Remove old token (if rotated) then add new one — prevents duplicate notifications
+    const update = oldToken && oldToken !== token
+      ? { $pull: { pushTokens: oldToken } }
+      : {};
+    if (Object.keys(update).length) {
+      await User.findByIdAndUpdate(req.user._id, update);
+    }
     await User.findByIdAndUpdate(req.user._id, { $addToSet: { pushTokens: token } });
     res.json({ message: 'Push token saved' });
   } catch (err) {
