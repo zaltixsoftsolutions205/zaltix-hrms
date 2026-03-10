@@ -107,7 +107,7 @@ const generatePayslipPDF = (payslipData) => {
       const infoW = MR - infoX;
 
       doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
-         .text('Zaltix Soft Solutions', infoX, y + 2, { width: infoW, align: 'center' });
+         .text('Zaltix Soft Solutions Private Limited', infoX, y + 2, { width: infoW, align: 'center' });
       doc.fillColor('#333333').fontSize(7.5).font('Helvetica')
          .text('Swarnakanchi Road, Green Hills Colony Rd No.3, above Vajra Food Court,', infoX, y + 20, { width: infoW, align: 'center' });
       doc.text('Green Hills Colony, Kothapet, Hyderabad, Telangana - 500102', infoX, y + 30, { width: infoW, align: 'center' });

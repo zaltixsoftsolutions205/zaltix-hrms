@@ -13,10 +13,10 @@ RUN apk update && apk upgrade && \
 WORKDIR /app
 
 
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 
 # Install only production dependencies
-RUN npm install --omit=dev --ignore-scripts && \
+RUN npm ci --omit=dev --ignore-scripts && \
     npm cache clean --force
 
 

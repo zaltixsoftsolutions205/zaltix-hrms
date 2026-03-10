@@ -31,7 +31,7 @@ jobs:
       # 4️⃣ Build & Push Docker Image
       - name: Build and Push
         run: |
-          IMAGE_URI=public.ecr.aws/g5p9n4i5/hrms-backend:latest
+          IMAGE_URI=public.ecr.aws/n2e2a2z5/hrms-backend:latest
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
@@ -43,7 +43,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
-            IMAGE_URI=public.ecr.aws/g5p9n4i5/hrms-backend:latest
+            IMAGE_URI=public.ecr.aws/n2e2a2z5/hrms-backend:latest
 
             echo "Pulling latest image..."
             docker pull $IMAGE_URI
