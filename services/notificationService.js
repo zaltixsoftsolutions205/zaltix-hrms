@@ -26,11 +26,18 @@ const emailBody = (title, message, link) => `
  * Send a notification to a single user.
  * Channels (in order): in-app DB → FCM push → email fallback
  */
-const notify = async (recipientId, { title, message, type = 'general', link = '' }) => {
+const notify = async (recipientId, { title, message, type = 'general', link = '', dedupKey = null, dedupWindowMs = 0 }) => {
   if (!recipientId) return null;
 
+  // Dedup check — if dedupKey provided, skip if same notification sent within the window
+  if (dedupKey && dedupWindowMs > 0) {
+    const since = new Date(Date.now() - dedupWindowMs);
+    const existing = await Notification.findOne({ recipient: recipientId, dedupKey, createdAt: { $gte: since } });
+    if (existing) return existing;
+  }
+
   // 1. In-app (MongoDB)
-  const notification = await Notification.create({ recipient: recipientId, title, message, type, link });
+  const notification = await Notification.create({ recipient: recipientId, title, message, type, link, dedupKey });
 
   // 2. FCM Push
   const [user, unreadCount] = await Promise.all([

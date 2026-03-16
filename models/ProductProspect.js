@@ -7,6 +7,7 @@ const prospectSchema = new mongoose.Schema({
   website:      { type: String, default: '' },
   contactNumber:{ type: String, default: '' },
   emailId:      { type: String, default: '' },
+  linkedinUrl:  { type: String, default: '' },
   companyType:  { type: String, default: '' },
   companySize:  { type: String, default: '' },
   remarks:      { type: String, default: '' },

@@ -8,6 +8,7 @@ const notificationSchema = new mongoose.Schema(
     type: { type: String, enum: ['leave', 'task', 'payslip', 'general', 'credential', 'crm', 'document'], default: 'general' },
     isRead: { type: Boolean, default: false },
     link: { type: String, default: '' },
+    dedupKey: { type: String, default: null },
   },
   { timestamps: true }
 );
