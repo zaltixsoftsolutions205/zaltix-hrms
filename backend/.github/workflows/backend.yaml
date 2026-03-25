@@ -32,7 +32,7 @@ jobs:
       - name: Build and Push
         run: |
           IMAGE_URI=public.ecr.aws/n2e2a2z5/hrms-backend:latest
-          docker build -f backend/Dockerfile -t $IMAGE_URI ./backend
+          docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
       # 5️⃣ Deploy to EC2
