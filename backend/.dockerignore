@@ -1,0 +1,38 @@
+# Dependencies (reinstalled inside the image)
+node_modules
+npm-debug.log*
+
+# Environment files (never bake secrets into the image)
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Docker files themselves
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Logs
+logs
+*.log
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+
+# Test / dev artifacts
+coverage
+.nyc_output
+*.test.js
+*.spec.js
+__tests__
+
+# Uploads (mounted as a volume at runtime)
+uploads/*
+!uploads/.gitkeep

@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  hrms-backend:
+    image: public.ecr.aws/n2e2a2z5/hrms-backend:latest
+    container_name: hrms-backend
+    restart: unless-stopped
+
+    ports:
+      - "5000:5000"
+
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      MONGO_URI: ${MONGO_URI}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN}
+      MAIL_HOST: ${MAIL_HOST}
+      MAIL_PORT: ${MAIL_PORT}
+      MAIL_USER: ${MAIL_USER}
+      MAIL_PASS: ${MAIL_PASS}
+      MAIL_FROM: ${MAIL_FROM}
+      FRONTEND_URL: ${FRONTEND_URL}
+
+    volumes:
+      - ./uploads:/app/uploads   # 🔥 bind mount (important)
+
+    networks:
+      - hrms_network
+
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+networks:
+  hrms_network:
+    driver: bridge
