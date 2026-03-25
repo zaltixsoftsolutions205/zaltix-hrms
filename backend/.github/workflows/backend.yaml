@@ -31,8 +31,8 @@ jobs:
       # 4️⃣ Build & Push Docker Image
       - name: Build and Push
         run: |
-          IMAGE_URI=public.ecr.aws/n2e2a2z5/hrms-backend:latest
-          docker build -f backend/Dockerfile -t $IMAGE_URI ./backend
+          IMAGE_URI=public.ecr.aws/g5p9n4i5/hrms-backend:latest
+          docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
       # 5️⃣ Copy upload limit config to EC2
@@ -53,7 +53,7 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key:      ${{ secrets.EC2_SSH_KEY }}
           script: |
-            IMAGE_URI=public.ecr.aws/n2e2a2z5/hrms-backend:latest
+            IMAGE_URI=public.ecr.aws/g5p9n4i5/hrms-backend:latest
 
             echo "Pulling latest image..."
             docker pull $IMAGE_URI
@@ -68,11 +68,20 @@ jobs:
             echo "Removing old myapp container if exists..."
             docker rm -f myapp || true
 
+            echo "Ensuring uploads directory exists on host..."
+            mkdir -p /home/ubuntu/hrms/uploads/employee-docs \
+                     /home/ubuntu/hrms/uploads/documents \
+                     /home/ubuntu/hrms/uploads/profile-photos \
+                     /home/ubuntu/hrms/uploads/payslips \
+                     /home/ubuntu/hrms/uploads/expenses \
+                     /home/ubuntu/hrms/uploads/resumes
+
             echo "Starting new container with env file..."
             docker run -d \
               --name myapp \
               -p 5000:5000 \
               --env-file /home/ubuntu/hrms/.env \
+              -v /home/ubuntu/hrms/uploads:/app/uploads \
               --restart always \
               $IMAGE_URI
 
