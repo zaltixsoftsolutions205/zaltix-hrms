@@ -32,10 +32,20 @@ jobs:
       - name: Build and Push
         run: |
           IMAGE_URI=public.ecr.aws/n2e2a2z5/hrms-backend:latest
-          docker build -t $IMAGE_URI .
+          docker build -f backend/Dockerfile -t $IMAGE_URI ./backend
           docker push $IMAGE_URI
 
-      # 5️⃣ Deploy to EC2
+      # 5️⃣ Copy upload limit config to EC2
+      - name: Copy nginx upload config
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          source: nginx-upload.conf
+          target: /tmp/
+
+      # 6️⃣ Deploy to EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -65,5 +75,9 @@ jobs:
               --env-file /home/ubuntu/hrms/.env \
               --restart always \
               $IMAGE_URI
+
+            echo "Applying nginx upload limit..."
+            sudo cp /tmp/nginx-upload.conf /etc/nginx/conf.d/upload-limit.conf
+            sudo nginx -t && sudo systemctl reload nginx || true
 
             echo "Deployment successful 🚀"
