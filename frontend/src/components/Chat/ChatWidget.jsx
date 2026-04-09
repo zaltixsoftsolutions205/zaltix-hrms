@@ -68,7 +68,7 @@ export default function ChatWidget() {
     activeChat, openChat, backToList,
     messages, users,
     unreadCounts, totalUnread,
-    sendMessage, chatKey,
+    sendMessage, chatKey, connected,
   } = useChat();
 
   const [input, setInput] = useState('');
@@ -139,7 +139,10 @@ export default function ChatWidget() {
                   </div>
                   <div>
                     <h2 className="text-sm font-semibold text-gray-900">Team Chat</h2>
-                    <p className="text-[11px] text-gray-400">{users.length + 1} members</p>
+                    <div className="flex items-center gap-1">
+                      <span className={`w-1.5 h-1.5 rounded-full ${connected ? 'bg-green-500' : 'bg-red-400'}`} />
+                      <p className="text-[11px] text-gray-400">{connected ? `${users.length + 1} members` : 'Connecting...'}</p>
+                    </div>
                   </div>
                 </div>
                 <button onClick={() => setIsOpen(false)}

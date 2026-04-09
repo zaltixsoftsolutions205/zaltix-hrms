@@ -76,6 +76,10 @@ jobs:
                      /home/ubuntu/hrms/uploads/expenses \
                      /home/ubuntu/hrms/uploads/resumes
 
+            echo "Setting uploads ownership to uid 1000 (matches container nodeuser)..."
+            sudo chown -R 1000:1000 /home/ubuntu/hrms/uploads
+            sudo chmod -R 755 /home/ubuntu/hrms/uploads
+
             echo "Starting new container with env file..."
             docker run -d \
               --name myapp \
