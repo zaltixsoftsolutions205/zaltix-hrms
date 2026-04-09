@@ -1,11 +1,15 @@
 require('dotenv').config();
+const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const jwt = require('jsonwebtoken');
 const connectDB = require('./config/db');
-const employeeRoutes = require('./routes/employees');
+const { Server } = require('socket.io');
+const Message = require('./models/Message');
 
 const app = express();
+const server = http.createServer(app);
 
 // =======================
 // 🔌 CONNECT DATABASE
@@ -36,6 +40,104 @@ app.use(
 );
 
 // =======================
+// 🔌 SOCKET.IO
+// =======================
+const io = new Server(server, {
+  cors: {
+    origin: allowedOrigins,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
+});
+
+// JWT auth middleware for socket
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+  if (!token) return next(new Error('Authentication error'));
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    socket.user = decoded;
+    next();
+  } catch {
+    next(new Error('Authentication error'));
+  }
+});
+
+// Role → group room mapping
+const roleToRooms = {
+  admin:      ['all', 'admin'],
+  hr:         ['all', 'hr'],
+  sales:      ['all', 'sales'],
+  field_sales:['all', 'sales'],
+  employee:   ['all'],
+};
+
+io.on('connection', (socket) => {
+  const { id: _id, role, name } = socket.user;
+
+  // Join role-based group rooms + personal room
+  const rooms = roleToRooms[role] || ['all'];
+  rooms.forEach(r => socket.join(`group:${r}`));
+  socket.join(`user:${_id}`);
+
+  // Send a group message
+  socket.on('group_message', async ({ group, content }) => {
+    const validGroups = ['all', 'admin', 'hr', 'sales', 'my_team'];
+    if (!validGroups.includes(group) || !content?.trim()) return;
+
+    try {
+      const msg = await Message.create({
+        sender: _id,
+        chatType: 'group',
+        group,
+        content: content.trim(),
+        readBy: [_id],
+      });
+      const populated = await msg.populate('sender', 'name role profilePicture employeeId');
+      io.to(`group:${group}`).emit('new_message', populated);
+    } catch (err) {
+      console.error('group_message error:', err.message);
+    }
+  });
+
+  // Send a direct message
+  socket.on('direct_message', async ({ receiverId, content }) => {
+    if (!receiverId || !content?.trim()) return;
+
+    try {
+      const msg = await Message.create({
+        sender: _id,
+        chatType: 'direct',
+        receiverId,
+        content: content.trim(),
+        readBy: [_id],
+      });
+      const populated = await msg.populate('sender', 'name role profilePicture employeeId');
+
+      // Send to receiver and sender
+      io.to(`user:${receiverId}`).emit('new_message', populated);
+      io.to(`user:${_id}`).emit('new_message', populated);
+    } catch (err) {
+      console.error('direct_message error:', err.message);
+    }
+  });
+
+  // Mark direct messages as read
+  socket.on('mark_read', async ({ fromUserId }) => {
+    try {
+      await Message.updateMany(
+        { chatType: 'direct', sender: fromUserId, receiverId: _id, readBy: { $ne: _id } },
+        { $addToSet: { readBy: _id } }
+      );
+    } catch (err) {
+      console.error('mark_read error:', err.message);
+    }
+  });
+
+  socket.on('disconnect', () => {});
+});
+
+// =======================
 // 📦 MIDDLEWARE
 // =======================
 app.use(express.json());
@@ -44,8 +146,6 @@ app.use(express.urlencoded({ extended: true }));
 // =======================
 // 📁 STATIC FILES
 // =======================
-// Access files like:
-// http://yourdomain.com/uploads/filename.pdf
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // =======================
@@ -74,6 +174,7 @@ app.use('/api/products',    require('./routes/products'));
 app.use('/api/field-leads', require('./routes/fieldLeads'));
 app.use('/api/automation', require('./routes/automation'));
 app.use('/api/kt',         require('./routes/kt'));
+app.use('/api/chat',       require('./routes/chat'));
 
 // =======================
 // ❤️ HEALTH CHECK
@@ -102,9 +203,8 @@ app.use((err, req, res, next) => {
 // =======================
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  // Start automation scheduler after DB is ready
   const { startAutomation } = require('./services/automationService');
   startAutomation();
 });
