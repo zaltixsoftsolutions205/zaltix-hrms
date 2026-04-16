@@ -32,7 +32,7 @@ RUN apk update && apk upgrade && \
         curl \
     && rm -rf /var/cache/apk/*
 
-# Create a non-root user for security
+# Create a non-root user (uid 1001 to avoid conflicts with the default node user in alpine)
 RUN addgroup -g 1001 -S nodegroup && \
     adduser  -u 1001 -S nodeuser -G nodegroup
 
