@@ -3,10 +3,17 @@ const http = require('http');
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const fs = require('fs');
 const jwt = require('jsonwebtoken');
 const connectDB = require('./config/db');
 const { Server } = require('socket.io');
 const Message = require('./models/Message');
+
+// Ensure upload directories exist on startup
+['uploads', 'uploads/payslips', 'uploads/profiles', 'uploads/documents', 'uploads/receipts'].forEach(dir => {
+  const dirPath = path.join(__dirname, dir);
+  if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
+});
 
 const app = express();
 const server = http.createServer(app);

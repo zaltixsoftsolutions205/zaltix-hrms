@@ -32,9 +32,9 @@ RUN apk update && apk upgrade && \
         curl \
     && rm -rf /var/cache/apk/*
 
-# Create a non-root user with uid 1000 (matches EC2 ubuntu user for volume permissions)
-RUN addgroup -g 1000 -S nodegroup && \
-    adduser  -u 1000 -S nodeuser -G nodegroup
+# Create a non-root user (uid 1001 to avoid conflicts with the default node user in alpine)
+RUN addgroup -g 1001 -S nodegroup && \
+    adduser  -u 1001 -S nodeuser -G nodegroup
 
 WORKDIR /app
 

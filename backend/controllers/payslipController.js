@@ -192,6 +192,7 @@ exports.downloadPayslip = async (req, res) => {
     res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
     fs.createReadStream(absolutePath).pipe(res);
   } catch (err) {
+    console.error('downloadPayslip error:', err);
     res.status(500).json({ message: err.message });
   }
 };
