@@ -9,7 +9,13 @@ const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-dig
 const statusLabel = { paid: 'Paid', pending: 'Pending', overdue: 'Overdue' };
 
 function InvoiceModal({ onClose, onSaved }) {
-  const [form, setForm] = useState({ client: '', amount: '', gstRate: '18', hsn: '', date: '', dueDate: '', description: '' });
+  const [form, setForm] = useState({
+    client: '', amount: '', gstRate: '18', date: '', dueDate: '', description: '',
+    companyAddress: 'Plot No 69, Greenhills colony, Road no 3,\nKothapet, Hyderabad - 500035',
+    companyGST: '36AACCZ6027D1ZF',
+    companyPhone: '+91 99666 53131',
+    companyEmail: 'info@zaltixsoftsolutions.com',
+  });
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState('');
 
@@ -35,7 +41,8 @@ function InvoiceModal({ onClose, onSaved }) {
           <button onClick={onClose}><X className="h-4 w-4" style={{ color: 'var(--fin-muted)' }} /></button>
         </div>
         <div className="space-y-4">
-          {[['Client Name', 'client', 'text'], ['Amount (₹)', 'amount', 'number'], ['GST Rate (%)', 'gstRate', 'number'], ['HSN Code', 'hsn', 'text']].map(([label, key, type]) => (
+          {/* Client + amount + GST */}
+          {[['Client Name', 'client', 'text'], ['Amount (₹)', 'amount', 'number'], ['GST Rate (%)', 'gstRate', 'number']].map(([label, key, type]) => (
             <div key={key}><label style={lbl}>{label}</label><input type={type} value={form[key]} onChange={e => setForm(p => ({ ...p, [key]: e.target.value }))} style={inp} /></div>
           ))}
           <div className="grid grid-cols-2 gap-3">
@@ -43,6 +50,14 @@ function InvoiceModal({ onClose, onSaved }) {
             <div><label style={lbl}>Due Date</label><input type="date" value={form.dueDate} onChange={e => setForm(p => ({ ...p, dueDate: e.target.value }))} style={inp} /></div>
           </div>
           <div><label style={lbl}>Description</label><input value={form.description} onChange={e => setForm(p => ({ ...p, description: e.target.value }))} style={inp} /></div>
+          {/* Company details */}
+          <p style={{ ...lbl, color: '#7c3aed', borderTop: '1px solid var(--fin-border)', paddingTop: 12, marginTop: 4 }}>Company Details</p>
+          <div className="grid grid-cols-2 gap-3">
+            <div><label style={lbl}>GST Number</label><input value={form.companyGST} onChange={e => setForm(p => ({ ...p, companyGST: e.target.value }))} style={inp} /></div>
+            <div><label style={lbl}>Phone</label><input value={form.companyPhone} onChange={e => setForm(p => ({ ...p, companyPhone: e.target.value }))} style={inp} /></div>
+          </div>
+          <div><label style={lbl}>Email</label><input value={form.companyEmail} onChange={e => setForm(p => ({ ...p, companyEmail: e.target.value }))} style={inp} /></div>
+          <div><label style={lbl}>Address</label><textarea rows={2} value={form.companyAddress} onChange={e => setForm(p => ({ ...p, companyAddress: e.target.value }))} style={{ ...inp, resize: 'none' }} /></div>
           {err && <p className="text-xs" style={{ color: '#f87171' }}>{err}</p>}
           <div className="flex gap-2 pt-2">
             <button className="fin-btn fin-btn-outline flex-1" onClick={onClose}>Cancel</button>
