@@ -14,32 +14,22 @@ if (!fs.existsSync(uploadDir)) {
 }
 
 const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    cb(null, `${Date.now()}-${file.originalname}`);
-  },
+  destination: (req, file, cb) => cb(null, uploadDir),
+  filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
 });
 
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => {
-    const allowedMimes = ['image/jpeg', 'image/png', 'application/pdf'];
-    if (allowedMimes.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only jpg, png, pdf allowed.'));
-    }
+    const allowed = ['image/jpeg', 'image/png', 'application/pdf'];
+    allowed.includes(file.mimetype) ? cb(null, true) : cb(new Error('Only jpg, png, pdf allowed.'));
   },
 });
 
-// Protect all routes
 router.use(protect);
 
 // ============ INCOME ROUTES ============
-// View: hr + admin | Mutate: hr only
 router.get('/income', roleCheck('admin', 'hr'), financeController.getIncome);
 router.get('/income/stats', roleCheck('admin', 'hr'), financeController.getIncomeStats);
 router.get('/income/:id', roleCheck('admin', 'hr'), financeController.getIncomeById);
@@ -48,7 +38,6 @@ router.delete('/income/:id', roleCheck('hr'), financeController.deleteIncome);
 router.post('/income/sync-deals', roleCheck('hr'), financeController.syncDealsToIncome);
 
 // ============ EXPENSE ROUTES ============
-// View: hr + admin | Mutate: hr only
 router.get('/expenses', roleCheck('admin', 'hr'), financeController.getExpenses);
 router.get('/expenses/stats', roleCheck('admin', 'hr'), financeController.getExpenseStats);
 router.get('/expenses/:id', roleCheck('admin', 'hr'), financeController.getExpenseById);
@@ -64,12 +53,55 @@ router.put('/expenses/:id/reject', roleCheck('admin'), financeController.rejectE
 router.put('/expenses/:id/set-status', roleCheck('admin'), financeController.setExpenseStatus);
 router.delete('/expenses/:id', roleCheck('hr'), financeController.deleteExpense);
 
-// ============ DASHBOARD ROUTES ============
-// View: hr + admin
+// ============ DASHBOARD + REPORT ROUTES ============
 router.get('/dashboard', roleCheck('admin', 'hr'), financeController.getDashboard);
 router.get('/reports/yearly', roleCheck('admin', 'hr'), financeController.getYearlyReport);
 router.get('/reports/by-category', roleCheck('admin', 'hr'), financeController.getByCategory);
 router.get('/reports/by-service', roleCheck('admin', 'hr'), financeController.getByService);
 router.get('/reports/profit-by-service', roleCheck('admin', 'hr'), financeController.getProfitByService);
+
+// ============ INVOICE ROUTES ============
+router.get('/invoices', roleCheck('admin', 'hr'), financeController.getInvoices);
+router.get('/invoices/:id', roleCheck('admin', 'hr'), financeController.getInvoiceById);
+router.post('/invoices', roleCheck('admin', 'hr'), financeController.createInvoice);
+router.put('/invoices/:id', roleCheck('admin', 'hr'), financeController.updateInvoice);
+router.delete('/invoices/:id', roleCheck('admin'), financeController.deleteInvoice);
+
+// ============ PAYMENT ROUTES ============
+router.get('/payments', roleCheck('admin', 'hr'), financeController.getPayments);
+router.post('/payments', roleCheck('admin', 'hr'), financeController.createPayment);
+router.put('/payments/:id', roleCheck('admin', 'hr'), financeController.updatePayment);
+router.delete('/payments/:id', roleCheck('admin'), financeController.deletePayment);
+
+// ============ RECEIVABLES ROUTES ============
+router.get('/receivables', roleCheck('admin', 'hr'), financeController.getReceivables);
+
+// ============ VENDOR ROUTES ============
+router.get('/vendors', roleCheck('admin', 'hr'), financeController.getVendors);
+router.post('/vendors', roleCheck('admin', 'hr'), financeController.createVendor);
+router.put('/vendors/:id', roleCheck('admin', 'hr'), financeController.updateVendor);
+router.delete('/vendors/:id', roleCheck('admin'), financeController.deleteVendor);
+
+// ============ SALARY ROUTES ============
+router.get('/salary', roleCheck('admin', 'hr'), financeController.getSalaryRegister);
+
+// ============ CASH FLOW ROUTES ============
+router.get('/cashflow', roleCheck('admin', 'hr'), financeController.getCashFlow);
+
+// ============ LEDGER ROUTES ============
+router.get('/ledger', roleCheck('admin', 'hr'), financeController.getLedger);
+
+// ============ COMPLIANCE ROUTES ============
+router.get('/compliance', roleCheck('admin', 'hr'), financeController.getComplianceStatus);
+
+// ============ AUDIT LOG ROUTES ============
+router.get('/audit-log', roleCheck('admin', 'hr'), financeController.getAuditLog);
+
+// ============ INTELLIGENCE ROUTES ============
+router.get('/intelligence', roleCheck('admin', 'hr'), financeController.getIntelligence);
+
+// ============ SETTINGS ROUTES ============
+router.get('/settings', roleCheck('admin', 'hr'), financeController.getFinanceSettings);
+router.put('/settings', roleCheck('admin'), financeController.updateFinanceSettings);
 
 module.exports = router;

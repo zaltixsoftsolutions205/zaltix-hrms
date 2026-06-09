@@ -151,7 +151,6 @@ exports.getTeamMembers = async (req, res) => {
 exports.getAllEmployees = async (req, res) => {
   try {
     const filter = { role: { $ne: 'admin' }, isActive: true };
-    if (req.user.role === 'hr') filter.role = { $in: ['employee', 'sales', 'hr'] };
     const employees = await User.find(filter).populate('department').sort({ employeeId: 1 });
     res.json(employees);
   } catch (err) {

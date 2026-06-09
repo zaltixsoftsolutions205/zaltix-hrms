@@ -11,7 +11,7 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await User.findOne({ email }).populate('department');
-    if (!user || !user.isActive) return res.status(401).json({ message: 'Invalid credentials or account deactivated' });
+    if (!user || user.isActive === false) return res.status(401).json({ message: 'Invalid credentials or account deactivated' });
 
     const match = await user.matchPassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });

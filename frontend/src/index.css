@@ -1,0 +1,444 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    @apply font-sans bg-white text-gray-900 antialiased;
+    min-height: 100vh;
+    font-size: 14px;
+  }
+
+  button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+    line-height: 1;
+  }
+
+  a[class*='btn-'] {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    vertical-align: middle;
+  }
+
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { @apply bg-violet-50; }
+  ::-webkit-scrollbar-thumb { @apply bg-violet-300 rounded-full; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-violet-400; }
+}
+
+@layer components {
+  /* ── Cards ── */
+  .glass-card {
+    @apply bg-white border border-violet-100 rounded-xl shadow-sm;
+  }
+  .glass-card-dark {
+    @apply bg-violet-50 border border-violet-200/70 rounded-xl shadow-sm;
+  }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-1.5 bg-golden-500 hover:bg-golden-600 text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all duration-200 shadow-sm hover:shadow-md active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed select-none;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-1.5 bg-violet-100 hover:bg-violet-200 text-violet-800 font-semibold px-4 py-2 rounded-lg text-sm transition-all duration-200 border border-violet-200 select-none;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-1.5 bg-gray-900 hover:bg-black text-white font-semibold px-4 py-2 rounded-lg text-sm transition-all duration-200 select-none;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-1.5 hover:bg-violet-100 text-violet-700 font-medium px-3 py-1.5 rounded-lg text-sm transition-all duration-200 select-none;
+  }
+  .btn-sm {
+    @apply !px-2.5 !py-1 !text-xs !rounded-md;
+  }
+
+  .page-header > .btn-primary,
+  .page-header > .btn-secondary,
+  .page-header > .btn-danger,
+  .page-header > .btn-ghost {
+    @apply self-start sm:self-auto w-auto;
+  }
+
+  /* ── Inputs ── */
+  .input-field {
+    @apply w-full bg-white border border-violet-200 rounded-lg px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-golden-400 focus:border-golden-400 transition-all duration-200 text-sm;
+  }
+  .input-label {
+    @apply block text-xs font-semibold text-violet-800 mb-1;
+  }
+  .label-text {
+    @apply block text-xs font-semibold text-violet-800 mb-1;
+  }
+
+  /* ── Badges — only violet / golden / dark ── */
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 0.1rem 0.5rem;
+    border-radius: 9999px;
+    font-size: 0.7rem;
+    font-weight: 600;
+    line-height: 1.2rem;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+  /* positive / success → green */
+  .badge-green  { @apply badge bg-green-100 text-green-700; }
+  /* negative / danger → red */
+  .badge-red    { @apply badge bg-red-100 text-red-700; }
+  /* warning / pending → golden */
+  .badge-yellow { @apply badge bg-golden-100 text-golden-700; }
+  /* info → violet */
+  .badge-blue   { @apply badge bg-violet-100 text-violet-700; }
+  /* primary → violet */
+  .badge-purple { @apply badge bg-violet-100 text-violet-700; }
+  /* neutral → subtle dark */
+  .badge-gray   { @apply badge bg-gray-100 text-gray-700; }
+
+  /* ── Navigation ── */
+  .nav-item {
+    @apply flex items-center gap-2.5 px-3 py-2 rounded-lg text-gray-700 hover:bg-violet-100/70 hover:text-violet-900 transition-all duration-200 cursor-pointer text-sm font-medium;
+  }
+  .nav-item.active {
+    @apply bg-golden-50 text-golden-700 border-l-2 border-golden-500 font-semibold;
+  }
+
+  /* ── KPI Cards ── */
+  .kpi-card {
+    @apply glass-card p-3 flex flex-col gap-1;
+  }
+  .kpi-value {
+    @apply text-lg font-bold text-gray-900;
+  }
+  .kpi-label {
+    @apply text-[10px] font-semibold text-violet-500 uppercase tracking-wider;
+  }
+
+  /* ── Tables ── */
+  .table-responsive {
+    @apply overflow-x-auto w-full;
+    -webkit-overflow-scrolling: touch;
+  }
+  .data-table { @apply w-full text-sm; min-width: 500px; }
+  .data-table thead tr { @apply border-b border-violet-100; }
+  .data-table thead th {
+    @apply text-[11px] font-semibold text-violet-600 uppercase tracking-wide
+           py-2 px-3 text-left whitespace-nowrap;
+  }
+  .data-table tbody tr { @apply border-b border-gray-50 hover:bg-violet-50/50 transition-colors; }
+  .data-table tbody td { @apply py-2 px-3 text-gray-800 text-sm; }
+
+  /* ── Page layout ── */
+  .page-header {
+    @apply flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 sm:gap-3 mb-3 sm:mb-4;
+  }
+  .page-title {
+    @apply text-lg sm:text-xl font-bold text-gray-900;
+  }
+  .page-subtitle {
+    @apply text-xs text-gray-500 mt-0.5;
+  }
+
+  /* ── Filter pills ── */
+  .filter-bar {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .filter-pill {
+    @apply inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-semibold
+           border border-transparent transition-all duration-150 select-none cursor-pointer
+           whitespace-nowrap;
+  }
+  .filter-pill-active {
+    @apply filter-pill bg-violet-700 text-white border-violet-700 shadow-sm;
+  }
+  .filter-pill-inactive {
+    @apply filter-pill bg-violet-100 text-violet-600 hover:bg-violet-200 border-violet-100;
+  }
+
+  /* ── PWA overrides ── */
+  :root.is-pwa .banner-avatar { width: 44px !important; height: 44px !important; font-size: 0.9rem !important; }
+  :root.is-pwa .profile-avatar .w-24 { width: 44px !important; height: 44px !important; }
+  :root.is-pwa .profile-circle-page { width: 96px !important; height: 96px !important; }
+  :root.is-pwa .profile-circle-banner { width: 72px !important; height: 72px !important; }
+  :root.is-pwa .profile-circle-banner svg, :root.is-pwa .profile-circle-page svg { width: 100% !important; height: 100% !important; }
+  :root.is-pwa .profile-circle-banner .text-sm, :root.is-pwa .profile-circle-page .text-lg { font-size: 0.85rem !important; }
+
+  @media (max-width: 720px) {
+    :root.is-pwa .profile-circle-banner { width: 40px !important; height: 40px !important; margin-right: 8px !important; transform: translateX(-6px) !important; }
+    :root.is-pwa .profile-circle-banner svg { width: 100% !important; height: 100% !important; }
+    :root.is-pwa .profile-circle-banner .text-sm { font-size: 0.68rem !important; line-height: 1 !important; }
+    :root.is-pwa .profile-circle-banner .text-xs { font-size: 0.6rem !important; }
+  }
+}
+
+.animate-fade-in { animation: fadeIn 0.25s ease-in-out; }
+.animate-slide-up { animation: slideUp 0.25s ease-out; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes slideIn { from { opacity: 0; transform: translateX(-12px); } to { opacity: 1; transform: translateX(0); } }
+
+/* ── Finance Module — White/Violet Theme (matches HRMS) ── */
+
+/* CSS tokens: white background, violet primary, golden accent */
+:root {
+  --fin-bg:         #f5f3ff;   /* violet-50 */
+  --fin-card:       #ffffff;
+  --fin-surface:    #f5f3ff;   /* violet-50 */
+  --fin-border:     #ede9fe;   /* violet-100 */
+  --fin-border-lt:  #ddd6fe;   /* violet-200 */
+  --fin-fg:         #111827;   /* gray-900 */
+  --fin-fg-2:       #374151;   /* gray-700 */
+  --fin-muted:      #6b7280;   /* gray-500 */
+  --fin-primary:    #7c3aed;   /* violet-600 */
+  --fin-primary-fg: #ffffff;
+  --fin-success:    #16a34a;   /* green-600 */
+  --fin-warning:    #d97706;   /* amber-600 */
+  --fin-danger:     #dc2626;   /* red-600 */
+  --fin-info:       #7c3aed;   /* violet-600 */
+  --fin-golden:     #f59e0b;   /* golden-400 */
+}
+
+/* ── Finance Page Layout ── */
+.fin-page {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 64px);
+  background: var(--fin-bg);
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+.fin-topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 20px 24px 16px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--fin-border);
+  flex-shrink: 0;
+}
+
+.fin-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+  min-height: calc(100vh - 120px);
+}
+
+/* ── Finance Sidebar ── */
+.fin-sidebar {
+  width: 196px;
+  flex-shrink: 0;
+  background: #ffffff;
+  border-right: 1px solid var(--fin-border);
+  overflow-y: auto;
+  padding: 12px 8px 24px;
+}
+
+.fin-sidebar-section {
+  margin-bottom: 4px;
+}
+
+.fin-sidebar-section-label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #9ca3af;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  border-radius: 6px;
+  margin-top: 6px;
+}
+.fin-sidebar-section-label:hover { background: var(--fin-surface); }
+
+.fin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #4b5563;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: background 0.13s, color 0.13s;
+  text-align: left;
+  margin-bottom: 1px;
+}
+.fin-nav-item:hover { background: #f5f3ff; color: #7c3aed; }
+.fin-nav-item.active {
+  background: #ede9fe;
+  color: #7c3aed;
+  font-weight: 600;
+  border-left: 3px solid #7c3aed;
+  padding-left: 7px;
+}
+
+/* ── Finance Main Content ── */
+.fin-main {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 24px;
+  min-width: 0;
+}
+
+/* ── Finance Cards ── */
+.fin-card {
+  background: var(--fin-card);
+  border: 1px solid var(--fin-border);
+  border-radius: 12px;
+  padding: 20px 22px;
+  transition: border-color 0.18s, box-shadow 0.18s;
+  box-shadow: 0 1px 3px rgba(109,40,217,0.04);
+}
+.fin-card:hover {
+  border-color: var(--fin-border-lt);
+  box-shadow: 0 4px 16px rgba(109,40,217,0.07);
+}
+
+/* ── Status badges ── */
+.fin-status-paid    { color: #16a34a; background: #dcfce7; border-radius: 99px; padding: 2px 10px; font-size: 11px; font-weight: 600; display: inline-block; }
+.fin-status-pending { color: #d97706; background: #fef3c7; border-radius: 99px; padding: 2px 10px; font-size: 11px; font-weight: 600; display: inline-block; }
+.fin-status-overdue { color: #dc2626; background: #fee2e2; border-radius: 99px; padding: 2px 10px; font-size: 11px; font-weight: 600; display: inline-block; }
+
+/* ── Table ── */
+.fin-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.fin-table thead { background: #f5f3ff; }
+.fin-table th {
+  text-align: left;
+  padding: 10px 16px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: #7c3aed;
+  border-bottom: 1px solid var(--fin-border);
+  white-space: nowrap;
+}
+.fin-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--fin-border);
+  color: var(--fin-fg-2);
+  vertical-align: middle;
+}
+.fin-table td.font-semibold { color: var(--fin-fg); }
+.fin-table tbody tr { transition: background 0.1s; }
+.fin-table tbody tr:hover { background: #f5f3ff; }
+.fin-table tbody tr:last-child td { border-bottom: none; }
+
+/* ── Health ring ── */
+.fin-health-ring { filter: drop-shadow(0 0 10px rgba(124,58,237,0.25)); }
+
+/* ── Buttons ── */
+.fin-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s;
+  border: none;
+  outline: none;
+  line-height: 1;
+  white-space: nowrap;
+}
+.fin-btn svg { flex-shrink: 0; }
+.fin-btn-primary  { background: #f59e0b; color: #ffffff; font-weight: 600; }
+.fin-btn-primary:hover { background: #d97706; }
+.fin-btn-outline  { background: transparent; color: #374151; border: 1px solid var(--fin-border-lt); }
+.fin-btn-outline:hover { background: var(--fin-surface); color: #7c3aed; border-color: #c4b5fd; }
+.fin-btn-ghost    { background: transparent; color: #6b7280; }
+.fin-btn-ghost:hover { background: var(--fin-surface); color: #7c3aed; }
+.fin-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── Select inside finance module ── */
+.fin-select {
+  background: #ffffff;
+  border: 1px solid var(--fin-border-lt);
+  border-radius: 7px;
+  color: #374151;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 10px;
+  outline: none;
+  transition: border-color 0.15s;
+  cursor: pointer;
+}
+.fin-select:focus { border-color: #7c3aed; box-shadow: 0 0 0 3px rgba(124,58,237,0.08); }
+
+/* ── Inputs inside finance module ── */
+.fin-page input,
+.fin-page select,
+.fin-page textarea {
+  background: #ffffff;
+  border: 1px solid var(--fin-border-lt);
+  border-radius: 8px;
+  color: var(--fin-fg);
+  font-family: inherit;
+  font-size: 13.5px;
+  outline: none;
+  transition: border-color 0.15s;
+}
+.fin-page input:focus,
+.fin-page select:focus,
+.fin-page textarea:focus {
+  border-color: #7c3aed;
+  box-shadow: 0 0 0 3px rgba(124,58,237,0.08);
+}
+.fin-page input::placeholder { color: #9ca3af; }
+
+/* ── KPI card accent bars ── */
+.fin-kpi-revenue { border-left: 3px solid #7c3aed; }
+.fin-kpi-expense { border-left: 3px solid #dc2626; }
+.fin-kpi-profit  { border-left: 3px solid #16a34a; }
+.fin-kpi-warning { border-left: 3px solid #f59e0b; }
+.fin-kpi-info    { border-left: 3px solid #7c3aed; }
+
+/* ── Chart tooltip ── */
+.recharts-tooltip-wrapper { font-family: 'Inter', sans-serif !important; }
+
+/* ── Modal overlay backdrop ── */
+.fin-modal-backdrop {
+  position: fixed; inset: 0; z-index: 100;
+  background: rgba(0,0,0,0.45);
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+}
+
+/* Scrollbars in finance area */
+.fin-sidebar::-webkit-scrollbar,
+.fin-main::-webkit-scrollbar { width: 4px; }
+.fin-sidebar::-webkit-scrollbar-track,
+.fin-main::-webkit-scrollbar-track { background: transparent; }
+.fin-sidebar::-webkit-scrollbar-thumb,
+.fin-main::-webkit-scrollbar-thumb { background: #c4b5fd; border-radius: 99px; }
+
+/* ── Legacy .finance-module scope kept for backward-compat ── */
+.finance-module {
+  background-color: var(--fin-bg);
+  color: var(--fin-fg);
+}

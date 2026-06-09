@@ -1,12 +1,3 @@
-# Dependencies (reinstalled inside the image)
-node_modules
-npm-debug.log*
-
-# Environment files (never bake secrets into the image)
-.env
-.env.*
-!.env.example
-
 # Git
 .git
 .gitignore
@@ -16,23 +7,55 @@ Dockerfile*
 docker-compose*.yml
 .dockerignore
 
+# Stale root-level backend (not used by Dockerfile)
+controllers/
+models/
+routes/
+middleware/
+config/
+constants/
+services/
+utils/
+public/
+uploads/
+node_modules/
+package.json
+package-lock.json
+server.js
+seed.js
+seedExpenseCategories.js
+.env
+
+# Separate project (not part of this app)
+core-finance-wise/
+
+# Frontend source (only built dist is copied)
+frontend/node_modules/
+
+# Backend dev artifacts
+backend/node_modules/
+backend/.env
+backend/uploads/*
+backend/temp.bin
+backend/token.txt
+backend/empid.txt
+backend/psid.txt
+backend/downloaded_payslip.pdf
+
 # Logs
-logs
 *.log
+npm-debug.log*
 
 # OS / editor noise
 .DS_Store
 Thumbs.db
 .vscode
 .idea
+.claude/
 
-# Test / dev artifacts
+# Test artifacts
 coverage
 .nyc_output
 *.test.js
 *.spec.js
 __tests__
-
-# Uploads (mounted as a volume at runtime)
-uploads/*
-!uploads/.gitkeep

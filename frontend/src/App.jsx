@@ -132,6 +132,7 @@ const AppRoutes = () => {
         <Route path="/admin/crm" element={<ProtectedRoute roles={['admin']}><AdminCRM /></ProtectedRoute>} />
         <Route path="/admin/field-sales" element={<ProtectedRoute roles={['admin']}><AdminFieldSales /></ProtectedRoute>} />
         <Route path="/admin/finance" element={<ProtectedRoute roles={['admin', 'hr']}><FinancePage /></ProtectedRoute>} />
+        <Route path="/finance" element={<ProtectedRoute roles={['admin', 'hr']}><FinancePage /></ProtectedRoute>} />
         <Route path="/admin/announcements" element={<ProtectedRoute roles={['admin', 'hr']}><AnnouncementsPage /></ProtectedRoute>} />
         <Route path="/admin/holidays" element={<ProtectedRoute roles={['admin', 'hr']}><HolidaysPage /></ProtectedRoute>} />
         <Route path="/admin/my-tasks" element={<ProtectedRoute roles={['admin']}><AdminMyTasks /></ProtectedRoute>} />

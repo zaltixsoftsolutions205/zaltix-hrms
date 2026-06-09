@@ -28,8 +28,11 @@ connectDB();
 // =======================
 const allowedOrigins = [
   process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_ALT,
+  'https://www.zaltixsoftsolutions.com',
+  'https://hrms.zaltixsoftsolutions.com',
   'http://localhost:5173',
-  'http://localhost:5174'
+  'http://localhost:5174',
 ].filter(Boolean);
 
 app.use(
@@ -72,11 +75,13 @@ io.use((socket, next) => {
 
 // Role → group room mapping
 const roleToRooms = {
-  admin:      ['all', 'admin'],
-  hr:         ['all', 'hr'],
-  sales:      ['all', 'sales'],
-  field_sales:['all', 'sales'],
-  employee:   ['all'],
+  admin:               ['all', 'admin'],
+  hr:                  ['all', 'hr'],
+  sales:               ['all', 'sales'],
+  field_sales:         ['all', 'sales'],
+  technical_associate: ['all'],
+  bda:                 ['all'],
+  employee:            ['all'],
 };
 
 io.on('connection', (socket) => {

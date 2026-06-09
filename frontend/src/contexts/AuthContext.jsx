@@ -14,15 +14,24 @@ export const AuthProvider = ({ children }) => {
     try {
       const { data } = await api.get('/employees/me');
       setUser(data);
-    } catch {
-      localStorage.removeItem('token');
-      localStorage.removeItem('user');
+    } catch (err) {
+      if (err.response?.status === 401) {
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
+      }
+      // network errors / 5xx: keep token, user stays null until retry
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => { loadUser(); }, [loadUser]);
+
+  useEffect(() => {
+    const handleForceLogout = () => setUser(null);
+    window.addEventListener('auth:logout', handleForceLogout);
+    return () => window.removeEventListener('auth:logout', handleForceLogout);
+  }, []);
 
   const login = async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
