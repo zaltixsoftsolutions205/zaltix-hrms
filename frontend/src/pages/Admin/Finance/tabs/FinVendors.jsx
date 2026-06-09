@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Users, IndianRupee, AlertTriangle, CheckCircle2, Plus, X } from 'lucide-react';
+import { Users, IndianRupee, AlertTriangle, CheckCircle2, Plus, X, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FinKPICard } from '../components/FinKPICard';
 import api from '../../../../utils/api';
@@ -88,7 +88,7 @@ export function FinVendors() {
           ) : (
             <table className="fin-table">
               <thead><tr>
-                <th>ID</th><th>Vendor Name</th><th>Contact</th><th>Total Payable</th><th>Paid</th><th>Pending</th><th>Status</th><th>Alert</th>
+                <th>ID</th><th>Vendor Name</th><th>Contact</th><th>Total Payable</th><th>Paid</th><th>Pending</th><th>Status</th><th>Alert</th><th></th>
               </tr></thead>
               <tbody>
                 {vendors.map((v, i) => (
@@ -111,6 +111,15 @@ export function FinVendors() {
                           <AlertTriangle className="h-3 w-3" />Due
                         </span>
                       )}
+                    </td>
+                    <td>
+                      <button onClick={() => {
+                        if (window.confirm(`Delete vendor "${v.name}"?`)) {
+                          api.delete(`/finance/vendors/${v._id}`).then(load).catch(() => alert('Delete failed'));
+                        }
+                      }} className="p-1 rounded-md hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </motion.tr>
                 ))}

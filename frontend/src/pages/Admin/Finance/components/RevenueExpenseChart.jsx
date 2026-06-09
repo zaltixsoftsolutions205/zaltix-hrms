@@ -4,7 +4,7 @@ import api from '../../../../utils/api';
 
 const fmt = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
 
-export function RevenueExpenseChart() {
+export function RevenueExpenseChart({ refresh }) {
   const [data, setData] = useState([]);
 
   useEffect(() => {
@@ -18,7 +18,7 @@ export function RevenueExpenseChart() {
         })));
       })
       .catch(() => {});
-  }, []);
+  }, [refresh]);
 
   return (
     <div className="fin-card">

@@ -43,7 +43,7 @@ function deriveInsights(data) {
   return insights;
 }
 
-export function AIInsights() {
+export function AIInsights({ refresh }) {
   const [insights, setInsights] = useState([]);
 
   useEffect(() => {
@@ -51,7 +51,7 @@ export function AIInsights() {
     api.get('/finance/dashboard', { params: { month: now.getMonth() + 1, year: now.getFullYear() } })
       .then(r => setInsights(deriveInsights(r.data)))
       .catch(() => setInsights(deriveInsights(null)));
-  }, []);
+  }, [refresh]);
 
   return (
     <div className="fin-card">

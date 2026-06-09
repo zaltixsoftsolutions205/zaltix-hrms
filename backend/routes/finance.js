@@ -71,7 +71,7 @@ router.delete('/invoices/:id', roleCheck('admin'), financeController.deleteInvoi
 router.get('/payments', roleCheck('admin', 'hr'), financeController.getPayments);
 router.post('/payments', roleCheck('admin', 'hr'), financeController.createPayment);
 router.put('/payments/:id', roleCheck('admin', 'hr'), financeController.updatePayment);
-router.delete('/payments/:id', roleCheck('admin'), financeController.deletePayment);
+router.delete('/payments/:id', roleCheck('admin', 'hr'), financeController.deletePayment);
 
 // ============ RECEIVABLES ROUTES ============
 router.get('/receivables', roleCheck('admin', 'hr'), financeController.getReceivables);
@@ -80,7 +80,7 @@ router.get('/receivables', roleCheck('admin', 'hr'), financeController.getReceiv
 router.get('/vendors', roleCheck('admin', 'hr'), financeController.getVendors);
 router.post('/vendors', roleCheck('admin', 'hr'), financeController.createVendor);
 router.put('/vendors/:id', roleCheck('admin', 'hr'), financeController.updateVendor);
-router.delete('/vendors/:id', roleCheck('admin'), financeController.deleteVendor);
+router.delete('/vendors/:id', roleCheck('admin', 'hr'), financeController.deleteVendor);
 
 // ============ SALARY ROUTES ============
 router.get('/salary', roleCheck('admin', 'hr'), financeController.getSalaryRegister);

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer } from 'recharts';
 import api from '../../../../utils/api';
 
-export function CashFlowMini() {
+export function CashFlowMini({ refresh }) {
   const [data, setData]   = useState([]);
   const [net, setNet]     = useState(0);
 
@@ -19,7 +19,7 @@ export function CashFlowMini() {
         setNet(totalNet);
       })
       .catch(() => {});
-  }, []);
+  }, [refresh]);
 
   const fmtNet = (v) => `${v >= 0 ? '+' : '-'}₹${Math.abs(v).toLocaleString('en-IN')}`;
 

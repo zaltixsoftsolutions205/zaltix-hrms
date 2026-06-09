@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CreditCard, IndianRupee, Clock, CheckCircle2, Plus, X } from 'lucide-react';
+import { CreditCard, IndianRupee, Clock, CheckCircle2, Plus, X, Trash2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { FinKPICard } from '../components/FinKPICard';
 import api from '../../../../utils/api';
@@ -120,7 +120,7 @@ export function FinPayments() {
           ) : (
             <table className="fin-table">
               <thead><tr>
-                <th>Payment ID</th><th>Invoice</th><th>Client</th><th>Amount</th><th>Paid</th><th>Mode</th><th>Date</th><th>Status</th>
+                <th>Payment ID</th><th>Invoice</th><th>Client</th><th>Amount</th><th>Paid</th><th>Mode</th><th>Date</th><th>Status</th><th></th>
               </tr></thead>
               <tbody>
                 {payments.map((p, i) => (
@@ -137,6 +137,15 @@ export function FinPayments() {
                         style={{ color: statusStyle[p.status]?.color, background: statusStyle[p.status]?.bg }}>
                         {p.status}
                       </span>
+                    </td>
+                    <td>
+                      <button onClick={() => {
+                        if (window.confirm('Delete this payment?')) {
+                          api.delete(`/finance/payments/${p._id}`).then(load).catch(() => alert('Delete failed'));
+                        }
+                      }} className="p-1 rounded-md hover:bg-red-50 text-red-400 hover:text-red-600 transition-colors">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     </td>
                   </motion.tr>
                 ))}

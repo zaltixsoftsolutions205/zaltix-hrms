@@ -1,17 +1,18 @@
 import { useState, useEffect } from 'react';
-import { Briefcase, IndianRupee, CheckCircle2, Clock } from 'lucide-react';
+import { Briefcase, IndianRupee, CheckCircle2, Clock, FileText } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { FinKPICard } from '../components/FinKPICard';
 import api from '../../../../utils/api';
 
 const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
+const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 
 export function FinSalary() {
   const now = new Date();
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [year, setYear] = useState(now.getFullYear());
-  const [data, setData] = useState({ payslips: [], stats: {} });
+  const [data, setData] = useState({ payslips: [], salaryExpenses: [], stats: {} });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -22,22 +23,23 @@ export function FinSalary() {
       .finally(() => setLoading(false));
   }, [month, year]);
 
-  const { payslips = [], stats = {} } = data;
+  const { payslips = [], salaryExpenses = [], stats = {} } = data;
   const totalGross = stats.totalGrossSalary || 0;
   const totalNet = stats.totalNetSalary || 0;
   const published = stats.published || 0;
   const pending = (stats.total || 0) - published;
   const depts = new Set(payslips.map(p => p.employee?.department)).size;
+  const manualTotal = stats.manualSalaryTotal || 0;
 
   const sel = { background: 'var(--fin-surface)', border: '1px solid var(--fin-border)', borderRadius: '0.5rem', padding: '4px 10px', color: 'var(--fin-fg)', fontSize: '13px', outline: 'none', cursor: 'pointer' };
 
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <FinKPICard title="Total Salary Payable" value={fmt(totalGross)} icon={IndianRupee}  accentColor="expense" />
-        <FinKPICard title="Net Paid Out"         value={fmt(totalNet)}  icon={CheckCircle2} accentColor="revenue" />
-        <FinKPICard title="Pending"              value={String(pending)} icon={Clock}        accentColor="warning" />
-        <FinKPICard title="Departments"          value={String(depts)}  icon={Briefcase}    accentColor="info"    />
+        <FinKPICard title="Total Salary Payable" value={fmt(totalGross + manualTotal)} icon={IndianRupee}  accentColor="expense" />
+        <FinKPICard title="Net Paid Out"         value={fmt(totalNet)}                icon={CheckCircle2} accentColor="revenue" />
+        <FinKPICard title="Pending Payslips"     value={String(pending)}              icon={Clock}        accentColor="warning" />
+        <FinKPICard title="Manual Entries"       value={fmt(manualTotal)}             icon={FileText}     accentColor="info"    />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -100,7 +102,7 @@ export function FinSalary() {
                     <motion.tr key={p._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
                       <td className="font-semibold">{p.employee?.name || '—'}</td>
                       <td className="font-mono text-xs" style={{ color: 'var(--fin-muted)' }}>{p.employee?.employeeId || '—'}</td>
-                      <td className="text-xs" style={{ color: 'var(--fin-muted)' }}>{p.employee?.department || '—'}</td>
+                      <td className="text-xs" style={{ color: 'var(--fin-muted)' }}>{p.employee?.department?.name || p.employee?.department || '—'}</td>
                       <td className="font-semibold">{fmt(p.grossSalary)}</td>
                       <td className="font-semibold" style={{ color: '#4ade80' }}>{fmt(p.netSalary)}</td>
                       <td>
@@ -115,6 +117,57 @@ export function FinSalary() {
               </table>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Manual Salary Entries from Expenses module */}
+      <div className="fin-card" style={{ padding: 0, overflow: 'hidden' }}>
+        <div className="flex items-center justify-between px-5 py-4" style={{ borderBottom: '1px solid var(--fin-border)' }}>
+          <div>
+            <h3 className="text-sm font-semibold" style={{ color: 'var(--fin-fg)' }}>
+              Manual Salary Entries — {MONTHS[month - 1]} {year}
+            </h3>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--fin-muted)' }}>
+              Salary expenses added via the Expenses module
+            </p>
+          </div>
+          {manualTotal > 0 && (
+            <span className="text-sm font-semibold" style={{ color: '#7c3aed' }}>Total: {fmt(manualTotal)}</span>
+          )}
+        </div>
+        <div className="overflow-x-auto">
+          {loading ? (
+            <div className="flex items-center justify-center py-8" style={{ color: 'var(--fin-muted)' }}>Loading…</div>
+          ) : salaryExpenses.length === 0 ? (
+            <div className="flex items-center justify-center py-8 text-sm" style={{ color: 'var(--fin-muted)' }}>
+              No manual salary entries for this period
+            </div>
+          ) : (
+            <table className="fin-table">
+              <thead><tr>
+                <th>Date</th><th>Description</th><th>Amount</th><th>Added By</th><th>Status</th>
+              </tr></thead>
+              <tbody>
+                {salaryExpenses.map((e, i) => (
+                  <motion.tr key={e._id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: i * 0.03 }}>
+                    <td className="text-xs" style={{ color: 'var(--fin-muted)' }}>{fmtDate(e.date)}</td>
+                    <td>{e.description}</td>
+                    <td className="font-semibold">{fmt(e.amount)}</td>
+                    <td className="text-xs" style={{ color: 'var(--fin-muted)' }}>{e.createdBy?.name || '—'}</td>
+                    <td>
+                      <span className="rounded-full px-2 py-0.5 text-[10px] font-semibold"
+                        style={{
+                          color: e.status === 'approved' ? '#16a34a' : e.status === 'rejected' ? '#dc2626' : '#d97706',
+                          background: e.status === 'approved' ? '#dcfce7' : e.status === 'rejected' ? '#fee2e2' : '#fef3c7',
+                        }}>
+                        {e.status.charAt(0).toUpperCase() + e.status.slice(1)}
+                      </span>
+                    </td>
+                  </motion.tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </div>
     </div>

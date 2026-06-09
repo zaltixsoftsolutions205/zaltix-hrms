@@ -140,12 +140,17 @@ const FinancePage = () => {
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const handleRefresh = () => setRefreshTrigger(p => p + 1);
 
-  const filterTabs  = ['income', 'expenses'];
+  const handleTabChange = (tab) => {
+    if (tab === 'dashboard') setRefreshTrigger(p => p + 1);
+    setActiveTab(tab);
+  };
+
+  const filterTabs  = ['income', 'expenses', 'dashboard'];
   const showFilters = filterTabs.includes(activeTab);
 
   const renderContent = () => {
     switch (activeTab) {
-      case 'dashboard':    return <FinDashboard month={month} year={year} />;
+      case 'dashboard':    return <FinDashboard month={month} year={year} refresh={refreshTrigger} />;
       case 'invoices':     return <FinInvoices />;
       case 'payments':     return <FinPayments />;
       case 'receivables':  return <FinReceivables />;
@@ -161,7 +166,7 @@ const FinancePage = () => {
       case 'audit':        return <FinAuditLog />;
       case 'quotation':    return <GenerateInvoice />;
       case 'settings':     return <FinSettings />;
-      default:             return <FinDashboard month={month} year={year} />;
+      default:             return <FinDashboard month={month} year={year} refresh={refreshTrigger} />;
     }
   };
 
@@ -180,7 +185,7 @@ const FinancePage = () => {
 
       {/* Body: sidebar + content */}
       <div className="fin-body">
-        <FinSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <FinSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         <main className="fin-main">
           {renderContent()}
         </main>

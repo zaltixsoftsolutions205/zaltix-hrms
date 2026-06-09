@@ -874,19 +874,26 @@ exports.getSalaryRegister = async (req, res) => {
     const m = parseInt(month) || new Date().getMonth() + 1;
     const y = parseInt(year) || new Date().getFullYear();
 
-    const payslips = await Payslip.find({ month: m, year: y })
-      .populate('employee', 'name employeeId department role')
-      .populate('generatedBy', 'name employeeId')
-      .sort({ createdAt: -1 });
+    const [payslips, salaryExpenses] = await Promise.all([
+      Payslip.find({ month: m, year: y })
+        .populate({ path: 'employee', select: 'name employeeId department role', populate: { path: 'department', select: 'name' } })
+        .populate('generatedBy', 'name employeeId')
+        .sort({ createdAt: -1 }),
+      Expense.find({ category: 'salary', date: monthRange(m, y) })
+        .populate('createdBy', 'name employeeId')
+        .sort({ date: -1 }),
+    ]);
 
     const stats = {
       total: payslips.length,
       published: payslips.filter(p => p.status === 'published').length,
       totalNetSalary: payslips.reduce((s, p) => s + p.netSalary, 0),
       totalGrossSalary: payslips.reduce((s, p) => s + p.grossSalary, 0),
+      manualSalaryTotal: salaryExpenses.reduce((s, e) => s + e.amount, 0),
+      manualSalaryCount: salaryExpenses.length,
     };
 
-    res.json({ payslips, stats, month: m, year: y });
+    res.json({ payslips, salaryExpenses, stats, month: m, year: y });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -1092,12 +1099,18 @@ exports.getComplianceStatus = async (req, res) => {
       { $set: { status: 'Overdue' } }
     );
 
-    // Enrich GST amounts from invoices per month
+    // Enrich compliance amounts from Income (revenue) and Payslips per month
     for (let m = 1; m <= 12; m++) {
       const range = monthRange(m, y);
       const period = `${new Date(y, m - 1).toLocaleString('default', { month: 'short' })} ${y}`;
 
-      const [gstData, payslipData] = await Promise.all([
+      const [incomeData, invoiceGstData, payslipData] = await Promise.all([
+        // Total revenue/sales income for the month
+        Income.aggregate([
+          { $match: { date: range } },
+          { $group: { _id: null, totalRevenue: { $sum: '$amount' } } },
+        ]),
+        // GST collected from invoices (more accurate than estimating)
         Invoice.aggregate([
           { $match: { date: range } },
           { $group: { _id: null, totalGst: { $sum: '$gst' }, totalAmount: { $sum: '$amount' } } },
@@ -1108,33 +1121,41 @@ exports.getComplianceStatus = async (req, res) => {
         ]),
       ]);
 
-      const invoiceAmount = gstData[0]?.totalAmount || null;
-      const gstAmount     = gstData[0]?.totalGst    || null;
-      const tdsAmount     = payslipData[0]?.totalGross
-        ? Math.round(payslipData[0].totalGross * 0.1)  // 10% TDS estimate
+      const totalRevenue = incomeData[0]?.totalRevenue || 0;
+      const invoiceGst   = invoiceGstData[0]?.totalGst || 0;
+
+      // GSTR-1: outward supplies = total revenue (income) for the month
+      const gstr1Amount = totalRevenue > 0 ? totalRevenue : (invoiceGstData[0]?.totalAmount || null);
+
+      // GSTR-3B: net GST payable — use actual invoice GST if available, else estimate 18% on revenue
+      const gstr3bAmount = invoiceGst > 0
+        ? invoiceGst
+        : (totalRevenue > 0 ? Math.round(totalRevenue * 0.18) : null);
+
+      const tdsAmount = payslipData[0]?.totalGross
+        ? Math.round(payslipData[0].totalGross * 0.1)  // ~10% TDS on gross salary
         : null;
 
-      if (invoiceAmount !== null) {
+      if (gstr1Amount !== null) {
         await ComplianceFiling.updateMany(
           { name: 'GSTR-1', period },
-          { $set: { amount: invoiceAmount } }
+          { $set: { amount: gstr1Amount } }
         );
       }
-      if (gstAmount !== null) {
+      if (gstr3bAmount !== null) {
         await ComplianceFiling.updateMany(
           { name: 'GSTR-3B', period },
-          { $set: { amount: gstAmount } }
+          { $set: { amount: gstr3bAmount } }
         );
       }
       if (tdsAmount !== null) {
-        // Update TDS for the quarter this month belongs to
         const quarterLabel =
           m <= 3  ? `Q4 Jan-Mar ${y}` :
           m <= 6  ? `Q1 Apr-Jun ${y}` :
           m <= 9  ? `Q2 Jul-Sep ${y}` :
                     `Q3 Oct-Dec ${y}`;
-        await ComplianceFiling.updateOne(
-          { name: 'TDS Return', period: quarterLabel, amount: null },
+        await ComplianceFiling.updateMany(
+          { name: 'TDS Return', period: quarterLabel },
           { $set: { amount: tdsAmount } }
         );
       }

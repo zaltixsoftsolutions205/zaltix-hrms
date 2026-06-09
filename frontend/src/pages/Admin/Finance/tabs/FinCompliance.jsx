@@ -1,8 +1,50 @@
 import { useState, useEffect } from 'react';
-import { Shield, AlertTriangle, CheckCircle2, Clock, Plus, Check, Trash2, Edit2, X } from 'lucide-react';
+import { Shield, AlertTriangle, CheckCircle2, Clock, Plus, Check, Trash2, Edit2, X, Download } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import * as XLSX from 'xlsx';
 import { FinKPICard } from '../components/FinKPICard';
 import api from '../../../../utils/api';
+
+const exportToExcel = (filings, score) => {
+  const rows = filings.map(f => ({
+    'Filing Name':   f.name,
+    'Filing Type':   f.filingType,
+    'Description':   f.description || '',
+    'Period':        f.period,
+    'Due Date':      f.dueDate ? new Date(f.dueDate).toLocaleDateString('en-IN') : '',
+    'Filed Date':    f.filedDate ? new Date(f.filedDate).toLocaleDateString('en-IN') : '',
+    'Amount (₹)':   f.amount != null ? f.amount : '',
+    'Status':        f.status,
+    'Notes':         f.notes || '',
+  }));
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+
+  // Column widths
+  ws['!cols'] = [
+    { wch: 18 }, { wch: 14 }, { wch: 30 }, { wch: 14 },
+    { wch: 14 }, { wch: 14 }, { wch: 14 }, { wch: 12 }, { wch: 30 },
+  ];
+
+  // Summary sheet
+  const summary = XLSX.utils.json_to_sheet([
+    { 'Metric': 'Total Filings',     'Value': filings.length },
+    { 'Metric': 'Filed',             'Value': filings.filter(f => f.status === 'Filed').length },
+    { 'Metric': 'Pending',           'Value': filings.filter(f => f.status === 'Pending').length },
+    { 'Metric': 'Overdue',           'Value': filings.filter(f => f.status === 'Overdue').length },
+    { 'Metric': 'Upcoming',          'Value': filings.filter(f => f.status === 'Upcoming').length },
+    { 'Metric': 'Compliance Score',  'Value': `${score}%` },
+    { 'Metric': 'Exported On',       'Value': new Date().toLocaleDateString('en-IN') },
+  ]);
+  summary['!cols'] = [{ wch: 20 }, { wch: 14 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Compliance Filings');
+  XLSX.utils.book_append_sheet(wb, summary, 'Summary');
+
+  const fileName = `Compliance_Report_${new Date().toISOString().slice(0, 10)}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+};
 
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
 
@@ -122,6 +164,11 @@ export function FinCompliance() {
                   </button>
                 ))}
               </div>
+              <button onClick={() => exportToExcel(filings, score)}
+                className="fin-btn fin-btn-outline flex items-center gap-1"
+                title="Export to Excel" disabled={filings.length === 0}>
+                <Download className="h-3.5 w-3.5" />Export
+              </button>
               <button onClick={openAdd} className="fin-btn fin-btn-primary flex items-center gap-1">
                 <Plus className="h-3.5 w-3.5" />Add
               </button>
