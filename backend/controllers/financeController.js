@@ -7,6 +7,7 @@ const Vendor = require('../models/Vendor');
 const FinanceAuditLog = require('../models/FinanceAuditLog');
 const FinanceSettings = require('../models/FinanceSettings');
 const Payslip = require('../models/Payslip');
+const ComplianceFiling = require('../models/ComplianceFiling');
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -1002,67 +1003,151 @@ exports.getLedger = async (req, res) => {
 
 // ============ COMPLIANCE HANDLERS ============
 
+// Seed default filings for current year if none exist
+async function seedDefaultFilings(year, userId) {
+  const existing = await ComplianceFiling.countDocuments();
+  if (existing > 0) return;
+
+  const now = new Date();
+  const monthName = (m) => new Date(year, m - 1).toLocaleString('default', { month: 'short' });
+  const defaults = [];
+
+  // Monthly GST filings for all months up to current
+  for (let m = 1; m <= 12; m++) {
+    const isPast = m < now.getMonth() + 1 || year < now.getFullYear();
+    const isCurrent = m === now.getMonth() + 1 && year === now.getFullYear();
+    const dueGstr1 = new Date(year, m - 1, 11);
+    const dueGstr3b = new Date(year, m - 1, 20);
+
+    defaults.push({
+      name: 'GSTR-1',
+      description: 'Outward supplies monthly return',
+      filingType: 'GST',
+      period: `${monthName(m)} ${year}`,
+      dueDate: dueGstr1,
+      status: isPast ? 'Filed' : isCurrent && now > dueGstr1 ? 'Overdue' : isCurrent ? 'Pending' : 'Upcoming',
+      createdBy: userId,
+    });
+
+    defaults.push({
+      name: 'GSTR-3B',
+      description: 'Summary GST return',
+      filingType: 'GST',
+      period: `${monthName(m)} ${year}`,
+      dueDate: dueGstr3b,
+      status: isPast ? 'Filed' : isCurrent && now > dueGstr3b ? 'Overdue' : isCurrent ? 'Pending' : 'Upcoming',
+      createdBy: userId,
+    });
+  }
+
+  // Quarterly TDS (Apr, Jul, Oct, Jan)
+  for (const [qMonth, label] of [[6, 'Q1 Apr-Jun'], [9, 'Q2 Jul-Sep'], [12, 'Q3 Oct-Dec'], [3, 'Q4 Jan-Mar']]) {
+    const qYear = qMonth === 3 ? year + 1 : year;
+    const due = new Date(qYear, qMonth - 1, 7);
+    defaults.push({
+      name: 'TDS Return',
+      description: 'Tax deducted at source',
+      filingType: 'TDS',
+      period: `${label} ${year}`,
+      dueDate: due,
+      status: now > due ? (now > new Date(due.getTime() + 86400000) ? 'Filed' : 'Overdue') : 'Upcoming',
+      createdBy: userId,
+    });
+  }
+
+  // Annual filings
+  defaults.push({
+    name: 'GST Annual Return',
+    description: 'GSTR-9 annual filing',
+    filingType: 'GST',
+    period: `FY ${year}-${year + 1}`,
+    dueDate: new Date(year + 1, 11, 31),
+    status: 'Upcoming',
+    createdBy: userId,
+  });
+
+  defaults.push({
+    name: 'Income Tax Return',
+    description: 'Company ITR filing',
+    filingType: 'Income Tax',
+    period: `FY ${year}-${year + 1}`,
+    dueDate: new Date(year + 1, 9, 31),
+    status: 'Upcoming',
+    createdBy: userId,
+  });
+
+  await ComplianceFiling.insertMany(defaults);
+}
+
 exports.getComplianceStatus = async (req, res) => {
   const { year = new Date().getFullYear() } = req.query;
   try {
     const now = new Date();
-    const currentMonth = now.getMonth() + 1;
-    const currentYear = now.getFullYear();
+    await seedDefaultFilings(parseInt(year), req.user._id);
 
-    // Generate filing schedule based on current date
-    const filings = [
-      {
-        id: 'gstr1',
-        name: 'GSTR-1',
-        description: 'Outward supplies',
-        dueDate: new Date(currentYear, currentMonth - 1, 11),
-        status: now.getDate() > 11 ? 'Filed' : 'Pending',
-        period: `${now.toLocaleString('default', { month: 'short' })} ${currentYear}`,
-        amount: null,
-      },
-      {
-        id: 'gstr3b',
-        name: 'GSTR-3B',
-        description: 'Summary GST return',
-        dueDate: new Date(currentYear, currentMonth - 1, 20),
-        status: now.getDate() > 20 ? 'Filed' : 'Pending',
-        period: `${now.toLocaleString('default', { month: 'short' })} ${currentYear}`,
-        amount: null,
-      },
-      {
-        id: 'tds',
-        name: 'TDS Return',
-        description: 'Tax deducted at source',
-        dueDate: new Date(currentYear, currentMonth - 1, 7),
-        status: now.getDate() > 7 ? 'Filed' : 'Pending',
-        period: `Q ending ${now.toLocaleString('default', { month: 'short' })} ${currentYear}`,
-        amount: null,
-      },
-      {
-        id: 'gst_annual',
-        name: 'GST Annual Return',
-        description: 'GSTR-9 annual filing',
-        dueDate: new Date(currentYear, 11, 31),
-        status: currentMonth >= 12 && now.getDate() > 31 ? 'Filed' : 'Upcoming',
-        period: `FY ${parseInt(year) - 1}-${year}`,
-        amount: null,
-      },
-    ];
+    // Auto-mark overdue
+    await ComplianceFiling.updateMany(
+      { status: 'Pending', dueDate: { $lt: now } },
+      { $set: { status: 'Overdue' } }
+    );
 
-    // compute GST from invoices for current month
-    const range = monthRange(currentMonth, currentYear);
-    const gstData = await Invoice.aggregate([
-      { $match: { date: range } },
-      { $group: { _id: null, totalGst: { $sum: '$gst' }, totalAmount: { $sum: '$amount' } } },
-    ]);
+    const filings = await ComplianceFiling.find()
+      .populate('createdBy', 'name')
+      .populate('updatedBy', 'name')
+      .sort({ dueDate: 1 });
 
-    if (gstData[0]) {
-      filings[0].amount = gstData[0].totalAmount;
-      filings[1].amount = gstData[0].totalGst;
-    }
+    const overdue  = filings.filter(f => f.status === 'Overdue').length;
+    const pending  = filings.filter(f => f.status === 'Pending').length;
+    const filed    = filings.filter(f => f.status === 'Filed').length;
+    const upcoming = filings.filter(f => f.status === 'Upcoming').length;
 
-    const overdue = filings.filter(f => f.status === 'Pending' && f.dueDate < now).length;
-    res.json({ filings, overdue });
+    res.json({ filings, overdue, pending, filed, upcoming, total: filings.length });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.createComplianceFiling = async (req, res) => {
+  try {
+    const filing = await ComplianceFiling.create({ ...req.body, createdBy: req.user._id });
+    res.status(201).json(filing);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.updateComplianceFiling = async (req, res) => {
+  try {
+    const filing = await ComplianceFiling.findByIdAndUpdate(
+      req.params.id,
+      { ...req.body, updatedBy: req.user._id },
+      { new: true }
+    );
+    if (!filing) return res.status(404).json({ message: 'Filing not found' });
+    res.json(filing);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.markFiled = async (req, res) => {
+  try {
+    const filing = await ComplianceFiling.findByIdAndUpdate(
+      req.params.id,
+      { status: 'Filed', filedDate: new Date(), updatedBy: req.user._id },
+      { new: true }
+    );
+    if (!filing) return res.status(404).json({ message: 'Filing not found' });
+    res.json(filing);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.deleteComplianceFiling = async (req, res) => {
+  try {
+    await ComplianceFiling.findByIdAndDelete(req.params.id);
+    res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

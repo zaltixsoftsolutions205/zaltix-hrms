@@ -92,7 +92,11 @@ router.get('/cashflow', roleCheck('admin', 'hr'), financeController.getCashFlow)
 router.get('/ledger', roleCheck('admin', 'hr'), financeController.getLedger);
 
 // ============ COMPLIANCE ROUTES ============
-router.get('/compliance', roleCheck('admin', 'hr'), financeController.getComplianceStatus);
+router.get('/compliance',              roleCheck('admin', 'hr'),    financeController.getComplianceStatus);
+router.post('/compliance',             roleCheck('admin', 'hr'),    financeController.createComplianceFiling);
+router.put('/compliance/:id',          roleCheck('admin', 'hr'),    financeController.updateComplianceFiling);
+router.put('/compliance/:id/mark-filed', roleCheck('admin', 'hr'), financeController.markFiled);
+router.delete('/compliance/:id',       roleCheck('admin'),          financeController.deleteComplianceFiling);
 
 // ============ AUDIT LOG ROUTES ============
 router.get('/audit-log', roleCheck('admin', 'hr'), financeController.getAuditLog);
