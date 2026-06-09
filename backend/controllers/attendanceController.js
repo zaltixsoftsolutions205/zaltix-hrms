@@ -1,5 +1,6 @@
 const Attendance = require('../models/Attendance');
 const User = require('../models/User');
+const Holiday = require('../models/Holiday');
 const moment = require('moment');
 const https = require('https');
 
@@ -32,6 +33,16 @@ exports.checkIn = async (req, res) => {
   try {
     const existing = await Attendance.findOne({ employee: req.user._id, date: today });
     if (existing) return res.status(400).json({ message: 'Already checked in today' });
+
+    // Holiday check — block check-in on holidays set by admin/HR
+    const holiday = await Holiday.findOne({ date: today });
+    if (holiday) {
+      return res.status(403).json({
+        message: `Today is a holiday: ${holiday.name}. Check-in is not allowed.`,
+        code: 'HOLIDAY',
+        holiday: holiday.name,
+      });
+    }
 
     // Geo-fence check
     const OFFICE_LAT    = parseFloat(process.env.OFFICE_LAT);
