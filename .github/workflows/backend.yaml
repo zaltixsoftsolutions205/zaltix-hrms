@@ -35,7 +35,17 @@ jobs:
           docker build -t $IMAGE_URI .
           docker push $IMAGE_URI
 
-      # 5️⃣ Deploy to EC2
+      # 5️⃣ Copy upload limit config to EC2
+      - name: Copy nginx upload config
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host:     ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USER }}
+          key:      ${{ secrets.EC2_SSH_KEY }}
+          source: nginx-upload.conf
+          target: /tmp/
+
+      # 6️⃣ Deploy to EC2
       - name: Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -58,12 +68,29 @@ jobs:
             echo "Removing old myapp container if exists..."
             docker rm -f myapp || true
 
+            echo "Ensuring uploads directory exists on host..."
+            mkdir -p /home/ubuntu/hrms/uploads/employee-docs \
+                     /home/ubuntu/hrms/uploads/documents \
+                     /home/ubuntu/hrms/uploads/profile-photos \
+                     /home/ubuntu/hrms/uploads/payslips \
+                     /home/ubuntu/hrms/uploads/expenses \
+                     /home/ubuntu/hrms/uploads/resumes
+
+            echo "Setting uploads ownership to uid 1001 (matches container nodeuser)..."
+            sudo chown -R 1001:1001 /home/ubuntu/hrms/uploads
+            sudo chmod -R 755 /home/ubuntu/hrms/uploads
+
             echo "Starting new container with env file..."
             docker run -d \
               --name myapp \
               -p 5000:5000 \
               --env-file /home/ubuntu/hrms/.env \
+              -v /home/ubuntu/hrms/uploads:/app/uploads \
               --restart always \
               $IMAGE_URI
+
+            echo "Applying nginx upload limit..."
+            sudo cp /tmp/nginx-upload.conf /etc/nginx/conf.d/upload-limit.conf
+            sudo nginx -t && sudo systemctl reload nginx || true
 
             echo "Deployment successful 🚀"
