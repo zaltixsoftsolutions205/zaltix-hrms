@@ -5,7 +5,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { FinKPICard } from '../components/FinKPICard';
 import api from '../../../../utils/api';
 
-const fmtL = (n) => `₹${(Number(n || 0) / 100000).toFixed(1)}L`;
+const fmtL = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 const tt = { background: '#ffffff', border: '1px solid #ede9fe', borderRadius: '8px', fontSize: '12px', color: '#111827' };
 const PIE_COLORS = ['#7c3aed', '#f59e0b', '#16a34a', '#dc2626', '#a78bfa', '#f97316'];
 
@@ -19,11 +19,7 @@ export function FinIntelligence() {
 
   const { trend = [], topClients = [], expenseBreakdown = [], insights = {} } = data;
 
-  const chartTrend = trend.map(d => ({
-    ...d,
-    revenueL: +(d.revenue / 100000).toFixed(2),
-    expensesL: +(d.expenses / 100000).toFixed(2),
-  }));
+  const chartTrend = trend;
 
   const aiInsights = [
     insights.incomeGrowth > 0
@@ -52,7 +48,7 @@ export function FinIntelligence() {
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2 fin-card">
-          <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--fin-fg)' }}>Revenue vs Expense Trend (₹ Lakhs)</h3>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--fin-fg)' }}>Revenue vs Expense Trend</h3>
           {loading ? (
             <div className="flex items-center justify-center h-64" style={{ color: 'var(--fin-muted)' }}>Loading…</div>
           ) : (
@@ -70,10 +66,10 @@ export function FinIntelligence() {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" />
                 <XAxis dataKey="label" tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} />
-                <Tooltip contentStyle={tt} formatter={(v) => [`₹${v}L`]} />
-                <Area type="monotone" dataKey="revenueL"  stroke="#7c3aed" fill="url(#intRevGrad)" strokeWidth={2} name="Revenue" />
-                <Area type="monotone" dataKey="expensesL" stroke="#f87171" fill="url(#intExpGrad)" strokeWidth={2} name="Expense" />
+                <YAxis tick={{ fill: '#6b7280', fontSize: 12 }} tickFormatter={(v) => `₹${Number(v).toLocaleString('en-IN')}`} />
+                <Tooltip contentStyle={tt} formatter={(v) => [`₹${Number(v).toLocaleString('en-IN')}`]} />
+                <Area type="monotone" dataKey="revenue"  stroke="#7c3aed" fill="url(#intRevGrad)" strokeWidth={2} name="Revenue" />
+                <Area type="monotone" dataKey="expenses" stroke="#f87171" fill="url(#intExpGrad)" strokeWidth={2} name="Expense" />
               </AreaChart>
             </ResponsiveContainer>
           )}

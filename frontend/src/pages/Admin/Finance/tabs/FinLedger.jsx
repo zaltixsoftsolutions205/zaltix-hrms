@@ -47,10 +47,10 @@ export function FinLedger() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <FinKPICard title="Total Debits"    value={`₹${(totalDebit / 100000).toFixed(1)}L`}   icon={ArrowUpRight}   accentColor="revenue" />
-        <FinKPICard title="Total Credits"   value={`₹${(totalCredit / 100000).toFixed(1)}L`}  icon={ArrowDownRight} accentColor="expense" />
-        <FinKPICard title="Journal Entries" value={String(entries.length)}                     icon={BookOpen}       accentColor="info"    />
-        <FinKPICard title="Balance"         value={`₹${(Math.abs(balance) / 100000).toFixed(1)}L`} icon={Scale}     accentColor="profit"  />
+        <FinKPICard title="Total Debits"    value={`₹${totalDebit.toLocaleString('en-IN')}`}          icon={ArrowUpRight}   accentColor="revenue" />
+        <FinKPICard title="Total Credits"   value={`₹${totalCredit.toLocaleString('en-IN')}`}         icon={ArrowDownRight} accentColor="expense" />
+        <FinKPICard title="Journal Entries" value={String(entries.length)}                             icon={BookOpen}       accentColor="info"    />
+        <FinKPICard title="Balance"         value={`₹${Math.abs(balance).toLocaleString('en-IN')}`}   icon={Scale}          accentColor="profit"  />
       </div>
 
       <div className="fin-card" style={{ padding: 0, overflow: 'hidden' }}>

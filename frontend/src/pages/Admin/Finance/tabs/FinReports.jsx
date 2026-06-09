@@ -40,9 +40,9 @@ export function FinReports() {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <FinKPICard title="Total Revenue"  value={`₹${(totalIncome / 100000).toFixed(1)}L`}  icon={TrendingUp}   accentColor="revenue" />
-        <FinKPICard title="Total Expense"  value={`₹${(totalExpense / 100000).toFixed(1)}L`} icon={BarChart3}    accentColor="expense" />
-        <FinKPICard title="Net Profit"     value={`₹${(totalProfit / 100000).toFixed(1)}L`}  icon={PieIcon}      accentColor="profit"  />
+        <FinKPICard title="Total Revenue"  value={`₹${totalIncome.toLocaleString('en-IN')}`}  icon={TrendingUp}   accentColor="revenue" />
+        <FinKPICard title="Total Expense"  value={`₹${totalExpense.toLocaleString('en-IN')}`} icon={BarChart3}    accentColor="expense" />
+        <FinKPICard title="Net Profit"     value={`₹${totalProfit.toLocaleString('en-IN')}`}  icon={PieIcon}      accentColor="profit"  />
         <FinKPICard title="Gross Margin"   value={`${grossMargin}%`}                          icon={FileBarChart} accentColor="info"    />
       </div>
 
@@ -56,9 +56,9 @@ export function FinReports() {
             <ResponsiveContainer width="100%" height={300}>
               <BarChart data={pnlData} layout="vertical">
                 <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" horizontal={false} />
-                <XAxis type="number" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => `₹${(Math.abs(v) / 100000).toFixed(0)}L`} axisLine={false} tickLine={false} />
+                <XAxis type="number" tick={{ fontSize: 10, fill: '#6b7280' }} tickFormatter={(v) => `₹${Math.abs(v).toLocaleString('en-IN')}`} axisLine={false} tickLine={false} />
                 <YAxis type="category" dataKey="category" tick={{ fontSize: 11, fill: '#374151' }} width={90} axisLine={false} tickLine={false} />
-                <Tooltip contentStyle={tt} formatter={(v) => [`₹${(Math.abs(Number(v)) / 100000).toFixed(1)}L`]} />
+                <Tooltip contentStyle={tt} formatter={(v) => [`₹${Math.abs(Number(v)).toLocaleString('en-IN')}`]} />
                 <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                   {pnlData.map((entry, i) => <Cell key={i} fill={entry.amount >= 0 ? '#7c3aed' : 'rgba(220,38,38,0.7)'} />)}
                 </Bar>
@@ -81,7 +81,7 @@ export function FinReports() {
                   <Pie data={pieData} cx="50%" cy="50%" innerRadius={60} outerRadius={90} dataKey="value" paddingAngle={3}>
                     {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                   </Pie>
-                  <Tooltip contentStyle={tt} formatter={(v) => [`₹${(Number(v) / 100000).toFixed(1)}L`]} />
+                  <Tooltip contentStyle={tt} formatter={(v) => [`₹${Number(v).toLocaleString('en-IN')}`]} />
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-2 space-y-2">
@@ -91,7 +91,7 @@ export function FinReports() {
                       <span className="h-2.5 w-2.5 rounded-full" style={{ background: c.color }} />
                       {c.name}
                     </span>
-                    <span className="font-semibold" style={{ color: 'var(--fin-fg)' }}>₹{(c.value / 100000).toFixed(1)}L</span>
+                    <span className="font-semibold" style={{ color: 'var(--fin-fg)' }}>₹{Number(c.value).toLocaleString('en-IN')}</span>
                   </div>
                 ))}
               </div>
@@ -107,8 +107,8 @@ export function FinReports() {
             <BarChart data={yearlyData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#ede9fe" />
               <XAxis dataKey="monthName" tick={{ fill: '#6b7280', fontSize: 11 }} />
-              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => `₹${(v / 100000).toFixed(0)}L`} />
-              <Tooltip contentStyle={tt} formatter={(v) => [`₹${(Number(v) / 100000).toFixed(1)}L`]} />
+              <YAxis tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => `₹${Number(v).toLocaleString('en-IN')}`} />
+              <Tooltip contentStyle={tt} formatter={(v) => [`₹${Number(v).toLocaleString('en-IN')}`]} />
               <Bar dataKey="income"  fill="#7c3aed"              radius={[4,4,0,0]} name="Revenue" />
               <Bar dataKey="expense" fill="rgba(220,38,38,0.6)" radius={[4,4,0,0]} name="Expense" />
             </BarChart>

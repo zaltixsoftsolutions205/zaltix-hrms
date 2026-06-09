@@ -51,11 +51,11 @@ export function FinReceivables() {
           <h3 className="text-sm font-semibold mb-4" style={{ color: 'var(--fin-fg)' }}>Aging Buckets</h3>
           <ResponsiveContainer width="100%" height={200}>
             <BarChart data={agingData} layout="vertical">
-              <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => `₹${(v / 100000).toFixed(1)}L`} />
+              <XAxis type="number" tick={{ fill: '#6b7280', fontSize: 11 }} tickFormatter={(v) => `₹${Number(v).toLocaleString('en-IN')}`} />
               <YAxis type="category" dataKey="bucket" width={90} tick={{ fill: '#6b7280', fontSize: 11 }} />
               <Tooltip
                 contentStyle={{ background: '#ffffff', border: '1px solid #ede9fe', borderRadius: '8px', fontSize: '12px', color: '#111827' }}
-                formatter={(v) => [`₹${(Number(v) / 100000).toFixed(2)}L`]}
+                formatter={(v) => [`₹${Number(v).toLocaleString('en-IN')}`]}
               />
               <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                 {agingData.map((entry, i) => <Cell key={i} fill={entry.color} />)}

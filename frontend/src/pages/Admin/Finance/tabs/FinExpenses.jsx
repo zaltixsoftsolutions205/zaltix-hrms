@@ -85,7 +85,7 @@ export function FinExpenses() {
                   <span className="h-2.5 w-2.5 rounded-full" style={{ background: dept.color }} />
                   {dept.name}
                 </span>
-                <span style={{ color: 'var(--fin-muted)' }}>₹{(dept.value / 100000).toFixed(1)}L</span>
+                <span style={{ color: 'var(--fin-muted)' }}>₹{Number(dept.value || 0).toLocaleString('en-IN')}</span>
               </div>
             ))}
           </div>
