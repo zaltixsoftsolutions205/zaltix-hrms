@@ -1,32 +1,45 @@
+import { useEffect, useState } from 'react';
 import { CheckCircle, AlertTriangle, Clock } from 'lucide-react';
-
-const items = [
-  { label: 'GSTR-1 (Mar)',      status: 'filed',   deadline: 'Apr 11, 2025' },
-  { label: 'GSTR-3B (Mar)',     status: 'pending', deadline: 'Apr 20, 2025' },
-  { label: 'TDS Q4',            status: 'due',     deadline: 'Apr 30, 2025' },
-  { label: 'GST Annual Return', status: 'pending', deadline: 'Jun 30, 2025' },
-];
+import api from '../../../../utils/api';
 
 const cfg = {
-  filed:   { icon: CheckCircle,  color: '#16a34a', label: 'Filed' },
-  pending: { icon: Clock,        color: '#d97706', label: 'Pending' },
-  due:     { icon: AlertTriangle,color: '#dc2626', label: 'Due Soon' },
+  Filed:   { icon: CheckCircle,   color: '#16a34a', label: 'Filed' },
+  Pending: { icon: Clock,         color: '#d97706', label: 'Pending' },
+  Overdue: { icon: AlertTriangle, color: '#dc2626', label: 'Overdue' },
 };
 
 export function ComplianceStatus() {
+  const [filings, setFilings] = useState([]);
+
+  useEffect(() => {
+    api.get('/finance/compliance')
+      .then(r => setFilings(r.data?.filings || []))
+      .catch(() => setFilings([]));
+  }, []);
+
+  if (filings.length === 0) {
+    return (
+      <div className="fin-card">
+        <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--fin-fg)' }}>Compliance Status</h3>
+        <p className="text-xs text-center py-4" style={{ color: 'var(--fin-muted)' }}>No compliance items found</p>
+      </div>
+    );
+  }
+
   return (
     <div className="fin-card">
       <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--fin-fg)' }}>Compliance Status</h3>
       <div className="space-y-3">
-        {items.map((item) => {
-          const c = cfg[item.status];
+        {filings.map((item) => {
+          const c = cfg[item.status] || cfg.Pending;
+          const Icon = c.icon;
           return (
-            <div key={item.label} className="flex items-center justify-between">
+            <div key={item.id} className="flex items-center justify-between">
               <div className="flex items-center gap-2.5">
-                <c.icon className="h-4 w-4" style={{ color: c.color }} />
+                <Icon className="h-4 w-4" style={{ color: c.color }} />
                 <div>
-                  <p className="text-xs font-medium" style={{ color: 'var(--fin-fg)' }}>{item.label}</p>
-                  <p className="text-[10px]" style={{ color: 'var(--fin-muted)' }}>Due: {item.deadline}</p>
+                  <p className="text-xs font-medium" style={{ color: 'var(--fin-fg)' }}>{item.name}</p>
+                  <p className="text-[10px]" style={{ color: 'var(--fin-muted)' }}>{item.period} · Due: {new Date(item.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</p>
                 </div>
               </div>
               <span className="text-[10px] font-semibold" style={{ color: c.color }}>{c.label}</span>

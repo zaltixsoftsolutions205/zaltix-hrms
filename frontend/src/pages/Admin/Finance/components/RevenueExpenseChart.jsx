@@ -1,29 +1,31 @@
+import { useEffect, useState } from 'react';
 import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import api from '../../../../utils/api';
 
-const data = [
-  { month: 'Jan', revenue: 420000, expenses: 310000 },
-  { month: 'Feb', revenue: 480000, expenses: 290000 },
-  { month: 'Mar', revenue: 510000, expenses: 340000 },
-  { month: 'Apr', revenue: 470000, expenses: 320000 },
-  { month: 'May', revenue: 560000, expenses: 350000 },
-  { month: 'Jun', revenue: 620000, expenses: 370000 },
-  { month: 'Jul', revenue: 580000, expenses: 390000 },
-  { month: 'Aug', revenue: 640000, expenses: 360000 },
-  { month: 'Sep', revenue: 710000, expenses: 400000 },
-  { month: 'Oct', revenue: 680000, expenses: 420000 },
-  { month: 'Nov', revenue: 740000, expenses: 410000 },
-  { month: 'Dec', revenue: 790000, expenses: 440000 },
-];
-
-const fmt = (v) => `₹${(v / 100000).toFixed(1)}L`;
+const fmt = (v) => `₹${Number(v || 0).toLocaleString('en-IN')}`;
 
 export function RevenueExpenseChart() {
+  const [data, setData] = useState([]);
+
+  useEffect(() => {
+    api.get('/finance/reports/yearly', { params: { year: new Date().getFullYear() } })
+      .then(r => {
+        const months = Array.isArray(r.data) ? r.data : (r.data?.months || []);
+        setData(months.map(m => ({
+          month: m.monthName || new Date(2000, m.month - 1).toLocaleString('default', { month: 'short' }),
+          revenue: m.income || m.totalIncome || 0,
+          expenses: m.expense || m.totalExpense || 0,
+        })));
+      })
+      .catch(() => {});
+  }, []);
+
   return (
     <div className="fin-card">
       <div className="mb-4 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--fin-fg)' }}>Revenue vs Expenses</h3>
-          <p className="text-xs" style={{ color: 'var(--fin-muted)' }}>FY 2024-25</p>
+          <p className="text-xs" style={{ color: 'var(--fin-muted)' }}>FY {new Date().getFullYear()}</p>
         </div>
         <div className="flex items-center gap-4 text-xs" style={{ color: 'var(--fin-muted)' }}>
           <span className="flex items-center gap-1.5">

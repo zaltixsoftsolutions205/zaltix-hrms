@@ -1083,13 +1083,62 @@ exports.getComplianceStatus = async (req, res) => {
   const { year = new Date().getFullYear() } = req.query;
   try {
     const now = new Date();
-    await seedDefaultFilings(parseInt(year), req.user._id);
+    const y = parseInt(year);
+    await seedDefaultFilings(y, req.user._id);
 
     // Auto-mark overdue
     await ComplianceFiling.updateMany(
       { status: 'Pending', dueDate: { $lt: now } },
       { $set: { status: 'Overdue' } }
     );
+
+    // Enrich GST amounts from invoices per month
+    for (let m = 1; m <= 12; m++) {
+      const range = monthRange(m, y);
+      const period = `${new Date(y, m - 1).toLocaleString('default', { month: 'short' })} ${y}`;
+
+      const [gstData, payslipData] = await Promise.all([
+        Invoice.aggregate([
+          { $match: { date: range } },
+          { $group: { _id: null, totalGst: { $sum: '$gst' }, totalAmount: { $sum: '$amount' } } },
+        ]),
+        Payslip.aggregate([
+          { $match: { month: m, year: y } },
+          { $group: { _id: null, totalGross: { $sum: '$grossSalary' } } },
+        ]),
+      ]);
+
+      const invoiceAmount = gstData[0]?.totalAmount || null;
+      const gstAmount     = gstData[0]?.totalGst    || null;
+      const tdsAmount     = payslipData[0]?.totalGross
+        ? Math.round(payslipData[0].totalGross * 0.1)  // 10% TDS estimate
+        : null;
+
+      if (invoiceAmount !== null) {
+        await ComplianceFiling.updateMany(
+          { name: 'GSTR-1', period },
+          { $set: { amount: invoiceAmount } }
+        );
+      }
+      if (gstAmount !== null) {
+        await ComplianceFiling.updateMany(
+          { name: 'GSTR-3B', period },
+          { $set: { amount: gstAmount } }
+        );
+      }
+      if (tdsAmount !== null) {
+        // Update TDS for the quarter this month belongs to
+        const quarterLabel =
+          m <= 3  ? `Q4 Jan-Mar ${y}` :
+          m <= 6  ? `Q1 Apr-Jun ${y}` :
+          m <= 9  ? `Q2 Jul-Sep ${y}` :
+                    `Q3 Oct-Dec ${y}`;
+        await ComplianceFiling.updateOne(
+          { name: 'TDS Return', period: quarterLabel, amount: null },
+          { $set: { amount: tdsAmount } }
+        );
+      }
+    }
 
     const filings = await ComplianceFiling.find()
       .populate('createdBy', 'name')

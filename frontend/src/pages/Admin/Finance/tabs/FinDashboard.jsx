@@ -8,7 +8,7 @@ import { AIInsights } from '../components/AIInsights';
 import { ComplianceStatus } from '../components/ComplianceStatus';
 import api from '../../../../utils/api';
 
-const fmt = (n) => `₹${(Number(n || 0) / 100000).toFixed(1)}L`;
+const fmt = (n) => `₹${Number(n || 0).toLocaleString('en-IN')}`;
 
 export function FinDashboard({ month, year }) {
   const [data, setData] = useState(null);
