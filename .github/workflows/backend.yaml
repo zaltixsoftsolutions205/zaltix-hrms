@@ -6,8 +6,43 @@ on:
       - main
 
 jobs:
+  sync-backend-repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout main repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push backend/ folder to hrms-backend repo
+        env:
+          HRMS_BACKEND_TOKEN: ${{ secrets.HRMS_BACKEND_TOKEN }}
+        run: |
+          git config --global user.email "ci@zaltixsoftsolutions.com"
+          git config --global user.name "Zaltix CI"
+
+          # Clone the target repo
+          git clone https://x-access-token:${HRMS_BACKEND_TOKEN}@github.com/zaltixsoftsolutions205/hrms-backend.git /tmp/hrms-backend
+
+          # Wipe everything except .git
+          find /tmp/hrms-backend -mindepth 1 -maxdepth 1 -not -name '.git' -exec rm -rf {} +
+
+          # Copy latest backend/ contents into the target repo root
+          cp -r backend/. /tmp/hrms-backend/
+
+          # Commit and push if anything changed
+          cd /tmp/hrms-backend
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No changes to sync."
+          else
+            git commit -m "sync: update from zaltix-hrms main @ $(date -u '+%Y-%m-%d %H:%M UTC')"
+            git push origin main
+          fi
+
   deploy:
     runs-on: ubuntu-latest
+    needs: sync-backend-repo
 
     steps:
       # 1️⃣ Checkout Repository
