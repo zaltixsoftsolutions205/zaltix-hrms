@@ -147,10 +147,15 @@ exports.getTeamMembers = async (req, res) => {
   }
 };
 
-// HR / Admin: Get all employees (active only)
+// HR / Admin: Get all employees
+// By default returns active employees only. Pass ?status=all or ?status=inactive
+// to include/filter by inactive employees (used by Employee Management page).
 exports.getAllEmployees = async (req, res) => {
   try {
-    const filter = { role: { $ne: 'admin' }, isActive: true };
+    const filter = { role: { $ne: 'admin' } };
+    if (req.query.status === 'inactive') filter.isActive = false;
+    else if (req.query.status !== 'all') filter.isActive = true;
+
     const employees = await User.find(filter).populate('department').sort({ employeeId: 1 });
     res.json(employees);
   } catch (err) {
@@ -172,6 +177,7 @@ exports.getEmployee = async (req, res) => {
 // HR / Admin: Update employee
 exports.updateEmployee = async (req, res) => {
   const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'isActive', 'role'];
+  const { email, sendNewCredentials } = req.body;
   try {
     const employee = await User.findById(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
@@ -181,7 +187,55 @@ exports.updateEmployee = async (req, res) => {
         employee[field] = field === 'department' ? req.body[field] || null : req.body[field];
       }
     });
+
+    let emailChanged = false;
+    if (email !== undefined && email.trim() && email.trim().toLowerCase() !== employee.email.toLowerCase()) {
+      const exists = await User.findOne({ email: email.trim(), _id: { $ne: employee._id } });
+      if (exists) return res.status(400).json({ message: 'Email already registered to another employee' });
+      employee.email = email.trim();
+      emailChanged = true;
+    }
+
+    let tempPassword;
+    if (sendNewCredentials) {
+      tempPassword = crypto.randomBytes(5).toString('hex');
+      employee.password = tempPassword;
+      employee.isFirstLogin = true;
+    }
+
     await employee.save();
+
+    if (sendNewCredentials) {
+      try {
+        await sendMail({
+          to: employee.email,
+          subject: 'Your HRMS Login Credentials',
+          html: credentialsTemplate({
+            employeeName: employee.name,
+            employeeId: employee.employeeId,
+            email: employee.email,
+            password: tempPassword,
+            loginUrl: process.env.FRONTEND_URL,
+          }),
+        });
+        await notificationService.notify(employee._id, {
+          title: 'Your login credentials were updated',
+          message: 'New login credentials have been sent to your email.',
+          type: 'credential',
+          link: '/dashboard',
+        });
+      } catch (mailErr) {
+        return res.status(500).json({ message: 'Employee updated, but failed to send credentials email. Check SMTP configuration in .env (MAIL_HOST, MAIL_USER, MAIL_PASS).' });
+      }
+    } else if (emailChanged) {
+      await notificationService.notify(employee._id, {
+        title: 'Your login email was updated',
+        message: `Your login email has been changed to ${employee.email}. Use your existing password to log in.`,
+        type: 'credential',
+        link: '/dashboard',
+      });
+    }
+
     const updated = await User.findById(employee._id).populate('department');
     res.json(updated);
   } catch (err) {
