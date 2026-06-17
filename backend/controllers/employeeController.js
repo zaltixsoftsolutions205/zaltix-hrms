@@ -70,7 +70,7 @@ exports.sendOfferLetter = async (req, res) => {
         }),
       });
     } catch (mailErr) {
-      return res.status(500).json({ message: 'Failed to send email. Check SMTP configuration in .env (MAIL_HOST, MAIL_USER, MAIL_PASS).' });
+      return res.status(500).json({ message: `Failed to send email: ${mailErr.message}` });
     }
 
     res.json({ message: 'Offer letter sent successfully' });
@@ -102,7 +102,7 @@ exports.sendCredentials = async (req, res) => {
         }),
       });
     } catch (mailErr) {
-      return res.status(500).json({ message: 'Failed to send email. Check SMTP configuration in .env (MAIL_HOST, MAIL_USER, MAIL_PASS).' });
+      return res.status(500).json({ message: `Failed to send email: ${mailErr.message}` });
     }
 
     // Email sent successfully — now update the password
@@ -176,7 +176,7 @@ exports.getEmployee = async (req, res) => {
 
 // HR / Admin: Update employee
 exports.updateEmployee = async (req, res) => {
-  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'isActive', 'role'];
+  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role'];
   const { email, sendNewCredentials } = req.body;
   try {
     const employee = await User.findById(req.params.id);
@@ -243,20 +243,62 @@ exports.updateEmployee = async (req, res) => {
   }
 };
 
-// HR / Admin: Delete employee (hard delete — permanently removes from database)
+// HR / Admin: Activate / deactivate employee.
+// Deactivated employees cannot log in and are blocked on every request (see auth middleware).
+exports.toggleEmployeeStatus = async (req, res) => {
+  try {
+    const employee = await User.findById(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    if (employee.role === 'admin') return res.status(403).json({ message: 'Cannot deactivate an admin account' });
+
+    // Accept explicit value if provided, otherwise toggle.
+    const nextActive = typeof req.body.isActive === 'boolean' ? req.body.isActive : !employee.isActive;
+    employee.isActive = nextActive;
+    await employee.save();
+
+    if (!nextActive) {
+      await notificationService.notify(employee._id, {
+        title: 'Account deactivated',
+        message: 'Your account has been deactivated. Please contact HR for assistance.',
+        type: 'credential',
+        link: '/login',
+      });
+    } else {
+      await notificationService.notify(employee._id, {
+        title: 'Account reactivated',
+        message: 'Your account has been reactivated. You can log in again.',
+        type: 'credential',
+        link: '/dashboard',
+      });
+    }
+
+    const updated = await User.findById(employee._id).populate('department');
+    res.json({ message: `${employee.name} has been ${nextActive ? 'activated' : 'deactivated'}.`, employee: updated });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// HR / Admin: Delete employee (soft delete — deactivates the account so it moves
+// to the Inactive tab. The record is kept; a deactivated employee cannot log in
+// and is blocked on every request by the auth middleware).
 exports.deleteEmployee = async (req, res) => {
   try {
     const employee = await User.findById(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
     if (employee.role === 'admin') return res.status(403).json({ message: 'Cannot delete an admin account' });
 
-    const name = employee.name;
-    await employee.deleteOne();
+    employee.isActive = false;
+    await employee.save();
 
-    // Also delete any onboarding documents for this employee
-    await Document.deleteMany({ employee: req.params.id });
+    await notificationService.notify(employee._id, {
+      title: 'Account deactivated',
+      message: 'Your account has been deactivated. Please contact HR for assistance.',
+      type: 'credential',
+      link: '/login',
+    });
 
-    res.json({ message: `${name} has been permanently deleted.` });
+    res.json({ message: `${employee.name} has been moved to inactive.` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

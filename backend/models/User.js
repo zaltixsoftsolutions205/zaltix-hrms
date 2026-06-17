@@ -47,6 +47,28 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return bcrypt.compare(enteredPassword, this.password);
 };
 
+// Hard-delete guard. Employees must never be removed from the database — they are
+// retired via soft delete (isActive = false) so attendance/payslip/leave history and
+// the audit trail survive. A production data-loss incident (an employee hard-deleted
+// by stale code) prompted this defence-in-depth: block deletion at the model level so
+// no controller, route, or future regression can wipe a User. Use User.hardDelete(id)
+// only for a deliberate, irreversible purge.
+function blockHardDelete(next) {
+  next(new Error('Hard-deleting a User is disabled. Set isActive=false to deactivate instead.'));
+}
+userSchema.pre('deleteOne', { document: true, query: false }, blockHardDelete);
+userSchema.pre('deleteOne', { document: false, query: true }, blockHardDelete);
+userSchema.pre('deleteMany', { query: true }, blockHardDelete);
+userSchema.pre('findOneAndDelete', blockHardDelete);
+userSchema.pre('findOneAndRemove', blockHardDelete);
+userSchema.pre('remove', { document: true, query: false }, blockHardDelete);
+
+// Escape hatch for an intentional, irreversible purge (e.g. a GDPR erasure request).
+// Bypasses the guard above; call deliberately and never from a generic delete route.
+userSchema.statics.hardDelete = function (id) {
+  return this.collection.deleteOne({ _id: new mongoose.Types.ObjectId(id) });
+};
+
 userSchema.methods.toJSON = function () {
   const obj = this.toObject();
   delete obj.password;
