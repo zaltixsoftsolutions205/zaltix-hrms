@@ -13,8 +13,7 @@ const { createEmployee,
        uploadProfilePhoto, 
        deleteProfilePhoto,
         getMyProfile,
-        attachEmployeeDocs,
-        toggleEmployeeStatus } = require('../controllers/employeeController');
+        attachEmployeeDocs } = require('../controllers/employeeController');
 const { protect } = require('../middleware/auth');
 const { roleCheck } = require('../middleware/roleCheck');
 const uploadProfilePhoto_middleware = require('../middleware/uploadProfilePhoto');
@@ -37,7 +36,6 @@ router.post('/send-credentials', roleCheck('hr', 'admin'), sendCredentials);
 router.get('/', roleCheck('hr', 'admin'), getAllEmployees);
 router.get('/:id', getEmployee);
 router.put('/:id', roleCheck('hr', 'admin'), updateEmployee);
-router.patch('/:id/status', roleCheck('hr', 'admin'), toggleEmployeeStatus);
 router.delete('/:id', roleCheck('hr', 'admin'), deleteEmployee);
 router.post('/:id/attach-docs', roleCheck('hr', 'admin'), uploadEmployeeDocs_middleware.fields([{ name: 'joiningLetter', maxCount: 1 }, { name: 'idCard', maxCount: 1 }]), attachEmployeeDocs);
 

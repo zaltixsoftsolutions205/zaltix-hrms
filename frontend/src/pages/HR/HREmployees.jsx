@@ -39,11 +39,10 @@ export default function HREmployees() {
   const [loading, setLoading]             = useState(false);
   const [search, setSearch]               = useState('');
   const [form, setForm]                   = useState(EMPTY_FORM);
-  const [statusTab, setStatusTab]         = useState('active');
 
   const fetchAll = async () => {
     try {
-      const [e, d] = await Promise.all([api.get('/employees?status=all'), api.get('/admin/departments')]);
+      const [e, d] = await Promise.all([api.get('/employees'), api.get('/admin/departments')]);
       setEmployees(e.data || []);
       setDepartments(d.data || []);
     } catch { /* silent */ }
@@ -79,29 +78,16 @@ export default function HREmployees() {
   };
 
   const handleDelete = async (emp) => {
-    if (!window.confirm(`Delete ${emp.name} (${emp.employeeId}) permanently?`)) return;
+    if (!window.confirm(`Delete ${emp.name} (${emp.employeeId})? This permanently removes the employee and cannot be undone.`)) return;
     try { await api.delete(`/employees/${emp._id}`); toast.success(`${emp.name} deleted.`); fetchAll(); }
     catch (err) { toast.error(err.response?.data?.message || 'Delete failed'); }
-  };
-
-  const handleToggleActive = async (emp) => {
-    const makeActive = !emp.isActive;
-    if (!window.confirm(`${makeActive ? 'Activate' : 'Deactivate'} ${emp.name} (${emp.employeeId})?`)) return;
-    try {
-      await api.put(`/employees/${emp._id}`, { isActive: makeActive });
-      toast.success(`${emp.name} ${makeActive ? 'activated' : 'deactivated'}.`);
-      fetchAll();
-    } catch (err) { toast.error(err.response?.data?.message || 'Update failed'); }
   };
 
   const openEdit   = (emp) => { setSelectedEmp(emp); setShowEditModal(true); };
   const openDocs   = (emp) => { setSelectedEmp(emp); setShowDocsModal(true); };
   const openAttach = (emp) => { setSelectedEmp(emp); setShowAttachModal(true); };
 
-  const activeEmployees   = employees.filter(e => e.isActive !== false);
-  const inactiveEmployees = employees.filter(e => e.isActive === false);
-
-  const filtered = (statusTab === 'inactive' ? inactiveEmployees : activeEmployees).filter(e =>
+  const filtered = employees.filter(e =>
     e.name.toLowerCase().includes(search.toLowerCase()) ||
     (e.employeeId || '').includes(search) ||
     e.email.toLowerCase().includes(search.toLowerCase())
@@ -135,29 +121,14 @@ export default function HREmployees() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <h2 className="text-xl font-bold text-violet-900">Employee Management</h2>
-          <p className="text-sm text-violet-500 mt-0.5">{activeEmployees.length} active · {inactiveEmployees.length} inactive</p>
+          <p className="text-sm text-violet-500 mt-0.5">
+            {employees.length} employee{employees.length === 1 ? '' : 's'}
+          </p>
         </div>
         <button onClick={() => setShowAddModal(true)}
           className="inline-flex items-center gap-2 px-4 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-bold transition-colors self-start sm:self-auto shadow-sm">
           <Ico d="M12 4v16m8-8H4" className="w-4 h-4" /> Add Employee
         </button>
-      </div>
-
-      {/* ── Status Tabs ── */}
-      <div className="flex gap-2">
-        {[
-          { key: 'active',   label: `Active (${activeEmployees.length})` },
-          { key: 'inactive', label: `Inactive (${inactiveEmployees.length})` },
-        ].map(tab => (
-          <button key={tab.key} onClick={() => setStatusTab(tab.key)}
-            className={`px-4 py-2 rounded-xl text-sm font-semibold transition-colors ${
-              statusTab === tab.key
-                ? 'bg-violet-600 text-white shadow-sm'
-                : 'bg-white border border-violet-100 text-violet-600 hover:bg-violet-50'
-            }`}>
-            {tab.label}
-          </button>
-        ))}
       </div>
 
       {/* ── Search bar ── */}
@@ -231,12 +202,8 @@ export default function HREmployees() {
                     <button onClick={() => openDocs(emp)}
                       className="col-span-1 text-xs py-2 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold transition-colors">Review Docs</button>
                   )}
-                  <button onClick={() => handleToggleActive(emp)}
-                    className="col-span-1 text-xs py-2 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold transition-colors">
-                    {emp.isActive === false ? 'Activate' : 'Deactivate'}
-                  </button>
                   <button onClick={() => handleDelete(emp)}
-                    className="col-span-1 text-xs py-2 rounded-xl bg-gray-100 text-gray-900 hover:bg-gray-100 font-semibold transition-colors">Delete</button>
+                    className="col-span-1 text-xs py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 font-semibold transition-colors">Delete</button>
                 </div>
               </div>
             ))}
@@ -316,14 +283,8 @@ export default function HREmployees() {
                             className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors">
                             <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </button>
-                          <button onClick={() => handleToggleActive(emp)} title={emp.isActive === false ? 'Activate employee' : 'Deactivate employee'}
-                            className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-100 transition-colors">
-                            {emp.isActive === false
-                              ? <Ico d="M5 13l4 4L19 7" />
-                              : <Ico d="M18.36 6.64a9 9 0 11-12.73 0M12 2v10" />}
-                          </button>
                           <button onClick={() => handleDelete(emp)} title="Delete employee"
-                            className="p-1.5 rounded-lg text-gray-900 hover:bg-gray-100 transition-colors">
+                            className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
                             <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </button>
                         </div>

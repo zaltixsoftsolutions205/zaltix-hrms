@@ -135,9 +135,8 @@ exports.getTeamMembers = async (req, res) => {
     const team = await User.find({
       department: deptId,
       _id: { $ne: req.user._id },
-      isActive: { $ne: false },
     })
-      .select('name employeeId designation role isActive')
+      .select('name employeeId designation role')
       .sort({ name: 1 })
       .lean();
 
@@ -148,14 +147,9 @@ exports.getTeamMembers = async (req, res) => {
 };
 
 // HR / Admin: Get all employees
-// By default returns active employees only. Pass ?status=all or ?status=inactive
-// to include/filter by inactive employees (used by Employee Management page).
 exports.getAllEmployees = async (req, res) => {
   try {
     const filter = { role: { $ne: 'admin' } };
-    if (req.query.status === 'inactive') filter.isActive = false;
-    else if (req.query.status !== 'all') filter.isActive = true;
-
     const employees = await User.find(filter).populate('department').sort({ employeeId: 1 });
     res.json(employees);
   } catch (err) {
@@ -243,62 +237,20 @@ exports.updateEmployee = async (req, res) => {
   }
 };
 
-// HR / Admin: Activate / deactivate employee.
-// Deactivated employees cannot log in and are blocked on every request (see auth middleware).
-exports.toggleEmployeeStatus = async (req, res) => {
-  try {
-    const employee = await User.findById(req.params.id);
-    if (!employee) return res.status(404).json({ message: 'Employee not found' });
-    if (employee.role === 'admin') return res.status(403).json({ message: 'Cannot deactivate an admin account' });
-
-    // Accept explicit value if provided, otherwise toggle.
-    const nextActive = typeof req.body.isActive === 'boolean' ? req.body.isActive : !employee.isActive;
-    employee.isActive = nextActive;
-    await employee.save();
-
-    if (!nextActive) {
-      await notificationService.notify(employee._id, {
-        title: 'Account deactivated',
-        message: 'Your account has been deactivated. Please contact HR for assistance.',
-        type: 'credential',
-        link: '/login',
-      });
-    } else {
-      await notificationService.notify(employee._id, {
-        title: 'Account reactivated',
-        message: 'Your account has been reactivated. You can log in again.',
-        type: 'credential',
-        link: '/dashboard',
-      });
-    }
-
-    const updated = await User.findById(employee._id).populate('department');
-    res.json({ message: `${employee.name} has been ${nextActive ? 'activated' : 'deactivated'}.`, employee: updated });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// HR / Admin: Delete employee (soft delete — deactivates the account so it moves
-// to the Inactive tab. The record is kept; a deactivated employee cannot log in
-// and is blocked on every request by the auth middleware).
+// HR / Admin: Delete employee (permanently removes from database)
 exports.deleteEmployee = async (req, res) => {
   try {
     const employee = await User.findById(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
     if (employee.role === 'admin') return res.status(403).json({ message: 'Cannot delete an admin account' });
 
-    employee.isActive = false;
-    await employee.save();
+    const name = employee.name;
+    await User.hardDelete(employee._id);
 
-    await notificationService.notify(employee._id, {
-      title: 'Account deactivated',
-      message: 'Your account has been deactivated. Please contact HR for assistance.',
-      type: 'credential',
-      link: '/login',
-    });
+    // Also delete any onboarding documents for this employee
+    await Document.deleteMany({ employee: req.params.id });
 
-    res.json({ message: `${employee.name} has been moved to inactive.` });
+    res.json({ message: `${name} has been permanently deleted.` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
