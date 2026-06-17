@@ -16,6 +16,11 @@ exports.login = async (req, res) => {
     const match = await user.matchPassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
+    // Deactivated employees cannot log in.
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Your account is inactive. Please contact HR.' });
+    }
+
     const token = generateToken(user._id);
     res.json({ token, user, isFirstLogin: user.isFirstLogin });
   } catch (err) {

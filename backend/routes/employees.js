@@ -7,8 +7,9 @@ const { createEmployee,
     getEmployee,
      updateEmployee, 
      updateOwnProfile,
-      deleteEmployee, 
-      getTeamMembers, 
+      deleteEmployee,
+      setEmployeeStatus,
+      getTeamMembers,
       getProfileCompletion,
        uploadProfilePhoto, 
        deleteProfilePhoto,
@@ -36,6 +37,7 @@ router.post('/send-credentials', roleCheck('hr', 'admin'), sendCredentials);
 router.get('/', roleCheck('hr', 'admin'), getAllEmployees);
 router.get('/:id', getEmployee);
 router.put('/:id', roleCheck('hr', 'admin'), updateEmployee);
+router.patch('/:id/status', roleCheck('hr', 'admin'), setEmployeeStatus);
 router.delete('/:id', roleCheck('hr', 'admin'), deleteEmployee);
 router.post('/:id/attach-docs', roleCheck('hr', 'admin'), uploadEmployeeDocs_middleware.fields([{ name: 'joiningLetter', maxCount: 1 }, { name: 'idCard', maxCount: 1 }]), attachEmployeeDocs);
 

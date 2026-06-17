@@ -237,6 +237,40 @@ exports.updateEmployee = async (req, res) => {
   }
 };
 
+// HR / Admin: Activate / deactivate an employee. Inactive employees cannot
+// log in (enforced in authController.login and the auth middleware), but their
+// record and history are preserved.
+exports.setEmployeeStatus = async (req, res) => {
+  const { isActive } = req.body;
+  try {
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: 'isActive (boolean) is required' });
+    }
+    const employee = await User.findById(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    if (employee.role === 'admin') {
+      return res.status(403).json({ message: 'Cannot change the status of an admin account' });
+    }
+
+    employee.isActive = isActive;
+    await employee.save();
+
+    if (isActive) {
+      await notificationService.notify(employee._id, {
+        title: 'Account Reactivated',
+        message: 'Your account has been reactivated. You can now log in.',
+        type: 'general',
+        link: '/dashboard',
+      }).catch(() => {});
+    }
+
+    const updated = await User.findById(employee._id).populate('department');
+    res.json({ message: `${employee.name} is now ${isActive ? 'active' : 'inactive'}.`, employee: updated });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // HR / Admin: Delete employee (permanently removes from database)
 exports.deleteEmployee = async (req, res) => {
   try {
