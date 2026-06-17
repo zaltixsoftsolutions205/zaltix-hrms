@@ -160,6 +160,16 @@ app.use(express.urlencoded({ extended: true }));
 // =======================
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// Friendly fallback when an uploaded file no longer exists on disk
+// (e.g. DB record points to a file that was never migrated to this machine).
+// express.static calls next() on a miss, so this only runs for missing files.
+app.use('/uploads', (req, res) => {
+  res.status(404).json({
+    message: 'Document not found. The file may have been removed — please re-upload it.',
+    path: req.originalUrl,
+  });
+});
+
 // =======================
 // 🚀 ROUTES
 // =======================

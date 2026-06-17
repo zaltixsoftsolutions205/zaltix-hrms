@@ -11,10 +11,14 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
   try {
     const user = await User.findOne({ email }).populate('department');
-    if (!user || user.isActive === false) return res.status(401).json({ message: 'Invalid credentials or account deactivated' });
+    if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     const match = await user.matchPassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
+
+    if (user.isActive === false) {
+      return res.status(403).json({ message: 'Your account has been deactivated. Please contact HR.' });
+    }
 
     const token = generateToken(user._id);
     res.json({ token, user, isFirstLogin: user.isFirstLogin });
