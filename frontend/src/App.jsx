@@ -35,6 +35,8 @@ import Dashboard from './pages/Dashboard/Dashboard';
 import EmployeeProfile from './pages/Profile/EmployeeProfile';
 import AttendancePage from './pages/Attendance/AttendancePage';
 import LeavePage from './pages/Leaves/LeavePage';
+import TimesheetPage from './pages/Timesheets/TimesheetPage';
+import TimesheetApprovals from './pages/Timesheets/TimesheetApprovals';
 import PayslipsPage from './pages/Payslips/PayslipsPage';
 import TasksPage from './pages/Tasks/TasksPage';
 import CRMPage from './pages/CRM/CRMPage';
@@ -104,6 +106,8 @@ const AppRoutes = () => {
         <Route path="/profile" element={<EmployeeProfile />} />
         <Route path="/attendance" element={<AttendancePage />} />
         <Route path="/leaves" element={<LeavePage />} />
+        <Route path="/timesheets" element={<TimesheetPage />} />
+        <Route path="/timesheets/approvals" element={<TimesheetApprovals />} />
         <Route path="/payslips" element={<PayslipsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/team" element={<TeamPage />} />
@@ -114,8 +118,8 @@ const AppRoutes = () => {
 
         {/* HR Routes */}
         <Route path="/hr/employees" element={<ProtectedRoute roles={['hr', 'admin']}><HREmployees /></ProtectedRoute>} />
-        <Route path="/hr/attendance" element={<ProtectedRoute roles={['hr', 'admin']}><HRAttendance /></ProtectedRoute>} />
-        <Route path="/hr/leaves" element={<ProtectedRoute roles={['hr', 'admin']}><HRLeaves /></ProtectedRoute>} />
+        <Route path="/hr/attendance" element={<ProtectedRoute roles={['hr', 'admin']} allowEmployeeIds={['ZSSE0023']}><HRAttendance /></ProtectedRoute>} />
+        <Route path="/hr/leaves" element={<ProtectedRoute roles={['hr', 'admin']} allowEmployeeIds={['ZSSE0023']}><HRLeaves /></ProtectedRoute>} />
         <Route path="/hr/tasks" element={<ProtectedRoute roles={['hr', 'admin']}><HRTasks /></ProtectedRoute>} />
         <Route path="/hr/payslips" element={<ProtectedRoute roles={['hr', 'admin']}><HRPayslips /></ProtectedRoute>} />
         <Route path="/hr/knowledge-center" element={<ProtectedRoute roles={['hr', 'admin']}><HRKnowledgeCenter /></ProtectedRoute>} />
