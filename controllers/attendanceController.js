@@ -175,30 +175,75 @@ exports.getMyAttendance = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 // HR / Admin: Get all attendance
 exports.getAllAttendance = async (req, res) => {
-  const { month, year, employeeId, departmentId, date, fromDate, toDate } = req.query;
+  const {
+    month,
+    year,
+    employeeId,
+    departmentId,
+    date,
+    fromDate,
+    toDate,
+    status,
+    isLate,
+    isEarlyLeave,
+  } = req.query;
+
   try {
     let empFilter = {};
+
     if (departmentId) empFilter.department = departmentId;
     if (employeeId) empFilter._id = employeeId;
 
-    const employees = await User.find({ ...empFilter, role: { $nin: ['admin'] } }).select('_id name employeeId');
-    const empIds = employees.map(e => e._id);
+    const employees = await User.find({
+      ...empFilter,
+      role: { $nin: ['admin'] },
+    }).select('_id name employeeId');
 
-    let filter = { employee: { $in: empIds } };
+    const empIds = employees.map((e) => e._id);
+
+    let filter = {
+      employee: { $in: empIds },
+    };
+
+    // Date filters
     if (date) {
       filter.date = date;
     } else if (fromDate && toDate) {
-      filter.date = { $gte: fromDate, $lte: toDate };
+      filter.date = {
+        $gte: fromDate,
+        $lte: toDate,
+      };
     } else if (month && year) {
       const start = `${year}-${String(month).padStart(2, '0')}-01`;
       const end = moment(start).endOf('month').format('YYYY-MM-DD');
-      filter.date = { $gte: start, $lte: end };
+
+      filter.date = {
+        $gte: start,
+        $lte: end,
+      };
     }
 
-    const records = await Attendance.find(filter).populate('employee', 'name employeeId department').sort({ date: -1 });
+    // Attendance status filter
+    if (status) {
+      filter.status = status;
+    }
+
+    // Late arrivals filter
+    if (isLate === 'true') {
+      filter.isLate = true;
+    }
+
+    // Early leave filter
+    if (isEarlyLeave === 'true') {
+      filter.isEarlyLeave = true;
+    }
+
+    const records = await Attendance.find(filter)
+      .populate('employee', 'name employeeId department')
+      .sort({ date: -1 });
+
     res.json(records);
   } catch (err) {
     res.status(500).json({ message: err.message });
