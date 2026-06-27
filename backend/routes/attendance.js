@@ -13,11 +13,12 @@ const {
   getMapImage,
 } = require('../controllers/attendanceController');
 const { protect } = require('../middleware/auth');
-const { roleCheck, roleOrEmployee } = require('../middleware/roleCheck');
+const { moduleAccess } = require('../middleware/roleCheck');
 
-// Employee IDs granted HR-level attendance access individually
-const ATTENDANCE_MANAGERS = ['ZSSE0023'];
-const hrAttendance = roleOrEmployee(['hr', 'admin'], ATTENDANCE_MANAGERS);
+// HR-level attendance management is gated by the 'hr_attendance' module.
+// Viewing records needs view access; marking / reviewing needs edit access.
+const hrAttendanceView = moduleAccess('hr_attendance', 'view');
+const hrAttendanceEdit = moduleAccess('hr_attendance', 'edit');
 
 // Public route — proxies Google Maps image server-side (no API key referrer restriction)
 router.get('/map-image', getMapImage);
@@ -29,9 +30,9 @@ router.post('/check-in', checkIn);
 router.post('/check-out', checkOut);
 router.get('/my', getMyAttendance);
 router.post('/regularize', applyRegularization);
-router.get('/regularizations', hrAttendance, getRegularizations);
-router.patch('/regularizations/:id', hrAttendance, reviewRegularization);
-router.get('/', hrAttendance, getAllAttendance);
-router.post('/mark', hrAttendance, markAttendance);
+router.get('/regularizations', hrAttendanceView, getRegularizations);
+router.patch('/regularizations/:id', hrAttendanceEdit, reviewRegularization);
+router.get('/', hrAttendanceView, getAllAttendance);
+router.post('/mark', hrAttendanceEdit, markAttendance);
 
 module.exports = router;

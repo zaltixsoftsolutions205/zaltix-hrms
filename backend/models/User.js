@@ -31,6 +31,19 @@ const userSchema = new mongoose.Schema(
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
     pushTokens: [{ type: String }],
+    // Per-employee module access. Empty array → fall back to role defaults
+    // (see constants/modules.js). Each entry grants one module at a
+    // permission level. Admin role bypasses this entirely.
+    moduleAccess: {
+      type: [
+        {
+          _id: false,
+          module: { type: String, required: true },
+          permission: { type: String, enum: ['view', 'edit'], default: 'view' },
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

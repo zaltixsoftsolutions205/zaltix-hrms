@@ -5,13 +5,14 @@ const Document = require('../models/Document');
 const { sendMail } = require('../config/mail');
 const { offerLetterTemplate, credentialsTemplate } = require('../utils/emailTemplates');
 const { getRequiredDocs } = require('./documentController');
+const { sanitizeModuleAccess } = require('../constants/modules');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
 // HR / Admin: Create employee
 exports.createEmployee = async (req, res) => {
-  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType } = req.body;
+  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess } = req.body;
   try {
     if (!employeeId || !employeeId.trim()) return res.status(400).json({ message: 'Employee ID is required' });
 
@@ -33,6 +34,7 @@ exports.createEmployee = async (req, res) => {
       address: address || '',
       isFirstLogin: true,
       employeeType: employeeType || null,
+      moduleAccess: sanitizeModuleAccess(moduleAccess) || [],
     });
 
     // Seed required document slots for new employees with onboarding type
@@ -181,6 +183,11 @@ exports.updateEmployee = async (req, res) => {
         employee[field] = field === 'department' ? req.body[field] || null : req.body[field];
       }
     });
+
+    if (req.body.moduleAccess !== undefined) {
+      const sanitized = sanitizeModuleAccess(req.body.moduleAccess);
+      if (sanitized) employee.moduleAccess = sanitized;
+    }
 
     let emailChanged = false;
     if (email !== undefined && email.trim() && email.trim().toLowerCase() !== employee.email.toLowerCase()) {

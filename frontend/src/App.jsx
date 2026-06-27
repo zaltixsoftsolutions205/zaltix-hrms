@@ -3,6 +3,7 @@ import { Component } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { PageLoader } from './components/UI/Spinner';
+import { canAccessModule, canEditModule } from './constants/modules';
 import Layout from './components/Layout/Layout';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import ChatWidget from './components/Chat/ChatWidget';
@@ -75,14 +76,23 @@ import AdminKnowledgeCenter from './pages/Admin/KnowledgeCenter';
 import HRKnowledgeCenter from './pages/HR/HRKnowledgeCenter';
 import KnowledgeCenter from './pages/KnowledgeCenter/KnowledgeCenter';
 
-const ProtectedRoute = ({ children, roles, allowEmployeeIds, allowFirstLogin = false }) => {
+const ProtectedRoute = ({ children, roles, allowEmployeeIds, module, requireEdit = false, allowFirstLogin = false }) => {
   const { user, loading } = useAuth();
   if (loading) return <PageLoader />;
   if (!user) return <Navigate to="/login" replace />;
+  if (user.isFirstLogin && !allowFirstLogin) return <Navigate to="/change-password" replace />;
+
+  // Module-based gating (primary). Admin always passes via canAccessModule.
+  if (module) {
+    const ok = requireEdit ? canEditModule(user, module) : canAccessModule(user, module);
+    if (!ok) return <Navigate to="/dashboard" replace />;
+    return children;
+  }
+
+  // Legacy role/employee-id gating (for routes not yet mapped to a module).
   const hasRole = roles && roles.includes(user.role);
   const hasEmployeeId = allowEmployeeIds && allowEmployeeIds.includes(user.employeeId);
   if (roles && !hasRole && !hasEmployeeId) return <Navigate to="/dashboard" replace />;
-  if (user.isFirstLogin && !allowFirstLogin) return <Navigate to="/change-password" replace />;
   return children;
 };
 
@@ -112,17 +122,17 @@ const AppRoutes = () => {
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/knowledge-center" element={<KnowledgeCenter />} />
-        <Route path="/crm" element={<ProtectedRoute roles={['sales', 'field_sales', 'hr', 'admin']}><CRMPage /></ProtectedRoute>} />
-        <Route path="/field-sales/leads" element={<ProtectedRoute roles={['field_sales', 'admin']}><FieldLeadsPage /></ProtectedRoute>} />
-        <Route path="/crm/products/:productId" element={<ProtectedRoute roles={['sales', 'field_sales', 'hr', 'admin']}><ProductDetailPage /></ProtectedRoute>} />
+        <Route path="/crm" element={<ProtectedRoute module="crm"><CRMPage /></ProtectedRoute>} />
+        <Route path="/field-sales/leads" element={<ProtectedRoute module="field_sales"><FieldLeadsPage /></ProtectedRoute>} />
+        <Route path="/crm/products/:productId" element={<ProtectedRoute module="crm"><ProductDetailPage /></ProtectedRoute>} />
 
         {/* HR Routes */}
-        <Route path="/hr/employees" element={<ProtectedRoute roles={['hr', 'admin']}><HREmployees /></ProtectedRoute>} />
-        <Route path="/hr/attendance" element={<ProtectedRoute roles={['hr', 'admin']} allowEmployeeIds={['ZSSE0023']}><HRAttendance /></ProtectedRoute>} />
-        <Route path="/hr/leaves" element={<ProtectedRoute roles={['hr', 'admin']} allowEmployeeIds={['ZSSE0023']}><HRLeaves /></ProtectedRoute>} />
-        <Route path="/hr/tasks" element={<ProtectedRoute roles={['hr', 'admin']}><HRTasks /></ProtectedRoute>} />
-        <Route path="/hr/payslips" element={<ProtectedRoute roles={['hr', 'admin']}><HRPayslips /></ProtectedRoute>} />
-        <Route path="/hr/knowledge-center" element={<ProtectedRoute roles={['hr', 'admin']}><HRKnowledgeCenter /></ProtectedRoute>} />
+        <Route path="/hr/employees" element={<ProtectedRoute module="hr_employees"><HREmployees /></ProtectedRoute>} />
+        <Route path="/hr/attendance" element={<ProtectedRoute module="hr_attendance"><HRAttendance /></ProtectedRoute>} />
+        <Route path="/hr/leaves" element={<ProtectedRoute module="hr_leaves"><HRLeaves /></ProtectedRoute>} />
+        <Route path="/hr/tasks" element={<ProtectedRoute module="hr_tasks"><HRTasks /></ProtectedRoute>} />
+        <Route path="/hr/payslips" element={<ProtectedRoute module="hr_payslips"><HRPayslips /></ProtectedRoute>} />
+        <Route path="/hr/knowledge-center" element={<ProtectedRoute module="knowledge_center"><HRKnowledgeCenter /></ProtectedRoute>} />
 
         {/* Admin Routes */}
         <Route path="/admin/employees" element={<ProtectedRoute roles={['admin']}><AdminEmployees /></ProtectedRoute>} />
@@ -132,17 +142,17 @@ const AppRoutes = () => {
         <Route path="/admin/tasks" element={<ProtectedRoute roles={['admin']}><AdminTasks /></ProtectedRoute>} />
         <Route path="/admin/payslips" element={<ProtectedRoute roles={['admin']}><AdminPayslips /></ProtectedRoute>} />
         <Route path="/admin/policies" element={<ProtectedRoute roles={['admin']}><AdminPolicies /></ProtectedRoute>} />
-        <Route path="/admin/reports" element={<ProtectedRoute roles={['admin']}><AdminReports /></ProtectedRoute>} />
+        <Route path="/admin/reports" element={<ProtectedRoute module="reports"><AdminReports /></ProtectedRoute>} />
         <Route path="/admin/crm" element={<ProtectedRoute roles={['admin']}><AdminCRM /></ProtectedRoute>} />
         <Route path="/admin/field-sales" element={<ProtectedRoute roles={['admin']}><AdminFieldSales /></ProtectedRoute>} />
-        <Route path="/admin/finance" element={<ProtectedRoute roles={['admin', 'hr']}><FinancePage /></ProtectedRoute>} />
-        <Route path="/finance" element={<ProtectedRoute roles={['admin', 'hr']}><FinancePage /></ProtectedRoute>} />
-        <Route path="/admin/announcements" element={<ProtectedRoute roles={['admin', 'hr']}><AnnouncementsPage /></ProtectedRoute>} />
-        <Route path="/admin/holidays" element={<ProtectedRoute roles={['admin', 'hr']}><HolidaysPage /></ProtectedRoute>} />
+        <Route path="/admin/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />
+        <Route path="/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />
+        <Route path="/admin/announcements" element={<ProtectedRoute module="announcements"><AnnouncementsPage /></ProtectedRoute>} />
+        <Route path="/admin/holidays" element={<ProtectedRoute module="holidays"><HolidaysPage /></ProtectedRoute>} />
         <Route path="/admin/my-tasks" element={<ProtectedRoute roles={['admin']}><AdminMyTasks /></ProtectedRoute>} />
-        <Route path="/admin/recruitment" element={<ProtectedRoute roles={['admin']} allowEmployeeIds={['ZSSE0023']}><RecruitmentPage /></ProtectedRoute>} />
-        <Route path="/admin/recruitment/p/:projectId" element={<ProtectedRoute roles={['admin']} allowEmployeeIds={['ZSSE0023']}><RecruitmentProjectPage /></ProtectedRoute>} />
-        <Route path="/admin/recruitment/:jobId" element={<ProtectedRoute roles={['admin']} allowEmployeeIds={['ZSSE0023']}><RecruitmentJobPage /></ProtectedRoute>} />
+        <Route path="/admin/recruitment" element={<ProtectedRoute module="recruitment"><RecruitmentPage /></ProtectedRoute>} />
+        <Route path="/admin/recruitment/p/:projectId" element={<ProtectedRoute module="recruitment"><RecruitmentProjectPage /></ProtectedRoute>} />
+        <Route path="/admin/recruitment/:jobId" element={<ProtectedRoute module="recruitment"><RecruitmentJobPage /></ProtectedRoute>} />
         <Route path="/admin/automation" element={<ProtectedRoute roles={['admin', 'hr']}><AutomationPage /></ProtectedRoute>} />
         <Route path="/admin/employee-management" element={<ProtectedRoute roles={['admin']}><AdminEmployeeHub /></ProtectedRoute>} />
         <Route path="/admin/knowledge-center" element={<ProtectedRoute roles={['admin']}><AdminKnowledgeCenter /></ProtectedRoute>} />

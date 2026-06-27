@@ -3,6 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { getInitials } from '../../utils/helpers';
+import { MODULES, resolveModuleKeys } from '../../constants/modules';
 
 /* ── SVG icon helper ── */
 const Svg = ({ d, size = 15, className = '' }) => (
@@ -200,16 +201,26 @@ const Sidebar = ({ isOpen, onClose }) => {
     navItems = [...navItems, ...timesheetItems];
   }
 
-  /* Special module access for specific employee ID (non-admin): Recruitment,
-     plus HR-level Attendance monitoring and Leave approvals. */
+  /* Per-employee module access.
+     - Admin and users on role defaults (no explicit moduleAccess) keep their
+       curated role-based nav above — preserves the CEO/HR/sales layouts.
+     - A non-admin with explicit grants gets a module-derived nav: the
+       always-on self-service baseline plus each granted module, in registry
+       order. This is what the "module access" picker controls. */
   let finalItems = navItems;
-  if (!isAdmin && user?.employeeId === 'ZSSE0023') {
-    const extras = [
-      { path: '/admin/recruitment', label: 'Recruitment', icon: "M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" },
-      { path: '/hr/attendance', label: 'Attendance', icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
-      { path: '/hr/leaves', label: 'Leave Approvals', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4" },
-    ].filter(extra => !navItems.some(i => i.path === extra.path));
-    finalItems = [...navItems, ...extras];
+  const hasExplicitAccess = !isAdmin && Array.isArray(user?.moduleAccess) && user.moduleAccess.length > 0;
+  if (hasExplicitAccess) {
+    const granted = resolveModuleKeys(user); // baseline + grants
+    finalItems = MODULES
+      .filter(m => granted.has(m.key))
+      .map(m => ({ path: m.path, label: m.label, icon: m.icon }));
+    // Keep the user's own timesheet entry (and approvals if they lead a team).
+    const isTechLead =
+      user?.department?.headOf &&
+      String(user.department.headOf) === String(user?._id || user?.id);
+    if (isTechLead && !finalItems.some(i => i.path === TIMESHEET_APPROVALS_NAV.path)) {
+      finalItems = [...finalItems, TIMESHEET_APPROVALS_NAV];
+    }
   }
 
   const handleLogout = () => { logout(); navigate('/login'); };
