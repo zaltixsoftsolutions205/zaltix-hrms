@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#4C1D95" />
+  <title>Offline — Zaltix HRMS</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #2e1065 0%, #4c1d95 50%, #5b21b6 100%);
+      font-family: 'Inter', system-ui, -apple-system, sans-serif;
+      color: #fff;
+      padding: 1rem;
+      overflow: hidden;
+    }
+
+    /* ambient blobs */
+    .blob {
+      position: fixed;
+      border-radius: 50%;
+      filter: blur(60px);
+      pointer-events: none;
+      opacity: 0.25;
+    }
+    .blob-1 { width: 400px; height: 400px; background: #7c3aed; top: -120px; left: -120px; }
+    .blob-2 { width: 300px; height: 300px; background: #d97706; bottom: -80px; right: -80px; }
+
+    .card {
+      position: relative;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.15);
+      border-radius: 24px;
+      padding: 2.5rem 2rem;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 25px 50px rgba(0,0,0,0.4);
+    }
+
+    .logo {
+      width: 64px;
+      height: 64px;
+      background: #d97706;
+      border-radius: 18px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 1.25rem;
+      letter-spacing: 0.05em;
+      color: #fff;
+      margin: 0 auto 1.25rem;
+      box-shadow: 0 8px 20px rgba(217,119,6,0.5);
+    }
+
+    .wifi-icon {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      display: block;
+      animation: pulse 2.5s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.95); }
+    }
+
+    h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: #fff;
+    }
+
+    p {
+      font-size: 0.875rem;
+      color: rgba(255,255,255,0.65);
+      line-height: 1.6;
+      margin-bottom: 1.75rem;
+    }
+
+    .retry-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: #d97706;
+      color: #fff;
+      font-weight: 600;
+      font-size: 0.875rem;
+      border: none;
+      border-radius: 12px;
+      padding: 0.75rem 1.75rem;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.15s;
+      box-shadow: 0 4px 12px rgba(217,119,6,0.4);
+    }
+    .retry-btn:hover  { background: #b45309; }
+    .retry-btn:active { transform: scale(0.97); }
+
+    .footer {
+      margin-top: 2rem;
+      font-size: 0.75rem;
+      color: rgba(255,255,255,0.35);
+    }
+  </style>
+</head>
+<body>
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+
+  <div class="card">
+    <div class="logo">ZS</div>
+    <span class="wifi-icon">📡</span>
+    <h1>You're Offline</h1>
+    <p>
+      No internet connection detected.<br/>
+      Check your network and try again — Zaltix HRMS will reconnect automatically.
+    </p>
+    <button class="retry-btn" onclick="window.location.reload()">
+      ↺ &nbsp;Retry Connection
+    </button>
+    <div class="footer">Zaltix Soft Solutions — HRMS + CRM</div>
+  </div>
+</body>
+</html>
