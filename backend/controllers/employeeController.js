@@ -5,13 +5,14 @@ const Document = require('../models/Document');
 const { sendMail } = require('../config/mail');
 const { offerLetterTemplate, credentialsTemplate } = require('../utils/emailTemplates');
 const { getRequiredDocs } = require('./documentController');
+const { sanitizeModuleAccess } = require('../constants/modules');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
 // HR / Admin: Create employee
 exports.createEmployee = async (req, res) => {
-  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType } = req.body;
+  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess } = req.body;
   try {
     if (!employeeId || !employeeId.trim()) return res.status(400).json({ message: 'Employee ID is required' });
 
@@ -33,6 +34,7 @@ exports.createEmployee = async (req, res) => {
       address: address || '',
       isFirstLogin: true,
       employeeType: employeeType || null,
+      moduleAccess: sanitizeModuleAccess(moduleAccess) || [],
     });
 
     // Seed required document slots for new employees with onboarding type
@@ -182,6 +184,11 @@ exports.updateEmployee = async (req, res) => {
       }
     });
 
+    if (req.body.moduleAccess !== undefined) {
+      const sanitized = sanitizeModuleAccess(req.body.moduleAccess);
+      if (sanitized) employee.moduleAccess = sanitized;
+    }
+
     let emailChanged = false;
     if (email !== undefined && email.trim() && email.trim().toLowerCase() !== employee.email.toLowerCase()) {
       const exists = await User.findOne({ email: email.trim(), _id: { $ne: employee._id } });
@@ -232,6 +239,40 @@ exports.updateEmployee = async (req, res) => {
 
     const updated = await User.findById(employee._id).populate('department');
     res.json(updated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// HR / Admin: Activate / deactivate an employee. Inactive employees cannot
+// log in (enforced in authController.login and the auth middleware), but their
+// record and history are preserved.
+exports.setEmployeeStatus = async (req, res) => {
+  const { isActive } = req.body;
+  try {
+    if (typeof isActive !== 'boolean') {
+      return res.status(400).json({ message: 'isActive (boolean) is required' });
+    }
+    const employee = await User.findById(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    if (employee.role === 'admin') {
+      return res.status(403).json({ message: 'Cannot change the status of an admin account' });
+    }
+
+    employee.isActive = isActive;
+    await employee.save();
+
+    if (isActive) {
+      await notificationService.notify(employee._id, {
+        title: 'Account Reactivated',
+        message: 'Your account has been reactivated. You can now log in.',
+        type: 'general',
+        link: '/dashboard',
+      }).catch(() => {});
+    }
+
+    const updated = await User.findById(employee._id).populate('department');
+    res.json({ message: `${employee.name} is now ${isActive ? 'active' : 'inactive'}.`, employee: updated });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

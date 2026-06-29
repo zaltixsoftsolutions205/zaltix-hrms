@@ -7,17 +7,24 @@ const { createEmployee,
     getEmployee,
      updateEmployee, 
      updateOwnProfile,
-      deleteEmployee, 
-      getTeamMembers, 
+      deleteEmployee,
+      setEmployeeStatus,
+      getTeamMembers,
       getProfileCompletion,
        uploadProfilePhoto, 
        deleteProfilePhoto,
         getMyProfile,
         attachEmployeeDocs } = require('../controllers/employeeController');
 const { protect } = require('../middleware/auth');
-const { roleCheck } = require('../middleware/roleCheck');
+const { moduleAccess } = require('../middleware/roleCheck');
 const uploadProfilePhoto_middleware = require('../middleware/uploadProfilePhoto');
 const uploadEmployeeDocs_middleware = require('../middleware/uploadEmployeeDocs');
+
+// HR employee management gated by the 'hr_employees' module.
+// NOTE: granting hr_employees edit lets a non-admin create/update employees,
+// including setting other employees' moduleAccess. Grant it deliberately.
+const hrEmployeesView = moduleAccess('hr_employees', 'view');
+const hrEmployeesEdit = moduleAccess('hr_employees', 'edit');
 
 router.use(protect);
 
@@ -30,13 +37,14 @@ router.delete('/me/profile-photo', deleteProfilePhoto);
 router.put('/me/profile', updateOwnProfile);
 
 // HR / Admin routes
-router.post('/', roleCheck('hr', 'admin'), createEmployee);
-router.post('/send-offer', roleCheck('hr', 'admin'), sendOfferLetter);
-router.post('/send-credentials', roleCheck('hr', 'admin'), sendCredentials);
-router.get('/', roleCheck('hr', 'admin'), getAllEmployees);
+router.post('/', hrEmployeesEdit, createEmployee);
+router.post('/send-offer', hrEmployeesEdit, sendOfferLetter);
+router.post('/send-credentials', hrEmployeesEdit, sendCredentials);
+router.get('/', hrEmployeesView, getAllEmployees);
 router.get('/:id', getEmployee);
-router.put('/:id', roleCheck('hr', 'admin'), updateEmployee);
-router.delete('/:id', roleCheck('hr', 'admin'), deleteEmployee);
-router.post('/:id/attach-docs', roleCheck('hr', 'admin'), uploadEmployeeDocs_middleware.fields([{ name: 'joiningLetter', maxCount: 1 }, { name: 'idCard', maxCount: 1 }]), attachEmployeeDocs);
+router.put('/:id', hrEmployeesEdit, updateEmployee);
+router.patch('/:id/status', hrEmployeesEdit, setEmployeeStatus);
+router.delete('/:id', hrEmployeesEdit, deleteEmployee);
+router.post('/:id/attach-docs', hrEmployeesEdit, uploadEmployeeDocs_middleware.fields([{ name: 'joiningLetter', maxCount: 1 }, { name: 'idCard', maxCount: 1 }]), attachEmployeeDocs);
 
 module.exports = router;

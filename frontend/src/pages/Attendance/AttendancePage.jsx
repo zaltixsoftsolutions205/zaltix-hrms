@@ -196,7 +196,9 @@ const AttendancePage = () => {
   const [filter, setFilter] = useState({ month: now.getMonth() + 1, year: now.getFullYear() });
 
   useEffect(() => {
-    const todayStr = new Date().toISOString().slice(0, 10);
+    // IST calendar date (matches the backend's istDate()), so the holiday banner
+    // shows on the correct local day regardless of the user's browser timezone.
+    const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
     api.get('/holidays', { params: { year: new Date().getFullYear() } })
       .then(({ data }) => {
         const holidays = Array.isArray(data) ? data : (data.holidays || []);
@@ -366,7 +368,7 @@ const AttendancePage = () => {
             <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold sm:ml-auto"
               style={{ background: '#fef3c7', color: '#92400e', border: '1px solid #fcd34d' }}>
               <SI d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={15} color="" />
-              Holiday: {todayHoliday.name} — Check-in disabled
+              Holiday: {todayHoliday.name} — Check-in &amp; check-out disabled
             </div>
           )}
 

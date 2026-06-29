@@ -14,6 +14,16 @@ const istTime = () => istNow().toISOString().slice(11, 16);  // HH:mm
 const OFFICE_START = '09:30'; // late if check-in after this
 const OFFICE_END   = '18:30'; // early leave if check-out before this
 
+// Find a holiday falling on the given IST calendar date (YYYY-MM-DD).
+// Holiday.date is stored as a Date (often midnight UTC), so we match by a
+// day range rather than exact equality — this is robust to any time component
+// or timezone offset in the stored value.
+const findHolidayForDate = async (ymd) => {
+  const start = new Date(`${ymd}T00:00:00.000Z`);
+  const end = new Date(`${ymd}T23:59:59.999Z`);
+  return Holiday.findOne({ date: { $gte: start, $lte: end } });
+};
+
 // Haversine formula — returns distance in metres between two GPS coordinates
 const haversineDistance = (lat1, lng1, lat2, lng2) => {
   const R = 6371000; // Earth radius in metres
@@ -35,7 +45,7 @@ exports.checkIn = async (req, res) => {
     if (existing) return res.status(400).json({ message: 'Already checked in today' });
 
     // Holiday check — block check-in on holidays set by admin/HR
-    const holiday = await Holiday.findOne({ date: today });
+    const holiday = await findHolidayForDate(today);
     if (holiday) {
       return res.status(403).json({
         message: `Today is a holiday: ${holiday.name}. Check-in is not allowed.`,
@@ -86,6 +96,16 @@ exports.checkOut = async (req, res) => {
   const today = istDate();
   const now = istTime();
   try {
+    // Holiday check — block check-out on holidays set by admin/HR
+    const holiday = await findHolidayForDate(today);
+    if (holiday) {
+      return res.status(403).json({
+        message: `Today is a holiday: ${holiday.name}. Check-out is not allowed.`,
+        code: 'HOLIDAY',
+        holiday: holiday.name,
+      });
+    }
+
     const record = await Attendance.findOne({ employee: req.user._id, date: today });
     if (!record) return res.status(404).json({ message: 'No check-in found for today' });
     if (record.checkOut) return res.status(400).json({ message: 'Already checked out today' });

@@ -4,14 +4,15 @@ const path = require('path');
 const fs = require('fs');
 const multer = require('multer');
 const { protect } = require('../middleware/auth');
+const { moduleAccess } = require('../middleware/roleCheck');
 const ctrl = require('../controllers/recruitmentController');
 
 router.use(protect);
 
-const recruitAccess = (req, res, next) => {
-  if (req.user.role === 'admin' || req.user.employeeId === 'ZSSE0023') return next();
-  return res.status(403).json({ message: 'Access denied' });
-};
+// Recruitment access is now driven by the 'recruitment' module grant
+// (admin bypasses). Replaces the former hardcoded ZSSE0023 special-case.
+const recruitAccess = moduleAccess('recruitment', 'view');
+const recruitEdit = moduleAccess('recruitment', 'edit');
 
 // Resume upload
 const uploadDir = path.join(__dirname, '../uploads/resumes');
@@ -38,23 +39,23 @@ const upload = multer({
 
 // Projects
 router.get('/projects',        recruitAccess, ctrl.getProjects);
-router.post('/projects',       recruitAccess, ctrl.createProject);
-router.put('/projects/:id',    recruitAccess, ctrl.updateProject);
-router.delete('/projects/:id', recruitAccess, ctrl.deleteProject);
+router.post('/projects',       recruitEdit,   ctrl.createProject);
+router.put('/projects/:id',    recruitEdit,   ctrl.updateProject);
+router.delete('/projects/:id', recruitEdit,   ctrl.deleteProject);
 
 // Stats
 router.get('/stats', recruitAccess, ctrl.getStats);
 
 // Job Postings
 router.get('/jobs',        recruitAccess, ctrl.getJobPostings);
-router.post('/jobs',       recruitAccess, ctrl.createJobPosting);
-router.put('/jobs/:id',    recruitAccess, ctrl.updateJobPosting);
-router.delete('/jobs/:id', recruitAccess, ctrl.deleteJobPosting);
+router.post('/jobs',       recruitEdit,   ctrl.createJobPosting);
+router.put('/jobs/:id',    recruitEdit,   ctrl.updateJobPosting);
+router.delete('/jobs/:id', recruitEdit,   ctrl.deleteJobPosting);
 
 // Applicants
 router.get('/applicants',              recruitAccess, ctrl.getApplicants);
-router.post('/applicants',             recruitAccess, upload.single('resume'), ctrl.createApplicant);
-router.put('/applicants/:id/status',   recruitAccess, ctrl.updateStatus);
-router.delete('/applicants/:id',       recruitAccess, ctrl.deleteApplicant);
+router.post('/applicants',             recruitEdit,   upload.single('resume'), ctrl.createApplicant);
+router.put('/applicants/:id/status',   recruitEdit,   ctrl.updateStatus);
+router.delete('/applicants/:id',       recruitEdit,   ctrl.deleteApplicant);
 
 module.exports = router;

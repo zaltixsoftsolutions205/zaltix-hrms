@@ -14,6 +14,10 @@ const protect = async (req, res, next) => {
     if (!req.user) {
       return res.status(401).json({ message: 'User not found' });
     }
+    // Block deactivated accounts even if they hold a valid token.
+    if (req.user.isActive === false) {
+      return res.status(403).json({ message: 'Your account is inactive. Please contact HR.' });
+    }
     next();
   } catch (err) {
     return res.status(401).json({ message: 'Not authorized, token failed' });

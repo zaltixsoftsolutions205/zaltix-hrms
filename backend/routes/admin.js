@@ -7,13 +7,18 @@ const {
   getProfitSummary,
 } = require('../controllers/adminController');
 const { protect } = require('../middleware/auth');
-const { roleCheck } = require('../middleware/roleCheck');
+const { roleCheck, moduleAccess } = require('../middleware/roleCheck');
 
 router.use(protect);
+
+// Reading department names is needed by anyone who can manage employees
+// (the Add/Edit Employee department dropdown), so allow hr_employees view
+// access here — BEFORE the admin/hr router guard below. Mutations stay admin.
+router.get('/departments', moduleAccess('hr_employees', 'view'), getDepartments);
+
 router.use(roleCheck('admin', 'hr'));
 
 // Departments
-router.get('/departments', getDepartments);
 router.post('/departments', roleCheck('admin'), createDepartment);
 router.put('/departments/:id', roleCheck('admin'), updateDepartment);
 router.delete('/departments/:id', roleCheck('admin'), deleteDepartment);

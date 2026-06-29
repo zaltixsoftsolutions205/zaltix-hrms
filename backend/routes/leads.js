@@ -2,10 +2,11 @@ const express = require('express');
 const router = express.Router();
 const { createLead, getLeads, getLead, updateLeadStatus, addActivity, updateLead, deleteLead, getPipeline, updatePipelineStage, getActivities, getOverdueAlerts } = require('../controllers/leadController');
 const { protect } = require('../middleware/auth');
-const { roleCheck } = require('../middleware/roleCheck');
+const { moduleAccess } = require('../middleware/roleCheck');
 
 router.use(protect);
-router.use(roleCheck('sales', 'hr', 'admin'));
+// CRM access via the 'crm' module (admin bypasses; sales/hr keep it by role default).
+router.use(moduleAccess('crm', 'view'));
 
 // Static routes MUST come before /:id
 router.get('/pipeline/board', getPipeline);

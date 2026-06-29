@@ -55,6 +55,20 @@ jobs:
           script: |
             IMAGE_URI=public.ecr.aws/g5p9n4i5/hrms-backend:latest
 
+            # Reclaim disk BEFORE pulling. The EC2 root volume is small (~7G);
+            # if it fills, `docker pull` fails mid-extract ("no space left on
+            # device") and Docker keeps the OLD image — a green deploy that
+            # silently ships stale code. Prune dangling images + build cache
+            # here (the running container's image is in use, so it's preserved).
+            echo "Disk usage before prune:"
+            df -h / || true
+            echo "Pruning dangling images and build cache..."
+            docker image prune -f || true
+            docker builder prune -a -f || true
+            docker container prune -f || true
+            echo "Disk usage after prune:"
+            df -h / || true
+
             echo "Pulling latest image..."
             docker pull $IMAGE_URI
 
@@ -88,6 +102,12 @@ jobs:
               -v /home/ubuntu/hrms/uploads:/app/uploads \
               --restart always \
               $IMAGE_URI
+
+            # New container is now running on the fresh image, so the previous
+            # image is no longer in use and can be reaped. `-a` removes all
+            # images not used by a running container, keeping the disk lean.
+            echo "Reaping now-unused old images..."
+            docker image prune -a -f || true
 
             echo "Applying nginx upload limit..."
             sudo cp /tmp/nginx-upload.conf /etc/nginx/conf.d/upload-limit.conf

@@ -2,12 +2,14 @@ const express = require('express');
 const router = express.Router();
 const ctrl = require('../controllers/announcementController');
 const { protect } = require('../middleware/auth');
-const { roleCheck } = require('../middleware/roleCheck');
+const { moduleAccess } = require('../middleware/roleCheck');
+
+const announcementsEdit = moduleAccess('announcements', 'edit');
 
 router.use(protect);
 
 router.get('/', ctrl.getAnnouncements);                            // all roles
-router.post('/', roleCheck('admin', 'hr'), ctrl.createAnnouncement);
-router.delete('/:id', roleCheck('admin', 'hr'), ctrl.deleteAnnouncement);
+router.post('/', announcementsEdit, ctrl.createAnnouncement);
+router.delete('/:id', announcementsEdit, ctrl.deleteAnnouncement);
 
 module.exports = router;

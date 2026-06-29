@@ -4,6 +4,7 @@ import api from '../../utils/api';
 import Modal from '../../components/UI/Modal';
 import { formatDate, getInitials, formatCurrency } from '../../utils/helpers';
 import IntelligenceAlerts from '../../components/UI/IntelligenceAlerts';
+import ModuleAccessPicker from '../../components/UI/ModuleAccessPicker';
 
 /* ── small inline svg ── */
 const Ico = ({ d, d2, className = 'w-4 h-4' }) => (
@@ -25,8 +26,27 @@ const Chip = ({ label, colorCls }) => (
   <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-semibold ${colorCls}`}>{label}</span>
 );
 
+// Active/Inactive dropdown. `isActive` is treated as active unless explicitly false.
+const StatusDropdown = ({ emp, onChange }) => {
+  const active = emp.isActive !== false;
+  return (
+    <select
+      value={active ? 'active' : 'inactive'}
+      onChange={e => onChange(emp, e.target.value === 'active')}
+      className={`text-xs font-semibold rounded-lg border px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400 transition-colors ${
+        active
+          ? 'bg-green-50 text-green-700 border-green-200'
+          : 'bg-red-50 text-red-700 border-red-200'
+      }`}
+    >
+      <option value="active">Active</option>
+      <option value="inactive">Inactive</option>
+    </select>
+  );
+};
+
 const PRESET_ROLES = ['employee', 'sales', 'field_sales', 'hr', 'technical_associate', 'bda'];
-const EMPTY_FORM = { employeeId: '', name: '', email: '', role: 'employee', customRole: '', departmentId: '', designation: '', phone: '', joiningDate: '', basicSalary: '', employeeType: '' };
+const EMPTY_FORM = { employeeId: '', name: '', email: '', role: 'employee', customRole: '', departmentId: '', designation: '', phone: '', joiningDate: '', basicSalary: '', employeeType: '', moduleAccess: [] };
 
 export default function HREmployees() {
   const [employees, setEmployees]         = useState([]);
@@ -41,11 +61,13 @@ export default function HREmployees() {
   const [form, setForm]                   = useState(EMPTY_FORM);
 
   const fetchAll = async () => {
-    try {
-      const [e, d] = await Promise.all([api.get('/employees'), api.get('/admin/departments')]);
-      setEmployees(e.data || []);
-      setDepartments(d.data || []);
-    } catch { /* silent */ }
+    // Settle independently: departments is an admin/HR-only endpoint, so a
+    // module-granted (e.g. sales) user gets 403 there — that must NOT blank
+    // out the employee list. The department dropdown just stays empty.
+    const [e, d] = await Promise.allSettled([api.get('/employees'), api.get('/admin/departments')]);
+    if (e.status === 'fulfilled') setEmployees(e.value.data || []);
+    else toast.error(e.reason?.response?.data?.message || 'Failed to load employees');
+    if (d.status === 'fulfilled') setDepartments(d.value.data || []);
   };
 
   useEffect(() => { fetchAll(); }, []);
@@ -81,6 +103,21 @@ export default function HREmployees() {
     if (!window.confirm(`Delete ${emp.name} (${emp.employeeId})? This permanently removes the employee and cannot be undone.`)) return;
     try { await api.delete(`/employees/${emp._id}`); toast.success(`${emp.name} deleted.`); fetchAll(); }
     catch (err) { toast.error(err.response?.data?.message || 'Delete failed'); }
+  };
+
+  const handleStatusChange = async (emp, nextActive) => {
+    if (emp.isActive === nextActive) return;
+    if (!nextActive && !window.confirm(`Set ${emp.name} (${emp.employeeId}) to Inactive? They will no longer be able to log in.`)) return;
+    // Optimistic update so the dropdown reflects the choice immediately
+    setEmployees(list => list.map(e => e._id === emp._id ? { ...e, isActive: nextActive } : e));
+    try {
+      await api.patch(`/employees/${emp._id}/status`, { isActive: nextActive });
+      toast.success(`${emp.name} is now ${nextActive ? 'active' : 'inactive'}.`);
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to update status');
+      fetchAll(); // revert optimistic change
+    }
   };
 
   const openEdit   = (emp) => { setSelectedEmp(emp); setShowEditModal(true); };
@@ -169,9 +206,10 @@ export default function HREmployees() {
                       )}
                     </div>
                     <p className="text-xs text-violet-400 truncate mt-0.5">{emp.employeeId} · {emp.email}</p>
-                    {emp.employeeType && (
-                      <div className="mt-1"><Chip label={emp.employeeType} colorCls={TYPE_COLORS[emp.employeeType] || 'bg-gray-100 text-gray-600'} /></div>
-                    )}
+                    <div className="mt-1.5 flex items-center gap-2 flex-wrap">
+                      {emp.employeeType && <Chip label={emp.employeeType} colorCls={TYPE_COLORS[emp.employeeType] || 'bg-gray-100 text-gray-600'} />}
+                      <StatusDropdown emp={emp} onChange={handleStatusChange} />
+                    </div>
                   </div>
                 </div>
                 {/* Meta grid */}
@@ -215,7 +253,7 @@ export default function HREmployees() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-violet-100 bg-violet-50/70">
-                    {['Employee', 'Department', 'Role / Type', 'Joining', 'Salary', 'Actions'].map(h => (
+                    {['Employee', 'Department', 'Role / Type', 'Status', 'Joining', 'Salary', 'Actions'].map(h => (
                       <th key={h} className="text-left text-[11px] font-bold text-violet-500 uppercase tracking-wide px-4 py-3 whitespace-nowrap first:rounded-tl-2xl last:rounded-tr-2xl">{h}</th>
                     ))}
                   </tr>
@@ -251,6 +289,10 @@ export default function HREmployees() {
                           <Chip label={roleLabel(emp.role)} colorCls={ROLE_COLORS[emp.role] || 'bg-gray-100 text-gray-600'} />
                           {emp.employeeType && <Chip label={emp.employeeType} colorCls={TYPE_COLORS[emp.employeeType] || 'bg-gray-100 text-gray-600'} />}
                         </div>
+                      </td>
+                      {/* Status */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <StatusDropdown emp={emp} onChange={handleStatusChange} />
                       </td>
                       {/* Joining */}
                       <td className="px-4 py-3 text-sm text-violet-600 whitespace-nowrap">{formatDate(emp.joiningDate)}</td>
@@ -353,6 +395,9 @@ export default function HREmployees() {
               </p>
             )}
           </div>
+          <div className="border-t border-violet-100 pt-3">
+            <ModuleAccessPicker value={form.moduleAccess} onChange={ma => setForm(f => ({ ...f, moduleAccess: ma }))} />
+          </div>
           <div className="flex flex-col sm:flex-row gap-2 pt-2">
             <button type="submit" disabled={loading}
               className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-colors">
@@ -424,6 +469,9 @@ function EditForm({ emp, departments, onDone }) {
     basicSalary: emp.basicSalary || 0,
     role: isPreset ? emp.role : 'custom',
     customRole: isPreset ? '' : emp.role,
+    moduleAccess: Array.isArray(emp.moduleAccess)
+      ? emp.moduleAccess.map(a => ({ module: a.module, permission: a.permission }))
+      : [],
   });
   const [sendNewCredentials, setSendNewCredentials] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -487,6 +535,9 @@ function EditForm({ emp, departments, onDone }) {
             onChange={e => setForm(p => ({ ...p, customRole: e.target.value }))}
           />
         )}
+      </div>
+      <div className="border-t border-violet-100 pt-3">
+        <ModuleAccessPicker value={form.moduleAccess} onChange={ma => setForm(p => ({ ...p, moduleAccess: ma }))} />
       </div>
       <div className="border border-violet-100 rounded-xl p-3 bg-violet-50/40">
         <label className="flex items-start gap-2 cursor-pointer">
