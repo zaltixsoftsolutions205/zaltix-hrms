@@ -96,7 +96,18 @@ exports.generatePayslip = async (req, res) => {
 // Employee: Get own payslips
 exports.getMyPayslips = async (req, res) => {
   try {
-    const payslips = await Payslip.find({ employee: req.user._id, status: 'published' }).sort({ year: -1, month: -1 });
+    const userId = req.user?._id;
+    if (!userId) {
+      return res.status(401).json({ message: 'Not authorized' });
+    }
+
+    const payslips = await Payslip.find({
+      employee: userId,
+      status: 'published',
+    })
+      .sort({ year: -1, month: -1 })
+      .lean();
+
     res.json(payslips);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -133,6 +144,68 @@ exports.deletePayslip = async (req, res) => {
 
     await payslip.deleteOne();
     res.json({ message: 'Payslip deleted' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// HR / Admin: Get single payslip
+exports.getPayslipById = async (req, res) => {
+  try {
+    const payslip = await Payslip.findById(req.params.id)
+      .populate('employee', 'name employeeId department designation location panNo role')
+      .populate('generatedBy', 'name');
+    if (!payslip) return res.status(404).json({ message: 'Payslip not found' });
+    res.json(payslip);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// HR / Admin: Update payslip
+exports.updatePayslip = async (req, res) => {
+  try {
+    const payslip = await Payslip.findById(req.params.id);
+    if (!payslip) return res.status(404).json({ message: 'Payslip not found' });
+
+    const { basicSalary, allowances, deductions, workingDays, presentDays, lwpDays } = req.body;
+
+    const totalAllowances = (allowances || payslip.allowances).reduce((s, a) => s + (a.amount || 0), 0);
+    const totalDeductions = (deductions || payslip.deductions).reduce((s, d) => s + (d.amount || 0), 0);
+    const gross = (basicSalary ?? payslip.basicSalary) + totalAllowances;
+    const net = gross - totalDeductions;
+
+    Object.assign(payslip, {
+      basicSalary: basicSalary ?? payslip.basicSalary,
+      allowances: allowances ?? payslip.allowances,
+      deductions: deductions ?? payslip.deductions,
+      grossSalary: gross,
+      netSalary: net,
+      workingDays: workingDays ?? payslip.workingDays,
+      presentDays: presentDays ?? payslip.presentDays,
+      lwpDays: lwpDays ?? payslip.lwpDays,
+    });
+
+    // Regenerate PDF
+    try {
+      const employee = await User.findById(payslip.employee).populate('department');
+      const ps = payslip.toObject();
+      const pStart = moment(`${ps.year}-${String(ps.month).padStart(2, '0')}-25`).subtract(1, 'month').format('YYYY-MM-DD');
+      const pEnd   = moment(`${ps.year}-${String(ps.month).padStart(2, '0')}-24`).format('YYYY-MM-DD');
+      const pdfPath = await generatePayslipPDF({
+        ...ps, employee, periodStart: pStart, periodEnd: pEnd,
+        accountNumber: employee.accountNumber || '',
+        ifscCode: employee.ifscCode || '',
+        uanNumber: employee.uanNumber || '',
+      });
+      payslip.pdfPath = pdfPath;
+    } catch (pdfErr) {
+      console.error('PDF regeneration failed:', pdfErr.message);
+    }
+
+    await payslip.save();
+    const populated = await Payslip.findById(payslip._id).populate('employee', 'name employeeId department').populate('generatedBy', 'name');
+    res.json(populated);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
