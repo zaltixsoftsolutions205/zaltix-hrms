@@ -31,7 +31,7 @@ const generatePayslipPDF = (payslipData) => {
         basicSalary, allowances, deductions,
         grossSalary, netSalary,
         workingDays, presentDays, lwpDays,
-        accountNumber, ifscCode, uanNumber,
+        accountNumber, ifscCode, uanNumber, panNumber,
       } = payslipData;
 
       const uploadsDir = path.join(__dirname, '../uploads/payslips');
@@ -143,7 +143,7 @@ const generatePayslipPDF = (payslipData) => {
         ['Employee Code', employee.employeeId,          'Employee Name', employee.name],
         ['Designation',   employee.designation || '—',  'Department',    employee.department?.name || '—'],
         ['Working Days',  String(wdDays),               'Present Days',  String(prsDays)],
-        ['Loss of Pay',   String(lopDays),              '',              ''],
+        ['Loss of Pay',   String(lopDays),              'PAN Number',    panNumber || '—'],
       ];
 
       empRows.forEach(([l1, v1, l2, v2]) => {

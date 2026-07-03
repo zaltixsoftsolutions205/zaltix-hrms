@@ -28,6 +28,7 @@ const userSchema = new mongoose.Schema(
     accountNumber: { type: String, default: '' },
     ifscCode: { type: String, default: '' },
     uanNumber: { type: String, default: '' },
+    panNumber: { type: String, default: '' },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
     pushTokens: [{ type: String }],

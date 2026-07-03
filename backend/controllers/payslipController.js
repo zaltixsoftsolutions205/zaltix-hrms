@@ -62,6 +62,7 @@ exports.generatePayslip = async (req, res) => {
         accountNumber: employee.accountNumber || '',
         ifscCode: employee.ifscCode || '',
         uanNumber: employee.uanNumber || '',
+        panNumber: employee.panNumber || '',
       });
       payslip.pdfPath = pdfPath;
       await payslip.save();
@@ -177,6 +178,7 @@ exports.downloadPayslip = async (req, res) => {
       accountNumber: employee.accountNumber || '',
       ifscCode: employee.ifscCode || '',
       uanNumber: employee.uanNumber || '',
+      panNumber: employee.panNumber || '',
     });
     payslip.pdfPath = pdfPath;
     await payslip.save();

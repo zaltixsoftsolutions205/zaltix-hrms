@@ -25,10 +25,12 @@ RUN npm install --omit=dev --ignore-scripts && \
 # =============================================================================
 FROM node:20-alpine AS production
 
-# Install security updates + dumb-init (proper PID 1 process management)
+# Install security updates + dumb-init (proper PID 1 process management).
+# su-exec lets the entrypoint fix bind-mount ownership as root, then drop to nodeuser.
 RUN apk update && apk upgrade && \
     apk add --no-cache \
         dumb-init \
+        su-exec \
         curl \
     && rm -rf /var/cache/apk/*
 
@@ -52,8 +54,10 @@ RUN mkdir -p uploads && \
 COPY --chown=nodeuser:nodegroup entrypoint.sh ./entrypoint.sh
 RUN chmod +x entrypoint.sh
 
-# Switch to non-root user
-USER nodeuser
+# NOTE: we intentionally do NOT switch to USER nodeuser here.
+# The entrypoint starts as root so it can chown the bind-mounted /app/uploads
+# volume (whose ownership comes from the host, overriding the build-time chown),
+# then drops privileges to nodeuser via su-exec before running node.
 
 # Expose application port
 EXPOSE 5000

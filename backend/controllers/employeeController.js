@@ -299,7 +299,7 @@ exports.deleteEmployee = async (req, res) => {
 
 // Employee: Update own profile (limited fields)
 exports.updateOwnProfile = async (req, res) => {
-  const allowed = ['phone', 'address', 'emergencyContact', 'accountNumber', 'ifscCode', 'uanNumber'];
+  const allowed = ['phone', 'address', 'emergencyContact', 'accountNumber', 'ifscCode', 'uanNumber', 'panNumber'];
   try {
     const employee = await User.findById(req.user._id);
     allowed.forEach(field => { if (req.body[field] !== undefined) employee[field] = req.body[field]; });

@@ -12,7 +12,7 @@ const PERMISSIONS = { VIEW: 'view', EDIT: 'edit' };
 // Every grantable module key. Keep in sync with the frontend registry.
 const MODULE_KEYS = [
   'dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks',
-  'timesheets', 'knowledge_center', 'team', 'crm', 'field_sales',
+  'timesheets', 'knowledge_center', 'team', 'crm', 'field_sales', 'query_management',
   'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips',
   'recruitment', 'finance', 'reports', 'announcements', 'holidays',
 ];
@@ -25,7 +25,7 @@ const BASELINE_EDITABLE = ['profile', 'attendance', 'leaves', 'tasks', 'timeshee
 
 const ROLE_DEFAULT_MODULES = {
   employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
-  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm'],
+  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
   field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
   hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets'],
 };

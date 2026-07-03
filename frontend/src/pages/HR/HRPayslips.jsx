@@ -355,7 +355,7 @@ const HRPayslips = () => {
         location: emp.location || 'Hyderabad - SEZ',
         department: emp.department?.name || emp.department || 'US Staffing - Healthcare',
         designation: emp.designation || 'Management Trainee',
-        panNo: emp.panNo || '',
+        panNo: emp.panNumber || '',
         earnings: {
           basic: emp.basicSalary ? String(emp.basicSalary) : '',
           da: emp.da ? String(emp.da) : '',

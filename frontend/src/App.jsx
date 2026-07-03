@@ -42,6 +42,7 @@ import PayslipsPage from './pages/Payslips/PayslipsPage';
 import TasksPage from './pages/Tasks/TasksPage';
 import CRMPage from './pages/CRM/CRMPage';
 import ProductDetailPage from './pages/CRM/ProductDetailPage';
+import QueryManagement from './pages/Sales/QueryManagement';
 import TeamPage from './pages/Team/TeamPage';
 
 // HR Pages
@@ -125,6 +126,7 @@ const AppRoutes = () => {
         <Route path="/crm" element={<ProtectedRoute module="crm"><CRMPage /></ProtectedRoute>} />
         <Route path="/field-sales/leads" element={<ProtectedRoute module="field_sales"><FieldLeadsPage /></ProtectedRoute>} />
         <Route path="/crm/products/:productId" element={<ProtectedRoute module="crm"><ProductDetailPage /></ProtectedRoute>} />
+        <Route path="/queries" element={<ProtectedRoute module="query_management"><QueryManagement /></ProtectedRoute>} />
 
         {/* HR Routes */}
         <Route path="/hr/employees" element={<ProtectedRoute module="hr_employees"><HREmployees /></ProtectedRoute>} />

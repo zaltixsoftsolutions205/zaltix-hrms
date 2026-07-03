@@ -59,6 +59,7 @@ export const MODULES = [
   // Sales / CRM
   { key: 'crm',              label: 'CRM',                path: '/crm',                  icon: ICON.crm,       editable: true,  group: 'Sales' },
   { key: 'field_sales',      label: 'Field Sales',        path: '/field-sales/leads',    icon: ICON.field,     editable: true,  group: 'Sales' },
+  { key: 'query_management', label: 'Query Management',   path: '/queries',              icon: ICON.approvals, editable: true,  group: 'Sales' },
 
   // HR-management modules
   { key: 'hr_employees',     label: 'Employees (HR)',     path: '/hr/employees',         icon: ICON.people,    editable: true,  group: 'HR Management' },
@@ -95,7 +96,7 @@ export const BASELINE_EDITABLE = ['profile', 'attendance', 'leaves', 'tasks', 't
 
 export const ROLE_DEFAULT_MODULES = {
   employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
-  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm'],
+  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
   field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
   hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets'],
 };
