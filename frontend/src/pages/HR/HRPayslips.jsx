@@ -286,10 +286,20 @@ const HRPayslips = () => {
   const [payslips, setPayslips] = useState([]);
   const [employees, setEmployees] = useState([]);
   const [showModal, setShowModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [downloading, setDownloading] = useState(null);
   const [deleting, setDeleting] = useState(null);
+  const [editingPayslipId, setEditingPayslipId] = useState(null);
   const [selectedEmpRole, setSelectedEmpRole] = useState('');
+  const [editForm, setEditForm] = useState({
+    basicSalary: '',
+    workingDays: 26,
+    presentDays: 26,
+    lwpDays: 0,
+    allowances: [],
+    deductions: [],
+  });
   const now = new Date();
   const [filterMonth, setFilterMonth] = useState('');
   const [filterYear, setFilterYear] = useState('');
@@ -437,6 +447,101 @@ const HRPayslips = () => {
     }
   };
 
+  const handleViewPdf = async (id) => {
+    setDownloading(id);
+    try {
+      const response = await api.get(`/payslips/${id}/download`, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);
+      toast.success('Payslip opened');
+    } catch (err) {
+      let msg = err.message || 'Unable to open payslip';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.message) msg = json.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        msg = err.response.data.message;
+      }
+      toast.error(msg);
+      console.error('View payslip error:', err);
+    } finally {
+      setDownloading(null);
+    }
+  };
+
+  const openEditModal = async (id) => {
+    try {
+      const response = await api.get(`/payslips/${id}`);
+      const payslip = response.data;
+      setEditingPayslipId(id);
+      setEditForm({
+        basicSalary: payslip.basicSalary ?? '',
+        workingDays: payslip.workingDays ?? 26,
+        presentDays: payslip.presentDays ?? payslip.workingDays ?? 26,
+        lwpDays: payslip.lwpDays ?? 0,
+        allowances: (payslip.allowances || []).map(item => ({ name: item.name || '', amount: item.amount ?? 0 })),
+        deductions: (payslip.deductions || []).map(item => ({ name: item.name || '', amount: item.amount ?? 0 })),
+      });
+      setShowEditModal(true);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to load payslip');
+    }
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await api.put(`/payslips/${editingPayslipId}`, {
+        basicSalary: parseFloat(editForm.basicSalary) || 0,
+        workingDays: parseInt(editForm.workingDays) || 0,
+        presentDays: parseInt(editForm.presentDays) || 0,
+        lwpDays: parseInt(editForm.lwpDays) || 0,
+        allowances: editForm.allowances.map(item => ({
+          name: item.name,
+          amount: parseFloat(item.amount) || 0,
+        })),
+        deductions: editForm.deductions.map(item => ({
+          name: item.name,
+          amount: parseFloat(item.amount) || 0,
+        })),
+      });
+      toast.success('Payslip updated');
+      setShowEditModal(false);
+      setEditingPayslipId(null);
+      fetch();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Unable to update payslip');
+    }
+  };
+
+  const updateEditAllowance = (index, field, value) => {
+    setEditForm(prev => {
+      const allowances = [...prev.allowances];
+      allowances[index] = { ...allowances[index], [field]: value };
+      return { ...prev, allowances };
+    });
+  };
+
+  const updateEditDeduction = (index, field, value) => {
+    setEditForm(prev => {
+      const deductions = [...prev.deductions];
+      deductions[index] = { ...deductions[index], [field]: value };
+      return { ...prev, deductions };
+    });
+  };
+
+  const addEditAllowance = () => {
+    setEditForm(prev => ({ ...prev, allowances: [...prev.allowances, { name: '', amount: 0 }] }));
+  };
+
+  const addEditDeduction = () => {
+    setEditForm(prev => ({ ...prev, deductions: [...prev.deductions, { name: '', amount: 0 }] }));
+  };
+
   const handleDelete = async (id) => {
     if (!window.confirm('Delete this payslip? This cannot be undone.')) return;
     setDeleting(id);
@@ -485,6 +590,7 @@ const HRPayslips = () => {
       setDownloading(null);
     }
   };
+  
 
   // Number to words converter (simplified)
   const numberToWords = (num) => {
@@ -590,15 +696,32 @@ const HRPayslips = () => {
                   </div>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => handleDownload(ps._id, ps.employee, ps.month, ps.year)}
+                      type="button"
+                      onClick={() => handleViewPdf(ps._id)}
                       disabled={downloading === ps._id}
                       className="btn-primary btn-sm flex items-center gap-1 flex-1 justify-center text-xs"
                     >
-                      {downloading === ps._id ? 'Downloading...' : (
-                        <><SI d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" size={13} color="text-white" /> Download PDF</>
+                      {downloading === ps._id ? 'Opening...' : (
+                        <><SI d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" size={13} color="text-white" /> View</>
                       )}
                     </button>
                     <button
+                      type="button"
+                      onClick={() => handleDownload(ps._id, ps.employee, ps.month, ps.year)}
+                      disabled={downloading === ps._id}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white btn-sm flex items-center justify-center px-3"
+                    >
+                      <SI d="M12 3v12m0 0l-4-4m4 4l4-4m-8 8h8" size={14} color="text-white" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => openEditModal(ps._id)}
+                      className="bg-amber-600 hover:bg-amber-700 text-white btn-sm flex items-center justify-center px-3"
+                    >
+                      <SI d="M11 4h2m-1 0v16m-7-7h16" size={14} color="text-white" />
+                    </button>
+                    <button
+                      type="button"
                       onClick={() => handleDelete(ps._id)}
                       disabled={deleting === ps._id}
                       className="btn-danger btn-sm flex items-center justify-center px-3"
@@ -639,15 +762,32 @@ const HRPayslips = () => {
                       <td>
                         <div className="flex items-center gap-2">
                           <button
-                            onClick={() => handleDownload(ps._id, ps.employee, ps.month, ps.year)}
+                            type="button"
+                            onClick={() => handleViewPdf(ps._id)}
                             disabled={downloading === ps._id}
                             className="btn-primary btn-sm flex items-center gap-1"
                           >
                             {downloading === ps._id ? '...' : (
-                              <><SI d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" size={13} color="text-white" /> PDF</>
+                              <><SI d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" size={13} color="text-white" /> View</>
                             )}
                           </button>
                           <button
+                            type="button"
+                            onClick={() => handleDownload(ps._id, ps.employee, ps.month, ps.year)}
+                            disabled={downloading === ps._id}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white btn-sm flex items-center justify-center aspect-square"
+                          >
+                            <SI d="M12 3v12m0 0l-4-4m4 4l4-4m-8 8h8" size={14} color="text-white" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => openEditModal(ps._id)}
+                            className="bg-amber-600 hover:bg-amber-700 text-white btn-sm flex items-center justify-center aspect-square"
+                          >
+                            <SI d="M11 4h2m-1 0v16m-7-7h16" size={14} color="text-white" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => handleDelete(ps._id)}
                             disabled={deleting === ps._id}
                             className="btn-danger btn-sm flex items-center justify-center aspect-square"
@@ -832,6 +972,105 @@ const HRPayslips = () => {
             <button type="button" className="btn-secondary flex-1 justify-center" onClick={() => setShowModal(false)}>
               Cancel
             </button>
+          </div>
+        </form>
+      </Modal>
+
+      <Modal isOpen={showEditModal} onClose={() => setShowEditModal(false)} title="Edit Payslip" size="lg">
+        <form onSubmit={handleEditSubmit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="input-label">Basic Salary (Rs.)</label>
+              <input
+                type="number"
+                className="input-field"
+                value={editForm.basicSalary}
+                onChange={(e) => setEditForm(prev => ({ ...prev, basicSalary: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="input-label">Working Days</label>
+              <input
+                type="number"
+                className="input-field"
+                value={editForm.workingDays}
+                onChange={(e) => setEditForm(prev => ({ ...prev, workingDays: e.target.value }))}
+              />
+            </div>
+            <div>
+              <label className="input-label">Present Days</label>
+              <input
+                type="number"
+                className="input-field"
+                value={editForm.presentDays}
+                onChange={(e) => setEditForm(prev => ({ ...prev, presentDays: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+            <div>
+              <label className="input-label">LWP Days</label>
+              <input
+                type="number"
+                className="input-field"
+                value={editForm.lwpDays}
+                onChange={(e) => setEditForm(prev => ({ ...prev, lwpDays: e.target.value }))}
+              />
+            </div>
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="input-label mb-0">Allowances</label>
+              <button type="button" onClick={addEditAllowance} className="text-xs text-violet-600 hover:text-violet-700 font-medium">+ Add</button>
+            </div>
+            {editForm.allowances.map((item, index) => (
+              <div key={`allow-${index}`} className="flex gap-2 mb-2">
+                <input
+                  className="input-field"
+                  value={item.name}
+                  onChange={(e) => updateEditAllowance(index, 'name', e.target.value)}
+                  placeholder="Name"
+                />
+                <input
+                  type="number"
+                  className="input-field w-32"
+                  value={item.amount}
+                  onChange={(e) => updateEditAllowance(index, 'amount', e.target.value)}
+                  placeholder="₹0"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className="input-label mb-0">Deductions</label>
+              <button type="button" onClick={addEditDeduction} className="text-xs text-violet-600 hover:text-violet-700 font-medium">+ Add</button>
+            </div>
+            {editForm.deductions.map((item, index) => (
+              <div key={`ded-${index}`} className="flex gap-2 mb-2">
+                <input
+                  className="input-field"
+                  value={item.name}
+                  onChange={(e) => updateEditDeduction(index, 'name', e.target.value)}
+                  placeholder="Name"
+                />
+                <input
+                  type="number"
+                  className="input-field w-32"
+                  value={item.amount}
+                  onChange={(e) => updateEditDeduction(index, 'amount', e.target.value)}
+                  placeholder="₹0"
+                />
+              </div>
+            ))}
+          </div>
+
+          <div className="flex gap-3">
+            <button type="submit" className="btn-primary flex-1">Save Changes</button>
+            <button type="button" className="btn-secondary flex-1" onClick={() => setShowEditModal(false)}>Cancel</button>
           </div>
         </form>
       </Modal>

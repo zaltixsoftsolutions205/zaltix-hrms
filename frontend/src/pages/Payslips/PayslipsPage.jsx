@@ -25,6 +25,29 @@ const PayslipsPage = () => {
     api.get('/user/profile-completion').then(r => setProfileCompletion(r.data)).catch(() => {});
   }, []);
 
+  const handleViewPdf = async (id) => {
+    try {
+      const res = await api.get(`/payslips/${id}/download`, { responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      window.open(blobUrl, '_blank', 'noopener,noreferrer');
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 10000);
+      toast.success('Payslip opened');
+    } catch (err) {
+      let msg = err.message || 'Unable to open payslip';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const json = JSON.parse(text);
+          if (json.message) msg = json.message;
+        } catch (_) {}
+      } else if (err.response?.data?.message) {
+        msg = err.response.data.message;
+      }
+      toast.error(msg);
+      console.error('View payslip error:', err);
+    }
+  };
+
   const handleDownload = async (id, month, year, empId) => {
     setDownloading(id);
     try {
@@ -100,55 +123,57 @@ const PayslipsPage = () => {
         ) : payslips.length === 0 ? (
           <EmptyState icon={<SI d="M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" size={40} color="text-violet-400" />} title="No payslips yet" message="Your payslips will appear here once published by HR." />
         ) : (
-          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {payslips.map(ps => (
-              <motion.div key={ps._id} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}
-                className="border border-violet-100 rounded-2xl p-4 hover:bg-violet-50/40 transition-colors">
-                <div className="mb-3 pb-3 border-b border-violet-100">
-                  <img src="/logo.png" alt="Zaltix Soft Solutions" className="h-7 object-contain" />
-                </div>
-                <div className="flex items-start justify-between mb-3">
-                  <div>
-                    <p className="font-bold text-violet-900">{monthName(ps.month)} {ps.year}</p>
-                    <p className="text-xs text-violet-400 mt-0.5">Generated payslip</p>
-                  </div>
-                  <span className="badge-green">Published</span>
-                </div>
-                <div className="space-y-2 mb-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Basic Salary</span>
-                    <span className="font-medium text-violet-900">{formatCurrency(ps.basicSalary)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Gross Salary</span>
-                    <span className="font-medium text-violet-900">{formatCurrency(ps.grossSalary)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-500">Deductions</span>
-                    <span className="font-medium text-gray-900">- {formatCurrency(sumMoney(ps.deductions))}</span>
-                  </div>
-                  <div className="border-t border-violet-100 pt-2 flex justify-between">
-                    <span className="font-semibold text-violet-900">Net Pay</span>
-                    <span className="font-bold text-golden-600 text-lg">{formatCurrency(ps.netSalary)}</span>
-                  </div>
-                </div>
-                {profileCompletion && profileCompletion.percentage < 100 ? (
-                  <div className="w-full text-center">
-                    <button disabled
-                      className="w-full btn-primary btn-sm flex items-center justify-center gap-2 opacity-40 cursor-not-allowed">
-                      <SI d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" size={14} /> Download Locked
-                    </button>
-                    <p className="text-[10px] text-amber-600 mt-1">Complete your profile to unlock</p>
-                  </div>
-                ) : (
-                  <button onClick={() => handleDownload(ps._id, ps.month, ps.year, user?.employeeId)}
-                    disabled={downloading === ps._id}
-                    className="w-full btn-primary btn-sm flex items-center justify-center gap-2">
-                    {downloading === ps._id ? 'Downloading...' : <span className="flex items-center gap-1.5"><SI d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" size={14} /> Download PDF</span>}
-                  </button>
-                )}
-              </motion.div>
-            ))}
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="border-b border-violet-100 text-left text-violet-700">
+                  <th className="px-3 py-2">Employee</th>
+                  <th className="px-3 py-2">Period</th>
+                  <th className="px-3 py-2">Generated By</th>
+                  <th className="px-3 py-2">Basic</th>
+                  <th className="px-3 py-2">Gross</th>
+                  <th className="px-3 py-2">Net Pay</th>
+                  <th className="px-3 py-2">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {payslips.map(ps => (
+                  <tr key={ps._id} className="border-b border-violet-50 hover:bg-violet-50/40">
+                    <td className="px-3 py-3">
+                      <p className="font-semibold text-violet-900">{user?.name || 'Employee'}</p>
+                      <p className="text-xs text-violet-400">{user?.employeeId || '—'}</p>
+                    </td>
+                    <td className="px-3 py-3">{monthName(ps.month)} {ps.year}</td>
+                    <td className="px-3 py-3 text-gray-600">{ps.generatedBy?.name || 'HR'}</td>
+                    <td className="px-3 py-3">{formatCurrency(ps.basicSalary)}</td>
+                    <td className="px-3 py-3">{formatCurrency(ps.grossSalary)}</td>
+                    <td className="px-3 py-3 font-semibold text-golden-600">{formatCurrency(ps.netSalary)}</td>
+                    <td className="px-3 py-3">
+                      {profileCompletion && profileCompletion.percentage < 100 ? (
+                        <span className="text-xs text-amber-600">Locked</span>
+                      ) : (
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handleViewPdf(ps._id)}
+                            className="btn-primary btn-sm flex items-center gap-1"
+                          >
+                            <SI d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" size={13} /> View
+                          </button>
+                          <button
+                            onClick={() => handleDownload(ps._id, ps.month, ps.year, user?.employeeId)}
+                            disabled={downloading === ps._id}
+                            className="btn-secondary btn-sm flex items-center gap-1"
+                          >
+                            {downloading === ps._id ? '...' : <><SI d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" size={13} /> Download</>}
+                          </button>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </Card>
