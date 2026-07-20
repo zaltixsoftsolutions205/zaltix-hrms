@@ -86,8 +86,9 @@ const Login = () => {
               <h2 className="text-lg font-bold text-violet-900 mb-6">Sign in to your account</h2>
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <label className="block text-xs font-medium text-violet-700 mb-1.5">Email Address</label>
+                  <label className="block text-xs font-medium text-violet-700 mb-1.5">Email Address or Employee ID</label>
                   <input type="text" value={logins} onChange={e => setLogin(e.target.value)} required
+                    autoCapitalize="none" autoCorrect="off" spellCheck="false" autoComplete="username"
                     className="w-full bg-white/70 border border-violet-200 rounded-xl px-4 py-3 text-violet-900 placeholder-violet-400 focus:outline-none focus:ring-2 focus:ring-golden-400 focus:border-transparent text-sm transition-all"
                     placeholder="Email or Employee ID" />
                 </div>

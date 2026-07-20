@@ -1,6 +1,3 @@
-node_modules
-
-```gitignore
 # Dependencies
 node_modules/
 
@@ -22,4 +19,11 @@ pnpm-debug.log*
 # Uploaded Files
 uploads/
 public/uploads/
-```
+
+# Local scratch files and credentials — never commit
+token.txt
+psid.txt
+temp.bin
+
+# Stray nested copy of the frontend; the real one lives at repo root
+frontend/
