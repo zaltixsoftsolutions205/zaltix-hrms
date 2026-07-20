@@ -47,6 +47,7 @@ import TeamPage from './pages/Team/TeamPage';
 
 // HR Pages
 import HREmployees from './pages/HR/HREmployees';
+import HREmployeeInfo from "./pages/HR/HREmployeeInfo";
 import HRAttendance from './pages/HR/HRAttendance';
 import HRLeaves from './pages/HR/HRLeaves';
 import HRTasks from './pages/HR/HRTasks';
@@ -130,6 +131,7 @@ const AppRoutes = () => {
 
         {/* HR Routes */}
         <Route path="/hr/employees" element={<ProtectedRoute module="hr_employees"><HREmployees /></ProtectedRoute>} />
+        <Route path="/hr/employees/:employeeId" element={<ProtectedRoute module="hr_employees"><HREmployeeInfo /></ProtectedRoute>} />
         <Route path="/hr/attendance" element={<ProtectedRoute module="hr_attendance"><HRAttendance /></ProtectedRoute>} />
         <Route path="/hr/leaves" element={<ProtectedRoute module="hr_leaves"><HRLeaves /></ProtectedRoute>} />
         <Route path="/hr/tasks" element={<ProtectedRoute module="hr_tasks"><HRTasks /></ProtectedRoute>} />

@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { generatePayslip, getMyPayslips, getAllPayslips, getPayslipById, updatePayslip, downloadPayslip, deletePayslip } = require('../controllers/payslipController');
+const { generatePayslip, getMyPayslips,getEmployeePayslips, getAllPayslips, getPayslipById, updatePayslip, downloadPayslip, deletePayslip } = require('../controllers/payslipController');
 const { protect } = require('../middleware/auth');
 const { moduleAccess } = require('../middleware/roleCheck');
 
@@ -14,6 +14,7 @@ router.use(protect);
 
 router.post('/', hrPayslipsEdit, generatePayslip);
 router.get('/my', employeePayslipsView, getMyPayslips);
+router.get('/my/:id/showall', employeePayslipsView, getEmployeePayslips);
 router.get('/:id/download', employeePayslipsView, downloadPayslip);
 router.get('/my/:id/show', employeePayslipsView, getPayslipById);
 router.get('/', hrPayslipsView, getAllPayslips);

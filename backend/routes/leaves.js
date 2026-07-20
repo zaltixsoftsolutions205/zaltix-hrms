@@ -3,6 +3,7 @@ const router = express.Router();
 const { applyLeave, getMyLeaves, getAllLeaves, updateLeaveStatus, getLeaveBalance } = require('../controllers/leaveController');
 const { protect } = require('../middleware/auth');
 const { moduleAccess } = require('../middleware/roleCheck');
+const { roleCheck } = require('../middleware/roleCheck');
 
 // HR-level leave management gated by the 'hr_leaves' module.
 const hrLeavesView = moduleAccess('hr_leaves', 'view');
@@ -12,6 +13,8 @@ router.use(protect);
 
 router.post('/', applyLeave);
 router.get('/my', getMyLeaves);
+// get all leaves of the emp
+router.get('/my/:id' ,roleCheck("hr", "admin"), getMyLeaves);
 router.get('/balance', getLeaveBalance);
 router.get('/balance/:employeeId', hrLeavesView, getLeaveBalance);
 router.get('/', hrLeavesView, getAllLeaves);

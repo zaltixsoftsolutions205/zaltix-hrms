@@ -85,14 +85,22 @@ exports.applyLeave = async (req, res) => {
 // Employee: Get own leaves
 exports.getMyLeaves = async (req, res) => {
   try {
-    const leaves = await Leave.find({ employee: req.user._id }).sort({ createdAt: -1 });
+    const employeeId = req.params.id || req.user._id;
+
+    const leaves = await Leave.find({
+      employee: employeeId,
+    }).sort({ createdAt: -1 });
+
     const year = new Date().getFullYear();
-    const balance = await getLeaveBalance(req.user._id, year);
+
+    const balance = await getLeaveBalance(employeeId, year);
+
     res.json({ leaves, balance });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 };
+
 
 // HR / Admin: Get all leaves
 exports.getAllLeaves = async (req, res) => {

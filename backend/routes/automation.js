@@ -14,6 +14,7 @@ router.use(protect);
 
 // Employee: own productivity score
 router.get('/my-score', getMyScore);
+// router.get('/my-score/:employeeId', roleCheck('hr', 'admin'), getMyScore);
 
 // HR + Admin: full dashboard
 router.get('/dashboard', roleCheck('hr', 'admin'), getDashboard);

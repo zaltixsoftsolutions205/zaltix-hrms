@@ -13,7 +13,7 @@ const SI = ({ d, d2, size = 16, color }) => (
   </svg>
 );
 
-const PayslipsPage = () => {
+const PayslipsPage = ({ employeeId = null }) => {
   const [payslips, setPayslips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [downloading, setDownloading] = useState(null);
@@ -21,9 +21,47 @@ const PayslipsPage = () => {
   const { user } = useAuth();
 
   useEffect(() => {
-    api.get('/payslips/my').then(r => setPayslips(r.data)).catch(() => {}).finally(() => setLoading(false));
-    api.get('/user/profile-completion').then(r => setProfileCompletion(r.data)).catch(() => {});
-  }, []);
+
+    const loadPayslips = async () => {
+
+      try {
+
+        setLoading(true);
+
+        const url = employeeId
+          ? `/payslips/my/${employeeId}/showall`
+          : "/payslips/my";
+
+        const res = await api.get(url);
+
+        setPayslips(res.data);
+
+      } catch (err) {
+
+        toast.error("Failed to load payslips");
+
+      } finally {
+
+        setLoading(false);
+
+      }
+
+    };
+
+    // Call the function
+    loadPayslips();
+
+    console.log("Employee ID:", employeeId);
+
+    if (!employeeId) {
+
+      api.get("/user/profile-completion")
+        .then((r) => setProfileCompletion(r.data))
+        .catch(() => { });
+
+    }
+
+  }, [employeeId]);
 
   const handleViewPdf = async (id) => {
     try {
@@ -39,7 +77,7 @@ const PayslipsPage = () => {
           const text = await err.response.data.text();
           const json = JSON.parse(text);
           if (json.message) msg = json.message;
-        } catch (_) {}
+        } catch (_) { }
       } else if (err.response?.data?.message) {
         msg = err.response.data.message;
       }
@@ -53,7 +91,7 @@ const PayslipsPage = () => {
     try {
       const res = await api.get(`/payslips/${id}/download`, { responseType: 'blob' });
       const url = URL.createObjectURL(res.data);
-      const FULL_MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+      const FULL_MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
       const cd = res.headers?.['content-disposition'];
       let filename = '';
       if (cd) {
@@ -75,7 +113,7 @@ const PayslipsPage = () => {
           const json = JSON.parse(text);
           if (json.message) msg = json.message;
           if (json.code) code = json.code;
-        } catch (_) {}
+        } catch (_) { }
       } else if (err.response?.data?.message) {
         msg = err.response.data.message;
         code = err.response?.data?.code;
@@ -90,25 +128,27 @@ const PayslipsPage = () => {
   };
 
   return (
-    <div className="max-w-6xl mx-auto px-3 sm:px-4 space-y-4 sm:space-y-5 animate-fade-in">
-      <div className="page-header">
-        <div><h2 className="page-title">My Payslips</h2><p className="page-subtitle">View and download your salary slips</p></div>
-      </div>
+    <div className="max-w-8xl mx-auto px-3 sm:px-4 space-y-4 sm:space-y-5 animate-fade-in">
+      {!employeeId && (
+        <div className="page-header">
+          <div><h2 className="page-title">My Payslips</h2><p className="page-subtitle">View and download your salary slips</p></div>
+        </div>
+      )}
 
       {/* Profile Completion Warning */}
-      {profileCompletion && profileCompletion.percentage < 100 && (
+      {!employeeId && profileCompletion && profileCompletion.percentage < 100 && (
         <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}>
           <Card className="border-l-4 border-l-amber-500 bg-amber-50">
             <div className="flex items-start gap-3">
               <div className="flex-shrink-0 pt-0.5">
                 <svg width={20} height={20} viewBox="0 0 24 24" fill="currentColor" className="text-amber-600">
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
                 </svg>
               </div>
               <div className="flex-1">
                 <h3 className="font-bold text-amber-900">Profile Incomplete ({profileCompletion.percentage}%)</h3>
                 <p className="text-sm text-amber-800 mt-0.5">
-                  Complete your profile including uploading a passport size photo to unlock payslip downloads. 
+                  Complete your profile including uploading a passport size photo to unlock payslip downloads.
                   <a href="/profile" className="font-semibold underline ml-1">Go to Profile →</a>
                 </p>
               </div>
@@ -140,8 +180,8 @@ const PayslipsPage = () => {
                 {payslips.map(ps => (
                   <tr key={ps._id} className="border-b border-violet-50 hover:bg-violet-50/40">
                     <td className="px-3 py-3">
-                      <p className="font-semibold text-violet-900">{user?.name || 'Employee'}</p>
-                      <p className="text-xs text-violet-400">{user?.employeeId || '—'}</p>
+                      <p className="font-semibold text-violet-900">{ps.employee?.name || user?.name || 'Employee'}</p>
+                      <p className="text-xs text-violet-400">{ps.employee?.employeeId || user?.employeeId || '—'}</p>
                     </td>
                     <td className="px-3 py-3">{monthName(ps.month)} {ps.year}</td>
                     <td className="px-3 py-3 text-gray-600">{ps.generatedBy?.name || 'HR'}</td>
@@ -149,7 +189,7 @@ const PayslipsPage = () => {
                     <td className="px-3 py-3">{formatCurrency(ps.grossSalary)}</td>
                     <td className="px-3 py-3 font-semibold text-golden-600">{formatCurrency(ps.netSalary)}</td>
                     <td className="px-3 py-3">
-                      {profileCompletion && profileCompletion.percentage < 100 ? (
+                      {!employeeId && profileCompletion && profileCompletion.percentage < 100 ? (
                         <span className="text-xs text-amber-600">Locked</span>
                       ) : (
                         <div className="flex flex-wrap gap-2">

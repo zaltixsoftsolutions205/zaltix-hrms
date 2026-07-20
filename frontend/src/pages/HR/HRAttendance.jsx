@@ -19,7 +19,7 @@ const SI = ({ d, d2, size = 16, color }) => (
 const getISTClock = () => new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
 const REG_BADGE = {
-  pending:  'bg-amber-100 text-amber-700',
+  pending: 'bg-amber-100 text-amber-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
 };
@@ -118,9 +118,60 @@ const RegularizationsPanel = () => {
                         {r.regularizationStatus}
                       </span>
                     </div>
-                    <p className="text-sm text-violet-700">
-                      <span className="font-medium text-violet-500">Reason: </span>{r.regularizationReason}
-                    </p>
+                    <div className="mt-3 space-y-2">
+
+                      {(r.isLate || r.regularizedCheckIn) && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <span className="font-medium text-violet-500 w-32">
+                            Check-In
+                          </span>
+
+                          <span className="text-gray-500">
+                            {formatTime12(r.checkIn)}
+                          </span>
+
+                          {r.regularizedCheckIn && (
+                            <>
+                              <span className="text-violet-400">→</span>
+
+                              <span className="font-semibold text-green-600">
+                                {r.regularizedCheckIn}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      {(r.isEarlyLeave || !r.checkOut || r.regularizedCheckOut) && (
+                        <div className="flex items-center gap-3 text-sm">
+                          <span className="font-medium text-violet-500 w-32">
+                            Check-Out
+                          </span>
+
+                          <span className="text-gray-500">
+                            {formatTime12(r.checkOut)}
+                          </span>
+
+                          {r.regularizedCheckOut && (
+                            <>
+                              <span className="text-violet-400">→</span>
+
+                              <span className="font-semibold text-green-600">
+                                {r.regularizedCheckOut}
+                              </span>
+                            </>
+                          )}
+                        </div>
+                      )}
+
+                      <div>
+                        <span className="font-medium text-violet-500">
+                          Reason:
+                        </span>{" "}
+                        {r.regularizationReason}
+                      </div>
+
+                    </div>
                     {r.regularizationComment && (
                       <p className="text-xs text-violet-500 mt-1">
                         <span className="font-medium">HR Note: </span>{r.regularizationComment}
@@ -204,7 +255,7 @@ const HRAttendance = () => {
     const m = now.getMonth() + 1, y = now.getFullYear();
     api.get(`/attendance/my?month=${m}&year=${y}`)
       .then(r => setTodayRecord(r.data.todayRecord))
-      .catch(() => {});
+      .catch(() => { });
   };
 
   const {
@@ -214,11 +265,11 @@ const HRAttendance = () => {
   } = useAttendance(fetchTodayRecord);
 
   useEffect(() => {
-    api.get('/employees').then(r => setEmployees(r.data)).catch(() => {});
-    api.get('/admin/departments').then(r => setDepartments(r.data)).catch(() => {});
+    api.get('/employees').then(r => setEmployees(r.data)).catch(() => { });
+    api.get('/admin/departments').then(r => setDepartments(r.data)).catch(() => { });
     api.get('/attendance/regularizations?status=pending')
       .then(r => setPendingRegCount(r.data.length))
-      .catch(() => {});
+      .catch(() => { });
     fetchTodayRecord();
   }, []);
 

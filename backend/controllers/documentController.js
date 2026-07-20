@@ -131,3 +131,42 @@ exports.checkAllDocsApproved = async (employeeId) => {
   const approvedCount = await Document.countDocuments({ employee: employeeId, status: 'approved' });
   return approvedCount >= required.length;
 };
+
+
+// Helper: download document
+exports.downloadDocument = async (req, res) => {
+  try {
+    const doc = await Document.findById(req.params.id);
+
+    if (!doc) {
+      return res.status(404).json({
+        message: "Document not found",
+      });
+    }
+
+    // Employee can download only their own document
+    // HR/Admin can download anyone's
+    if (
+      req.user.role === "employee" &&
+      doc.employee.toString() !== req.user._id.toString()
+    ) {
+      return res.status(403).json({
+        message: "Unauthorized",
+      });
+    }
+
+    const filePath = path.join(__dirname, "..", doc.filePath);
+
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        message: "File not found",
+      });
+    }
+
+    res.download(filePath);
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
