@@ -8,16 +8,19 @@ const { resetPasswordTemplate } = require('../utils/emailTemplates');
 const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expiresIn: process.env.JWT_EXPIRES_IN });
 
 exports.login = async (req, res) => {
-  const { email, password } = req.body;
+  const { login, password  } = req.body;
   try {
-    const user = await User.findOne({ email }).populate('department');
+    const user = await User.findOne({  $or: [
+        { email: login },
+        { employeeId: login }
+      ]}).populate('department');
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 
     const match = await user.matchPassword(password);
     if (!match) return res.status(401).json({ message: 'Invalid credentials' });
 
     // Deactivated employees cannot log in.
-    if (user.isActive === false) {
+    if (!user.isActive) {
       return res.status(403).json({ message: 'Your account is inactive. Please contact HR.' });
     }
 

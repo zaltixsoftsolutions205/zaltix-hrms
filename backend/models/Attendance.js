@@ -20,6 +20,8 @@ const attendanceSchema = new mongoose.Schema(
     // HR regularization workflow
     regularizationStatus: { type: String, enum: ['pending', 'approved', 'rejected'], default: null },
     regularizationReason: { type: String, default: '' },
+    regularizedCheckIn: { type: String, default: null },
+    regularizedCheckOut: {type: String, default: null},
     regularizationComment: { type: String, default: '' },
   },
   { timestamps: true }

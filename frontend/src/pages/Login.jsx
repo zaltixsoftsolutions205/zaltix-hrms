@@ -23,6 +23,7 @@ const EyeOffIcon = () => (
 const Login = () => {
   const [mode, setMode] = useState('login'); // 'login' | 'forgot'
   const [email, setEmail] = useState('');
+  const [logins, setLogin] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
@@ -33,7 +34,7 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const data = await login(email, password);
+      const data = await login(logins, password);
       if (data.isFirstLogin) {
         toast.success('Welcome! Please change your password.');
         navigate('/change-password');
@@ -77,7 +78,7 @@ const Login = () => {
         <div className="text-center mb-8">
           <img src="/logo.png" alt="Zaltix Soft Solutions" className="h-14 mx-auto mb-3 object-contain" />
         </div>
-
+    
         {/* Card */}
         <div className="bg-violet-100/80 backdrop-blur-xl border border-violet-200 rounded-3xl p-8 shadow-lg">
           {mode === 'login' ? (
@@ -86,9 +87,9 @@ const Login = () => {
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
                   <label className="block text-xs font-medium text-violet-700 mb-1.5">Email Address</label>
-                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required
+                  <input type="text" value={logins} onChange={e => setLogin(e.target.value)} required
                     className="w-full bg-white/70 border border-violet-200 rounded-xl px-4 py-3 text-violet-900 placeholder-violet-400 focus:outline-none focus:ring-2 focus:ring-golden-400 focus:border-transparent text-sm transition-all"
-                    placeholder="you@company.com" />
+                    placeholder="Email or Employee ID" />
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-violet-700 mb-1.5">Password</label>

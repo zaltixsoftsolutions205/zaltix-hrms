@@ -8,6 +8,7 @@ const {
   uploadDocument,
   getEmployeeDocuments,
   reviewDocument,
+  downloadDocument,
 } = require('../controllers/documentController');
 
 // Employee: get own documents
@@ -22,4 +23,6 @@ router.get('/employee/:employeeId', protect, roleCheck('hr', 'admin'), getEmploy
 // HR/Admin: approve or reject a document
 router.patch('/:id/review', protect, roleCheck('hr', 'admin'), reviewDocument);
 
+// 
+router.get("/:id/download", protect, downloadDocument );
 module.exports = router;

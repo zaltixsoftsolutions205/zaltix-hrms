@@ -162,6 +162,35 @@ exports.getPayslipById = async (req, res) => {
   }
 };
 
+// HR / Admin: Get all payslips of an employee
+exports.getEmployeePayslips = async (req, res) => {
+  try {
+    const  employeeId  = req.params.id;
+    console.log(employeeId);
+
+    const payslips = await Payslip.find({ employee: employeeId })
+      .populate(
+        "employee",
+        "name employeeId department designation location panNo role"
+      )
+      .populate("generatedBy", "name")
+      .sort({ year: -1, month: -1 }); // Latest payslips first
+
+    if (!payslips.length) {
+      return res.status(404).json({
+        message: "No payslips found for this employee",
+      });
+    }
+
+    res.status(200).json(payslips);
+  } catch (err) {
+    res.status(500).json({
+      message: err.message,
+    });
+  }
+};
+
+
 // HR / Admin: Update payslip
 exports.updatePayslip = async (req, res) => {
   try {

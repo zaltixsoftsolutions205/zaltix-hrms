@@ -177,7 +177,7 @@ exports.updateEmployee = async (req, res) => {
   try {
     const employee = await User.findById(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
-
+    
     allowed.forEach(field => {
       if (req.body[field] !== undefined) {
         employee[field] = field === 'department' ? req.body[field] || null : req.body[field];

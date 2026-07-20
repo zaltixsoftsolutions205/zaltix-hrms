@@ -146,15 +146,31 @@ exports.getEmployeeScores = async (req, res) => {
 
 exports.getMyScore = async (req, res) => {
   try {
-    const scores = await ProductivityScore.find({ employee: req.user._id })
+    const employeeId = req.params.employeeId || req.user._id;
+
+    const scores = await ProductivityScore.find({
+      employee: employeeId
+    })
       .sort({ weekStart: -1 })
       .limit(8)
       .lean();
 
-    const latestTask = await Task.countDocuments({ assignedTo: req.user._id, status: { $nin: ['completed'] } });
-    const overdueTask = await Task.countDocuments({ assignedTo: req.user._id, status: { $nin: ['completed'] }, deadline: { $lt: new Date() } });
+    const pendingTasks = await Task.countDocuments({
+      assignedTo: employeeId,
+      status: { $nin: ['completed'] }
+    });
 
-    res.json({ scores, pendingTasks: latestTask, overdueTasks: overdueTask });
+    const overdueTasks = await Task.countDocuments({
+      assignedTo: employeeId,
+      status: { $nin: ['completed'] },
+      deadline: { $lt: new Date() }
+    });
+
+    res.json({
+      scores,
+      pendingTasks,
+      overdueTasks,
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

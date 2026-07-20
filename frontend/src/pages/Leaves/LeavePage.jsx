@@ -16,27 +16,27 @@ const SI = ({ d, d2, size = 16, color }) => (
 );
 
 const WEEK_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
 const TYPE_STYLE = {
   casual: 'bg-violet-100 text-violet-700 font-semibold',
-  sick:   'bg-gray-100 text-gray-900 font-semibold',
-  other:  'bg-amber-100 text-amber-700 font-semibold',
-  lop:    'bg-gray-200 text-gray-700 font-semibold',
+  sick: 'bg-gray-100 text-gray-900 font-semibold',
+  other: 'bg-amber-100 text-amber-700 font-semibold',
+  lop: 'bg-gray-200 text-gray-700 font-semibold',
 };
 
 const TYPE_LABEL = {
   casual: 'Casual',
-  sick:   'Sick',
-  other:  'Other',
-  lop:    'Loss of Pay',
+  sick: 'Sick',
+  other: 'Other',
+  lop: 'Loss of Pay',
 };
 
 const SESSION_LABEL = { morning: 'Morning', afternoon: 'Afternoon' };
 
 const STATUS_OPACITY = {
   approved: '',
-  pending:  'opacity-60',
+  pending: 'opacity-60',
   rejected: 'opacity-30 line-through',
 };
 
@@ -81,10 +81,10 @@ const LeaveCalendar = ({ leaves, calMonth, calYear, onPrev, onNext }) => {
       {/* Legend */}
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         {[
-          { label: 'Casual',       cls: 'bg-violet-100 text-violet-700' },
-          { label: 'Sick',         cls: 'bg-gray-100 text-gray-900' },
-          { label: 'Other',        cls: 'bg-amber-100 text-amber-700' },
-          { label: 'Loss of Pay',  cls: 'bg-gray-200 text-gray-700' },
+          { label: 'Casual', cls: 'bg-violet-100 text-violet-700' },
+          { label: 'Sick', cls: 'bg-gray-100 text-gray-900' },
+          { label: 'Other', cls: 'bg-amber-100 text-amber-700' },
+          { label: 'Loss of Pay', cls: 'bg-gray-200 text-gray-700' },
         ].map(l => (
           <span key={l.label} className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full ${l.cls}`}>
             <span className="w-1.5 h-1.5 rounded-full bg-current" />{l.label}
@@ -128,7 +128,7 @@ const LeaveCalendar = ({ leaves, calMonth, calYear, onPrev, onNext }) => {
   );
 };
 
-const LeavePage = () => {
+const LeavePage = ({ employeeId = null }) => {
   const [data, setData] = useState({ leaves: [], balance: {} });
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({ type: 'casual', fromDate: '', toDate: '', reason: '', halfDay: false, session: 'morning' });
@@ -136,7 +136,7 @@ const LeavePage = () => {
 
   const now = new Date();
   const [calMonth, setCalMonth] = useState(now.getMonth() + 1);
-  const [calYear, setCalYear]   = useState(now.getFullYear());
+  const [calYear, setCalYear] = useState(now.getFullYear());
 
   const prevMonth = () => {
     if (calMonth === 1) { setCalMonth(12); setCalYear(y => y - 1); }
@@ -149,11 +149,17 @@ const LeavePage = () => {
 
   const fetch = async () => {
     try {
-      const res = await api.get('/leaves/my');
+      const url = employeeId
+        ? `/leaves/my/${employeeId}`
+        : "/leaves/my";
+
+      const res = await api.get(url);
       setData(res.data);
-    } catch {}
+    } catch (err) {
+      toast.error("Failed to load leave data");
+    }
   };
-  useEffect(() => { fetch(); }, []);
+  useEffect(() => { fetch(); }, [employeeId]);
 
   const handleApply = async (e) => {
     e.preventDefault();
@@ -173,7 +179,7 @@ const LeavePage = () => {
     if (!data.balance || !Object.keys(data.balance).length) return [];
     const alerts = [];
     const casual = data.balance.casual;
-    const sick   = data.balance.sick;
+    const sick = data.balance.sick;
     if (casual && casual.remaining === 0)
       alerts.push({ level: 'error', message: `You have no casual leaves remaining. Any further absence will be Loss of Pay (LOP).` });
     else if (casual && casual.remaining <= 1)
@@ -187,7 +193,7 @@ const LeavePage = () => {
   })();
 
   return (
-    <div className="max-w-6xl mx-auto px-3 sm:px-4 space-y-4 animate-fade-in">
+    <div className="max-w-8xl mx-auto px-3 sm:px-4 space-y-4 animate-fade-in">
       <IntelligenceAlerts alerts={leaveAlerts} />
       {/* Leave Balance */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -245,9 +251,14 @@ const LeavePage = () => {
                 <h3 className="font-bold text-violet-900 text-sm sm:text-base">My Leave Requests</h3>
                 <p className="text-xs text-violet-500 mt-0.5">{data.leaves.length} request{data.leaves.length !== 1 ? 's' : ''}</p>
               </div>
-              <button onClick={() => setShowModal(true)} className="btn-primary btn-sm">
-                + Apply Leave
-              </button>
+              {!employeeId && (
+                <button
+                  onClick={() => setShowModal(true)}
+                  className="btn-primary btn-sm"
+                >
+                  + Apply Leave
+                </button>
+              )}
             </div>
 
             {data.leaves.length === 0 ? (
@@ -284,64 +295,66 @@ const LeavePage = () => {
       </Card>
 
       {/* Apply Modal */}
-      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Apply for Leave">
-        <form onSubmit={handleApply} className="space-y-4">
-          <div>
-            <label className="input-label">Leave Type</label>
-            <select className="input-field" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
-              <option value="casual">Casual Leave</option>
-              <option value="sick">Sick Leave</option>
-              <option value="other">Other Leave</option>
-              <option value="lop">Loss of Pay</option>
-            </select>
-            {form.type === 'lop' && (
-              <p className="mt-1 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
-                Loss of Pay leaves will result in salary deduction and are subject to HR approval.
-              </p>
-            )}
-          </div>
-          {/* Half Day toggle */}
-          <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-lg border border-violet-100">
-            <label className="flex items-center gap-2 cursor-pointer select-none flex-1">
-              <input type="checkbox" className="w-4 h-4 rounded accent-violet-600" checked={form.halfDay}
-                onChange={e => setForm(f => ({ ...f, halfDay: e.target.checked, toDate: e.target.checked ? f.fromDate : f.toDate }))} />
-              <span className="text-sm font-semibold text-violet-800">Half Day</span>
-            </label>
-            {form.halfDay && (
-              <select className="input-field w-auto text-xs py-1" value={form.session}
-                onChange={e => setForm(f => ({ ...f, session: e.target.value }))}>
-                <option value="morning">Morning</option>
-                <option value="afternoon">Afternoon</option>
-              </select>
-            )}
-          </div>
-          <div className={form.halfDay ? '' : 'grid grid-cols-2 gap-3'}>
+      {!employeeId && (
+        <Modal isOpen={showModal} onClose={() => setShowModal(false)} title="Apply for Leave">
+          <form onSubmit={handleApply} className="space-y-4">
             <div>
-              <label className="input-label">{form.halfDay ? 'Date' : 'From Date'}</label>
-              <input type="date" className="input-field" required value={form.fromDate}
-                onChange={e => setForm(f => ({ ...f, fromDate: e.target.value, toDate: f.halfDay ? e.target.value : f.toDate }))} min={new Date().toISOString().split('T')[0]} />
+              <label className="input-label">Leave Type</label>
+              <select className="input-field" value={form.type} onChange={e => setForm(f => ({ ...f, type: e.target.value }))}>
+                <option value="casual">Casual Leave</option>
+                <option value="sick">Sick Leave</option>
+                <option value="other">Other Leave</option>
+                <option value="lop">Loss of Pay</option>
+              </select>
+              {form.type === 'lop' && (
+                <p className="mt-1 text-xs text-gray-500 bg-gray-50 px-3 py-2 rounded-lg border border-gray-200">
+                  Loss of Pay leaves will result in salary deduction and are subject to HR approval.
+                </p>
+              )}
             </div>
-            {!form.halfDay && (
+            {/* Half Day toggle */}
+            <div className="flex items-center gap-3 p-3 bg-violet-50 rounded-lg border border-violet-100">
+              <label className="flex items-center gap-2 cursor-pointer select-none flex-1">
+                <input type="checkbox" className="w-4 h-4 rounded accent-violet-600" checked={form.halfDay}
+                  onChange={e => setForm(f => ({ ...f, halfDay: e.target.checked, toDate: e.target.checked ? f.fromDate : f.toDate }))} />
+                <span className="text-sm font-semibold text-violet-800">Half Day</span>
+              </label>
+              {form.halfDay && (
+                <select className="input-field w-auto text-xs py-1" value={form.session}
+                  onChange={e => setForm(f => ({ ...f, session: e.target.value }))}>
+                  <option value="morning">Morning</option>
+                  <option value="afternoon">Afternoon</option>
+                </select>
+              )}
+            </div>
+            <div className={form.halfDay ? '' : 'grid grid-cols-2 gap-3'}>
               <div>
-                <label className="input-label">To Date</label>
-                <input type="date" className="input-field" required value={form.toDate}
-                  onChange={e => setForm(f => ({ ...f, toDate: e.target.value }))} min={form.fromDate || new Date().toISOString().split('T')[0]} />
+                <label className="input-label">{form.halfDay ? 'Date' : 'From Date'}</label>
+                <input type="date" className="input-field" required value={form.fromDate}
+                  onChange={e => setForm(f => ({ ...f, fromDate: e.target.value, toDate: f.halfDay ? e.target.value : f.toDate }))} min={new Date().toISOString().split('T')[0]} />
               </div>
-            )}
-          </div>
-          <div>
-            <label className="input-label">Reason</label>
-            <textarea className="input-field" rows={3} required value={form.reason}
-              onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} placeholder="Explain the reason for your leave..." />
-          </div>
-          <div className="flex gap-3">
-            <button type="submit" className="btn-primary flex-1" disabled={loading}>
-              {loading ? 'Submitting...' : 'Submit Request'}
-            </button>
-            <button type="button" className="btn-secondary flex-1" onClick={() => setShowModal(false)}>Cancel</button>
-          </div>
-        </form>
-      </Modal>
+              {!form.halfDay && (
+                <div>
+                  <label className="input-label">To Date</label>
+                  <input type="date" className="input-field" required value={form.toDate}
+                    onChange={e => setForm(f => ({ ...f, toDate: e.target.value }))} min={form.fromDate || new Date().toISOString().split('T')[0]} />
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="input-label">Reason</label>
+              <textarea className="input-field" rows={3} required value={form.reason}
+                onChange={e => setForm(f => ({ ...f, reason: e.target.value }))} placeholder="Explain the reason for your leave..." />
+            </div>
+            <div className="flex gap-3">
+              <button type="submit" className="btn-primary flex-1" disabled={loading}>
+                {loading ? 'Submitting...' : 'Submit Request'}
+              </button>
+              <button type="button" className="btn-secondary flex-1" onClick={() => setShowModal(false)}>Cancel</button>
+            </div>
+          </form>
+        </Modal>
+      )}
     </div>
   );
 };

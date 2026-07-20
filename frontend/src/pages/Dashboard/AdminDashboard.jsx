@@ -23,24 +23,24 @@ const Icon = ({ d, size = 16, className = '', strokeWidth = 1.75 }) => (
 
 /* ── Icon paths ── */
 const IC = {
-  users:      "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
-  phone:      "M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z",
-  calendar:   "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-  video:      "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
-  doc:        "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-  deal:       "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
-  client:     "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
-  chart:      "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
-  money:      "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
-  task:       "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
-  check:      "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
-  trash:      "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
-  clock:      "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-  arrow:      "M13 7l5 5m0 0l-5 5m5-5H6",
-  plus:       "M12 4v16m8-8H4",
-  lead:       "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7",
-  building:   "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
-  lightning:  "M13 10V3L4 14h7v7l9-11h-7z",
+  users: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
+  phone: "M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z",
+  calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  video: "M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z",
+  doc: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+  deal: "M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z",
+  client: "M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z",
+  chart: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z",
+  money: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z",
+  task: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
+  check: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z",
+  trash: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16",
+  clock: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  arrow: "M13 7l5 5m0 0l-5 5m5-5H6",
+  plus: "M12 4v16m8-8H4",
+  lead: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7",
+  building: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
+  lightning: "M13 10V3L4 14h7v7l9-11h-7z",
 };
 
 /* ── Duration helpers ── */
@@ -99,26 +99,25 @@ const CountdownBadge = ({ task }) => {
   const expired = ms === 0;
   const urgent = !expired && ms < task.duration * 60000 * 0.2;
   return (
-    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-      expired ? 'bg-red-100 text-red-600 animate-pulse'
+    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${expired ? 'bg-red-100 text-red-600 animate-pulse'
       : urgent ? 'bg-amber-100 text-amber-600 animate-pulse'
-      : 'bg-violet-100 text-violet-600'
-    }`}>
+        : 'bg-violet-100 text-violet-600'
+      }`}>
       {expired ? 'Expired' : fmtMs(ms)}
     </span>
   );
 };
 
 const priorityStyle = {
-  high:   { bg: 'bg-red-50',   text: 'text-red-600',   dot: 'bg-red-400',   label: 'High' },
+  high: { bg: 'bg-red-50', text: 'text-red-600', dot: 'bg-red-400', label: 'High' },
   medium: { bg: 'bg-amber-50', text: 'text-amber-600', dot: 'bg-amber-400', label: 'Med' },
-  low:    { bg: 'bg-gray-100', text: 'text-gray-500',  dot: 'bg-gray-300',  label: 'Low' },
+  low: { bg: 'bg-gray-100', text: 'text-gray-500', dot: 'bg-gray-300', label: 'Low' },
 };
 const statusCycle = { 'not-started': 'in-progress', 'in-progress': 'completed', 'completed': 'not-started' };
 const statusStyle = {
-  'not-started': { dot: 'bg-gray-300',   ring: 'ring-gray-300' },
-  'in-progress': { dot: 'bg-amber-400',  ring: 'ring-amber-400' },
-  'completed':   { dot: 'bg-violet-500', ring: 'ring-violet-500' },
+  'not-started': { dot: 'bg-gray-300', ring: 'ring-gray-300' },
+  'in-progress': { dot: 'bg-amber-400', ring: 'ring-amber-400' },
+  'completed': { dot: 'bg-violet-500', ring: 'ring-violet-500' },
 };
 
 /* ── Week start (Monday) ── */
@@ -134,12 +133,12 @@ const getWeekStart = () => {
 const WeeklyKPI = ({ label, value, icon, color, to, className = '' }) => {
   const cls = {
     violet: 'bg-violet-50 text-violet-500',
-    blue:   'bg-blue-50   text-blue-500',
+    blue: 'bg-blue-50   text-blue-500',
     indigo: 'bg-indigo-50 text-indigo-500',
-    amber:  'bg-amber-50  text-amber-500',
-    slate:  'bg-slate-50  text-slate-500',
-    green:  'bg-emerald-50 text-emerald-500',
-    rose:   'bg-rose-50   text-rose-500',
+    amber: 'bg-amber-50  text-amber-500',
+    slate: 'bg-slate-50  text-slate-500',
+    green: 'bg-emerald-50 text-emerald-500',
+    rose: 'bg-rose-50   text-rose-500',
   }[color] || 'bg-violet-50 text-violet-500';
 
   const inner = (
@@ -162,10 +161,10 @@ const WeeklyKPI = ({ label, value, icon, color, to, className = '' }) => {
 const StatCard = ({ label, value, icon, color, to, sub }) => {
   const c = {
     violet: { iconBg: 'bg-violet-50 text-violet-600', val: 'text-gray-900' },
-    amber:  { iconBg: 'bg-amber-50  text-amber-600',  val: 'text-gray-900' },
-    green:  { iconBg: 'bg-emerald-50 text-emerald-600', val: 'text-gray-900' },
-    red:    { iconBg: 'bg-red-50    text-red-500',    val: 'text-gray-900' },
-    blue:   { iconBg: 'bg-blue-50   text-blue-600',   val: 'text-gray-900' },
+    amber: { iconBg: 'bg-amber-50  text-amber-600', val: 'text-gray-900' },
+    green: { iconBg: 'bg-emerald-50 text-emerald-600', val: 'text-gray-900' },
+    red: { iconBg: 'bg-red-50    text-red-500', val: 'text-gray-900' },
+    blue: { iconBg: 'bg-blue-50   text-blue-600', val: 'text-gray-900' },
   }[color] || { iconBg: 'bg-violet-50 text-violet-600', val: 'text-gray-900' };
 
   const inner = (
@@ -184,52 +183,57 @@ const StatCard = ({ label, value, icon, color, to, sub }) => {
 /* ══════════════════════════════ MAIN COMPONENT ═══════════════════════════════ */
 const AdminDashboard = () => {
   const { user } = useAuth();
-  const [stats, setStats]           = useState(null);
-  const [payroll, setPayroll]       = useState(null);
-  const [crmReport, setCrmReport]   = useState(null);
-  const [allLeads, setAllLeads]     = useState([]);
-  const [deals, setDeals]           = useState([]);
-  const [clients, setClients]       = useState([]);
-  const [finance, setFinance]       = useState(null);
+  const [stats, setStats] = useState(null);
+  const [payroll, setPayroll] = useState(null);
+  const [crmReport, setCrmReport] = useState(null);
+  const [allLeads, setAllLeads] = useState([]);
+  const [deals, setDeals] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [finance, setFinance] = useState(null);
   const [prevFinance, setPrevFinance] = useState(null);
-  const [loading, setLoading]       = useState(true);
+  const [loading, setLoading] = useState(true);
   const [automationData, setAutomationData] = useState(null);
   const [showIntelBanner, setShowIntelBanner] = useState(false);
 
   /* tasks */
-  const [myTasks, setMyTasks]           = useState([]);
-  const [taskFilter, setTaskFilter]     = useState('active');
+  const [myTasks, setMyTasks] = useState([]);
+  const [taskFilter, setTaskFilter] = useState('active');
   const [showTaskForm, setShowTaskForm] = useState(false);
-  const [taskForm, setTaskForm]         = useState({ title: '', priority: 'medium', deadline: '', duration: '' });
+  const [taskForm, setTaskForm] = useState({ title: '', priority: 'medium', deadline: '', duration: '' });
   const [taskSubmitting, setTaskSubmitting] = useState(false);
-  const [activeFocus, setActiveFocus]   = useState(null);
+  const [activeFocus, setActiveFocus] = useState(null);
+  const [attendanceData, setAttendanceData] = useState([]);
+  const [attendanceLoading, setAttendanceLoading] = useState(true);
 
-  const fetchMyTasks  = () => api.get('/tasks/my').then(r => setMyTasks(r.data.tasks || [])).catch(() => {});
-  const fetchFocus    = () => api.get('/tasks/active-self').then(r => setActiveFocus(r.data || null)).catch(() => setActiveFocus(null));
+  const fetchMyTasks = () => api.get('/tasks/my').then(r => setMyTasks(r.data.tasks || [])).catch(() => { });
+  const fetchFocus = () => api.get('/tasks/active-self').then(r => setActiveFocus(r.data || null)).catch(() => setActiveFocus(null));
 
   useEffect(() => {
-    const now   = new Date();
+    const now = new Date();
     const month = now.getMonth() + 1;
-    const year  = now.getFullYear();
-    const pm    = month === 1 ? 12 : month - 1;
-    const py    = month === 1 ? year - 1 : year;
+    const year = now.getFullYear();
+    const pm = month === 1 ? 12 : month - 1;
+    const py = month === 1 ? year - 1 : year;
 
     Promise.all([
-      api.get('/admin/dashboard-stats').then(r => setStats(r.data)).catch(() => {}),
-      api.get(`/admin/reports/payroll?month=${month}&year=${year}`).then(r => setPayroll(r.data)).catch(() => {}),
-      api.get('/admin/reports/crm').then(r => setCrmReport(r.data)).catch(() => {}),
-      api.get('/leads').then(r => setAllLeads(r.data?.leads || r.data || [])).catch(() => {}),
-      api.get('/deals').then(r => setDeals(r.data?.deals || r.data || [])).catch(() => {}),
-      api.get('/clients').then(r => setClients(r.data || [])).catch(() => {}),
-      api.get(`/finance/dashboard?month=${month}&year=${year}`).then(r => setFinance(r.data)).catch(() => {}),
-      api.get(`/finance/dashboard?month=${pm}&year=${py}`).then(r => setPrevFinance(r.data)).catch(() => {}),
+      api.get('/admin/dashboard-stats').then(r => setStats(r.data)).catch(() => { }),
+      api.get(`/admin/reports/payroll?month=${month}&year=${year}`).then(r => setPayroll(r.data)).catch(() => { }),
+      api.get('/admin/reports/crm').then(r => setCrmReport(r.data)).catch(() => { }),
+      api.get('/leads').then(r => setAllLeads(r.data?.leads || r.data || [])).catch(() => { }),
+      api.get('/deals').then(r => setDeals(r.data?.deals || r.data || [])).catch(() => { }),
+      api.get('/clients').then(r => setClients(r.data || [])).catch(() => { }),
+      api.get("/attendance").then(r => setAttendanceData(r.data)),
+      api.get(`/finance/dashboard?month=${month}&year=${year}`).then(r => setFinance(r.data)).catch(() => { }),
+      api.get(`/finance/dashboard?month=${pm}&year=${py}`).then(r => setPrevFinance(r.data)).catch(() => { }),
     ]).finally(() => setLoading(false));
+
 
     fetchMyTasks();
     fetchFocus();
-    api.get('/automation/dashboard').then(r => setAutomationData(r.data)).catch(() => {});
+    api.get('/automation/dashboard').then(r => setAutomationData(r.data)).catch(() => { });
   }, []);
 
+  console.log(attendanceData);
   /* ── Work Intelligence: show banner after 30s, auto-hide after 8s ── */
   useEffect(() => {
     const showTimer = setTimeout(() => {
@@ -244,22 +248,22 @@ const AdminDashboard = () => {
 
   /* ── weekly metrics ── */
   const weekStart = getWeekStart();
-  const dayStart  = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
-  const weekLeads        = allLeads.filter(l => new Date(l.createdAt) >= weekStart);
-  const weekActivities   = allLeads.flatMap(l => (l.activities || []).filter(a => new Date(a.date || a.createdAt) >= weekStart));
-  const weekCallsMade    = weekActivities.filter(a => a.type === 'call').length;
-  const weekMeetings     = weekActivities.filter(a => a.type === 'meeting').length;
-  const weekDemos        = weekActivities.filter(a => ['demo', 'Demo'].includes(a.type)).length;
-  const weekProposals    = weekActivities.filter(a => a.type === 'proposal' || (a.notes && a.notes.toLowerCase().includes('proposal'))).length;
-  const weekDeals        = deals.filter(d => d.status === 'won' && new Date(d.updatedAt || d.createdAt) >= weekStart).length;
-  const activeClients    = clients.filter(c => c.status === 'active').length || clients.length;
+  const dayStart = (() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d; })();
+  const weekLeads = allLeads.filter(l => new Date(l.createdAt) >= weekStart);
+  const weekActivities = allLeads.flatMap(l => (l.activities || []).filter(a => new Date(a.date || a.createdAt) >= weekStart));
+  const weekCallsMade = weekActivities.filter(a => a.type === 'call').length;
+  const weekMeetings = weekActivities.filter(a => a.type === 'meeting').length;
+  const weekDemos = weekActivities.filter(a => ['demo', 'Demo'].includes(a.type)).length;
+  const weekProposals = weekActivities.filter(a => a.type === 'proposal' || (a.notes && a.notes.toLowerCase().includes('proposal'))).length;
+  const weekDeals = deals.filter(d => d.status === 'won' && new Date(d.updatedAt || d.createdAt) >= weekStart).length;
+  const activeClients = clients.filter(c => c.status === 'active').length || clients.length;
 
   /* ── finance derived ── */
-  const netProfit   = finance?.profit ?? null;
-  const prevProfit  = prevFinance?.profit ?? null;
+  const netProfit = finance?.profit ?? null;
+  const prevProfit = prevFinance?.profit ?? null;
   const profitGrowth = netProfit != null && prevProfit != null && prevProfit !== 0
     ? ((netProfit - prevProfit) / Math.abs(prevProfit)) * 100 : null;
-  const isGrowing   = profitGrowth != null ? profitGrowth >= 0 : null;
+  const isGrowing = profitGrowth != null ? profitGrowth >= 0 : null;
 
   /* ── task handlers ── */
   const focusLocked = activeFocus && taskForm.duration;
@@ -299,22 +303,42 @@ const AdminDashboard = () => {
 
   const filteredTasks = myTasks.filter(t =>
     taskFilter === 'active' ? t.status !== 'completed'
-    : taskFilter === 'completed' ? t.status === 'completed'
-    : true
+      : taskFilter === 'completed' ? t.status === 'completed'
+        : true
   );
   const isOverdue = (t) => t.status !== 'completed' && new Date(t.deadline) < new Date();
 
   /* ── chart data ── */
   const crmPieData = crmReport ? [
-    { name: 'Converted',     value: crmReport.totalConverted ?? 0 },
+    { name: 'Converted', value: crmReport.totalConverted ?? 0 },
     { name: 'Not Converted', value: Math.max(0, (crmReport.totalLeads ?? 0) - (crmReport.totalConverted ?? 0)) },
   ] : [];
 
   /* payroll trend */
   const payrollBarData = (payroll?.payslips || []).slice(0, 8).map(p => ({
     name: p.employee?.name?.split(' ')[0] || '?',
-    net:  p.netSalary ?? 0,
+    net: p.netSalary ?? 0,
   }));
+
+  /*-- total attedance of the emp--*/
+  const totalHoursData = Object.values(
+    attendanceData.reduce((acc, item) => {
+      const id = item.employee?.employeeId;
+
+      if (!id) return acc;
+
+      if (!acc[id]) {
+        acc[id] = {
+          ...item,
+          workHours: 0,
+        };
+      }
+
+      acc[id].workHours += Number(item.workHours || 0);
+
+      return acc;
+    }, {})
+  );
 
   if (loading) return (
     <div className="flex items-center justify-center h-64">
@@ -350,9 +374,8 @@ const AdminDashboard = () => {
               {netProfit != null ? formatCurrency(netProfit) : '—'}
             </p>
             {profitGrowth != null && (
-              <div className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                isGrowing ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
-              }`}>
+              <div className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isGrowing ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
+                }`}>
                 <span>{isGrowing ? '▲' : '▼'}</span>
                 <span>{Math.abs(profitGrowth).toFixed(1)}%</span>
               </div>
@@ -375,13 +398,13 @@ const AdminDashboard = () => {
           </Link>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-          <WeeklyKPI label="Leads Generated"  value={weekLeads.length} icon={IC.lead}     color="violet" to="/admin/crm" />
-          <WeeklyKPI label="Calls Made"       value={weekCallsMade}    icon={IC.phone}    color="blue"   to="/admin/crm" />
-          <WeeklyKPI label="Meetings Booked"  value={weekMeetings}     icon={IC.calendar} color="indigo" to="/admin/crm" />
-          <WeeklyKPI label="Demos Completed"  value={weekDemos}        icon={IC.video}    color="amber"  to="/admin/crm" />
-          <WeeklyKPI label="Proposals Sent"   value={weekProposals}    icon={IC.doc}      color="slate"  to="/admin/crm" />
-          <WeeklyKPI label="Deals Closed"     value={weekDeals}        icon={IC.deal}     color="green"  to="/admin/crm" />
-          <WeeklyKPI label="Active Clients"   value={activeClients}    icon={IC.client}   color="rose"   to="/crm?tab=clients" className="col-span-2 sm:col-span-1 lg:col-span-1" />
+          <WeeklyKPI label="Leads Generated" value={weekLeads.length} icon={IC.lead} color="violet" to="/admin/crm" />
+          <WeeklyKPI label="Calls Made" value={weekCallsMade} icon={IC.phone} color="blue" to="/admin/crm" />
+          <WeeklyKPI label="Meetings Booked" value={weekMeetings} icon={IC.calendar} color="indigo" to="/admin/crm" />
+          <WeeklyKPI label="Demos Completed" value={weekDemos} icon={IC.video} color="amber" to="/admin/crm" />
+          <WeeklyKPI label="Proposals Sent" value={weekProposals} icon={IC.doc} color="slate" to="/admin/crm" />
+          <WeeklyKPI label="Deals Closed" value={weekDeals} icon={IC.deal} color="green" to="/admin/crm" />
+          <WeeklyKPI label="Active Clients" value={activeClients} icon={IC.client} color="rose" to="/crm?tab=clients" className="col-span-2 sm:col-span-1 lg:col-span-1" />
         </div>
       </motion.div>
 
@@ -403,9 +426,8 @@ const AdminDashboard = () => {
             <div className="flex gap-1 bg-gray-100 p-1 rounded-xl">
               {[{ key: 'today', label: 'Today' }, { key: 'week', label: 'This Week' }].map(opt => (
                 <button key={opt.key} onClick={() => setLeadView(opt.key)}
-                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                    leadView === opt.key ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
-                  }`}>
+                  className={`px-3 py-1 rounded-lg text-[11px] font-semibold transition-all ${leadView === opt.key ? 'bg-white text-violet-700 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    }`}>
                   {opt.label}
                 </button>
               ))}
@@ -545,19 +567,17 @@ const AdminDashboard = () => {
           {/* Filter tabs */}
           <div className="flex gap-1 mb-3">
             {[
-              { key: 'active',    label: 'Active',    n: myTasks.filter(t => t.status !== 'completed').length },
-              { key: 'completed', label: 'Done',      n: myTasks.filter(t => t.status === 'completed').length },
-              { key: 'all',       label: 'All',       n: myTasks.length },
+              { key: 'active', label: 'Active', n: myTasks.filter(t => t.status !== 'completed').length },
+              { key: 'completed', label: 'Done', n: myTasks.filter(t => t.status === 'completed').length },
+              { key: 'all', label: 'All', n: myTasks.length },
             ].map(f => (
               <button key={f.key} onClick={() => setTaskFilter(f.key)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${
-                  taskFilter === f.key ? 'bg-violet-100 text-violet-700' : 'text-gray-400 hover:text-gray-600'
-                }`}>
+                className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors ${taskFilter === f.key ? 'bg-violet-100 text-violet-700' : 'text-gray-400 hover:text-gray-600'
+                  }`}>
                 {f.label}
                 {f.n > 0 && (
-                  <span className={`ml-1 text-[10px] px-1 py-0.5 rounded font-bold ${
-                    taskFilter === f.key ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-500'
-                  }`}>{f.n}</span>
+                  <span className={`ml-1 text-[10px] px-1 py-0.5 rounded font-bold ${taskFilter === f.key ? 'bg-violet-600 text-white' : 'bg-gray-100 text-gray-500'
+                    }`}>{f.n}</span>
                 )}
               </button>
             ))}
@@ -573,9 +593,9 @@ const AdminDashboard = () => {
             ) : (
               <AnimatePresence>
                 {filteredTasks.map(task => {
-                  const st  = statusStyle[task.status];
-                  const pr  = priorityStyle[task.priority] || priorityStyle.medium;
-                  const ov  = isOverdue(task);
+                  const st = statusStyle[task.status];
+                  const pr = priorityStyle[task.priority] || priorityStyle.medium;
+                  const ov = isOverdue(task);
                   const isFocus = activeFocus && activeFocus._id === task._id;
                   const hasDuration = task.duration && task.status === 'in-progress' && task.startedAt;
                   const pct = hasDuration
@@ -584,17 +604,15 @@ const AdminDashboard = () => {
                   return (
                     <motion.div key={task._id}
                       initial={{ opacity: 0, x: -4 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 4 }}
-                      className={`p-2.5 rounded-xl border transition-colors ${
-                        task.status === 'completed' ? 'bg-gray-50 border-gray-100 opacity-60'
+                      className={`p-2.5 rounded-xl border transition-colors ${task.status === 'completed' ? 'bg-gray-50 border-gray-100 opacity-60'
                         : isFocus ? 'bg-amber-50 border-amber-100'
-                        : ov ? 'bg-red-50/40 border-red-100'
-                        : 'bg-white border-gray-100 hover:border-violet-100 hover:bg-violet-50/30'
-                      }`}>
+                          : ov ? 'bg-red-50/40 border-red-100'
+                            : 'bg-white border-gray-100 hover:border-violet-100 hover:bg-violet-50/30'
+                        }`}>
                       <div className="flex items-center gap-2">
                         <button onClick={() => handleStatusToggle(task)}
-                          className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center hover:ring-2 ring-offset-1 transition-all ${st.ring} ${
-                            task.status === 'completed' ? 'bg-violet-500 border-violet-500' : 'bg-white border-gray-300'
-                          }`}>
+                          className={`w-4 h-4 rounded-full border-2 flex-shrink-0 flex items-center justify-center hover:ring-2 ring-offset-1 transition-all ${st.ring} ${task.status === 'completed' ? 'bg-violet-500 border-violet-500' : 'bg-white border-gray-300'
+                            }`}>
                           {task.status === 'completed' && (
                             <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={3.5} className="w-2 h-2"><path d="M5 13l4 4L19 7" /></svg>
                           )}
@@ -637,14 +655,14 @@ const AdminDashboard = () => {
           <p className="font-bold text-gray-900 text-sm mb-4">Quick Actions</p>
           <div className="grid grid-cols-2 gap-2">
             {[
-              { label: 'New Lead',      path: '/crm',               icon: IC.lead,     bg: 'bg-violet-50 text-violet-600 hover:bg-violet-100' },
-              { label: 'Schedule Demo', path: '/crm',               icon: IC.video,    bg: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
-              { label: 'Add Task',      action: () => { setShowTaskForm(true); }, icon: IC.task, bg: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
-              { label: 'CRM Reports',   path: '/admin/crm',         icon: IC.chart,    bg: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' },
-              { label: 'Finance',       path: '/admin/finance',     icon: IC.money,    bg: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
-              { label: 'Payroll',       path: '/admin/payslips',    icon: IC.building, bg: 'bg-rose-50 text-rose-500 hover:bg-rose-100' },
-              { label: 'Recruitment',   path: '/admin/recruitment', icon: IC.users,    bg: 'bg-slate-50 text-slate-600 hover:bg-slate-100' },
-              { label: 'Leave Mgmt',    path: '/admin/leaves',      icon: IC.clock,    bg: 'bg-gray-50 text-gray-600 hover:bg-gray-100' },
+              { label: 'New Lead', path: '/crm', icon: IC.lead, bg: 'bg-violet-50 text-violet-600 hover:bg-violet-100' },
+              { label: 'Schedule Demo', path: '/crm', icon: IC.video, bg: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
+              { label: 'Add Task', action: () => { setShowTaskForm(true); }, icon: IC.task, bg: 'bg-amber-50 text-amber-600 hover:bg-amber-100' },
+              { label: 'CRM Reports', path: '/admin/crm', icon: IC.chart, bg: 'bg-indigo-50 text-indigo-600 hover:bg-indigo-100' },
+              { label: 'Finance', path: '/admin/finance', icon: IC.money, bg: 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100' },
+              { label: 'Payroll', path: '/admin/payslips', icon: IC.building, bg: 'bg-rose-50 text-rose-500 hover:bg-rose-100' },
+              { label: 'Recruitment', path: '/admin/recruitment', icon: IC.users, bg: 'bg-slate-50 text-slate-600 hover:bg-slate-100' },
+              { label: 'Leave Mgmt', path: '/admin/leaves', icon: IC.clock, bg: 'bg-gray-50 text-gray-600 hover:bg-gray-100' },
             ].map(item => {
               const cls = `${item.bg} p-3 rounded-xl flex flex-col items-center gap-1.5 hover:-translate-y-0.5 transition-all duration-150 cursor-pointer`;
               const inner = (
@@ -663,8 +681,8 @@ const AdminDashboard = () => {
           <div className="mt-4 pt-4 border-t border-gray-50 grid grid-cols-3 gap-2">
             {[
               { label: 'Employees', value: stats?.totalEmployees, color: 'text-violet-700' },
-              { label: 'Present',   value: stats?.presentToday,   color: 'text-emerald-600' },
-              { label: 'Leaves',    value: stats?.pendingLeaves,  color: 'text-amber-600' },
+              { label: 'Present', value: stats?.presentToday, color: 'text-emerald-600' },
+              { label: 'Leaves', value: stats?.pendingLeaves, color: 'text-amber-600' },
             ].map(s => (
               <div key={s.label} className="text-center py-2 bg-gray-50 rounded-xl">
                 <p className={`text-lg font-extrabold leading-none ${s.color}`}>{s.value ?? '—'}</p>
@@ -675,15 +693,63 @@ const AdminDashboard = () => {
         </motion.div>
       </div>
 
+      {/* total working hours */}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4 }}
+        className="w-full h-[400px] bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden flex flex-col"
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-gray-100">
+          <h2 className="text-lg font-bold">Employee Working Hours</h2>
+        </div>
+
+        {/* Scrollable Table */}
+        <div className="flex-1 overflow-auto">
+          <table className="w-full">
+
+            <thead className="sticky top-0 z-10 bg-gray-50">
+              <tr className="text-left text-xs uppercase tracking-wider text-gray-500">
+                <th className="px-6 py-4">Employee</th>
+                <th className="px-6 py-4">Employee ID</th>
+                <th className="px-6 py-4">Role</th>
+                <th className="px-6 py-4">Department</th>
+                <th className="px-6 py-4">Total Hours</th>
+              </tr>
+            </thead>
+
+            <tbody>
+              {totalHoursData.map((emp) => (
+                <tr key={emp.employee.employeeId} className="border-b border-gray-100 hover:bg-violet-50 transition">
+                  <td className="px-6 py-4">{emp.employee?.name}</td>
+                  <td className="px-6 py-4">{emp.employee?.employeeId}</td>
+                  <td className="px-6 py-4">{emp.employee?.role}</td>
+                  <td className="px-6 py-4">{emp.employee?.department?.name}</td>
+                  <td className="px-6 py-4">
+                    {emp.workHours.toFixed(2)} hrs
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+
+          {attendanceData?.length === 0 && (
+            <div className="py-12 text-center text-gray-400">
+              No employee records found.
+            </div>
+          )}
+        </div>
+      </motion.div>
       {/* ═══ STATS ROW ═══ */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.14 }}
         className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <StatCard label="Total Employees"   value={stats?.totalEmployees}        icon={<Icon d={IC.users}   size={18} />} color="violet" to="/admin/employees" />
-        <StatCard label="Present Today"     value={stats?.presentToday}          icon={<Icon d={IC.check}   size={18} />} color="green"  to="/admin/attendance" sub={`of ${stats?.totalEmployees ?? '?'}`} />
-        <StatCard label="Active Clients"    value={activeClients || '—'}         icon={<Icon d={IC.client}  size={18} />} color="blue"   to="/crm?tab=clients" />
-        <StatCard label="Monthly Revenue"   value={finance?.totalIncome != null ? formatCurrency(finance.totalIncome) : '—'} icon={<Icon d={IC.money} size={18} />} color="amber" to="/admin/finance" />
-        <StatCard label="Total Leads"       value={crmReport?.totalLeads || '—'} icon={<Icon d={IC.lead}    size={18} />} color="violet" to="/admin/crm" />
-        <StatCard label="Pending Leaves"    value={stats?.pendingLeaves ?? '—'}  icon={<Icon d={IC.clock}   size={18} />} color="red"    to="/admin/leaves" />
+        <StatCard label="Total Employees" value={stats?.totalEmployees} icon={<Icon d={IC.users} size={18} />} color="violet" to="/admin/employees" />
+        <StatCard label="Present Today" value={stats?.presentToday} icon={<Icon d={IC.check} size={18} />} color="green" to="/admin/attendance" sub={`of ${stats?.totalEmployees ?? '?'}`} />
+        <StatCard label="Active Clients" value={activeClients || '—'} icon={<Icon d={IC.client} size={18} />} color="blue" to="/crm?tab=clients" />
+        <StatCard label="Monthly Revenue" value={finance?.totalIncome != null ? formatCurrency(finance.totalIncome) : '—'} icon={<Icon d={IC.money} size={18} />} color="amber" to="/admin/finance" />
+        <StatCard label="Total Leads" value={crmReport?.totalLeads || '—'} icon={<Icon d={IC.lead} size={18} />} color="violet" to="/admin/crm" />
+        <StatCard label="Pending Leaves" value={stats?.pendingLeaves ?? '—'} icon={<Icon d={IC.clock} size={18} />} color="red" to="/admin/leaves" />
       </motion.div>
 
       {/* ═══ CHARTS ═══ */}
@@ -703,7 +769,7 @@ const AdminDashboard = () => {
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={payrollBarData} barSize={20}>
                 <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 9, fill: '#D1D5DB' }} tickFormatter={v => `₹${(v/1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 9, fill: '#D1D5DB' }} tickFormatter={v => `₹${(v / 1000).toFixed(0)}k`} axisLine={false} tickLine={false} />
                 <Tooltip
                   formatter={v => [formatCurrency(v), 'Net Salary']}
                   contentStyle={{ borderRadius: 10, border: '1px solid #F3F4F6', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
@@ -765,64 +831,64 @@ const AdminDashboard = () => {
           (automationData.staleLeads?.length ?? 0) > 0 ||
           (automationData.pendingDocs?.length ?? 0) > 0
         ) && (
-          <motion.div
-            initial={{ opacity: 0, x: 80 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 80 }}
-            transition={{ type: 'spring', stiffness: 300, damping: 28 }}
-            className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-80 bg-white border border-amber-200 rounded-2xl shadow-xl overflow-hidden">
-            {/* amber top bar */}
-            <div className="h-1 bg-amber-400 w-full" />
-            <div className="p-4">
-              <div className="flex items-start justify-between gap-2 mb-3">
-                <div className="flex items-center gap-2">
-                  <span className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
-                    <Icon d={IC.lightning} size={14} className="text-amber-500" />
-                  </span>
-                  <div>
-                    <p className="text-sm font-bold text-gray-900 leading-none">Work Intelligence</p>
-                    <p className="text-[10px] text-amber-500 mt-0.5">Auto-detected issues</p>
-                  </div>
-                </div>
-                <button
-                  onClick={() => setShowIntelBanner(false)}
-                  className="text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0 mt-0.5">
-                  <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
-                    <path d="M18 6L6 18M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
-                {[
-                  { label: 'Overdue Tasks',     value: automationData.summary?.totalOverdue ?? 0,          warn: (automationData.summary?.totalOverdue ?? 0) > 0 },
-                  { label: 'Missing Checkouts', value: automationData.missingCheckouts?.length ?? 0,       warn: (automationData.missingCheckouts?.length ?? 0) > 0 },
-                  { label: 'Stale CRM Leads',   value: automationData.staleLeads?.length ?? 0,             warn: (automationData.staleLeads?.length ?? 0) > 0 },
-                  { label: 'Pending Docs',      value: automationData.pendingDocs?.length ?? 0,            warn: (automationData.pendingDocs?.length ?? 0) > 0 },
-                ].map(({ label, value, warn }) => (
-                  <div key={label} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${warn ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
-                    <p className={`text-lg font-extrabold leading-none ${warn ? 'text-amber-600' : 'text-gray-400'}`}>{value}</p>
-                    <p className="text-[10px] font-medium text-gray-500 leading-tight">{label}</p>
-                  </div>
-                ))}
-              </div>
-
-              <Link to="/admin/automation"
-                onClick={() => setShowIntelBanner(false)}
-                className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 transition-colors">
-                View full report →
-              </Link>
-            </div>
-
-            {/* countdown bar */}
             <motion.div
-              className="h-0.5 bg-amber-300 origin-left"
-              initial={{ scaleX: 1 }}
-              animate={{ scaleX: 0 }}
-              transition={{ duration: 8, ease: 'linear' }}
-            />
-          </motion.div>
-        )}
+              initial={{ opacity: 0, x: 80 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 80 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 28 }}
+              className="fixed bottom-3 right-3 sm:bottom-6 sm:right-6 z-50 w-[calc(100vw-1.5rem)] sm:w-80 bg-white border border-amber-200 rounded-2xl shadow-xl overflow-hidden">
+              {/* amber top bar */}
+              <div className="h-1 bg-amber-400 w-full" />
+              <div className="p-4">
+                <div className="flex items-start justify-between gap-2 mb-3">
+                  <div className="flex items-center gap-2">
+                    <span className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center flex-shrink-0">
+                      <Icon d={IC.lightning} size={14} className="text-amber-500" />
+                    </span>
+                    <div>
+                      <p className="text-sm font-bold text-gray-900 leading-none">Work Intelligence</p>
+                      <p className="text-[10px] text-amber-500 mt-0.5">Auto-detected issues</p>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => setShowIntelBanner(false)}
+                    className="text-gray-300 hover:text-gray-500 transition-colors flex-shrink-0 mt-0.5">
+                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { label: 'Overdue Tasks', value: automationData.summary?.totalOverdue ?? 0, warn: (automationData.summary?.totalOverdue ?? 0) > 0 },
+                    { label: 'Missing Checkouts', value: automationData.missingCheckouts?.length ?? 0, warn: (automationData.missingCheckouts?.length ?? 0) > 0 },
+                    { label: 'Stale CRM Leads', value: automationData.staleLeads?.length ?? 0, warn: (automationData.staleLeads?.length ?? 0) > 0 },
+                    { label: 'Pending Docs', value: automationData.pendingDocs?.length ?? 0, warn: (automationData.pendingDocs?.length ?? 0) > 0 },
+                  ].map(({ label, value, warn }) => (
+                    <div key={label} className={`flex items-center gap-2 px-3 py-2 rounded-xl border ${warn ? 'bg-amber-50 border-amber-100' : 'bg-gray-50 border-gray-100'}`}>
+                      <p className={`text-lg font-extrabold leading-none ${warn ? 'text-amber-600' : 'text-gray-400'}`}>{value}</p>
+                      <p className="text-[10px] font-medium text-gray-500 leading-tight">{label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <Link to="/admin/automation"
+                  onClick={() => setShowIntelBanner(false)}
+                  className="mt-3 flex items-center justify-center gap-1 text-xs font-semibold text-amber-600 hover:text-amber-700 transition-colors">
+                  View full report →
+                </Link>
+              </div>
+
+              {/* countdown bar */}
+              <motion.div
+                className="h-0.5 bg-amber-300 origin-left"
+                initial={{ scaleX: 1 }}
+                animate={{ scaleX: 0 }}
+                transition={{ duration: 8, ease: 'linear' }}
+              />
+            </motion.div>
+          )}
       </AnimatePresence>
 
     </div>

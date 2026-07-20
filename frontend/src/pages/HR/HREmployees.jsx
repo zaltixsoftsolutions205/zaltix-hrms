@@ -2,9 +2,12 @@ import { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import api from '../../utils/api';
 import Modal from '../../components/UI/Modal';
+import { useNavigate } from 'react-router-dom';
 import { formatDate, getInitials, formatCurrency } from '../../utils/helpers';
 import IntelligenceAlerts from '../../components/UI/IntelligenceAlerts';
 import ModuleAccessPicker from '../../components/UI/ModuleAccessPicker';
+
+
 
 /* ── small inline svg ── */
 const Ico = ({ d, d2, className = 'w-4 h-4' }) => (
@@ -17,8 +20,8 @@ const Ico = ({ d, d2, className = 'w-4 h-4' }) => (
 const ROLE_COLORS = { employee: 'bg-violet-100 text-violet-700', sales: 'bg-amber-100 text-amber-700', field_sales: 'bg-amber-100 text-amber-700', hr: 'bg-violet-100 text-violet-700', admin: 'bg-gray-100 text-gray-900', technical_associate: 'bg-blue-100 text-blue-700', bda: 'bg-green-100 text-green-700' };
 const ROLE_LABELS = { employee: 'Employee', sales: 'Sales', field_sales: 'Field Sales', hr: 'HR', admin: 'Admin', technical_associate: 'Technical Associate', bda: 'BDA' };
 const TYPE_COLORS = { fresher: 'bg-violet-100 text-violet-700', experienced: 'bg-violet-100 text-violet-700' };
-const DOC_STATUS  = { pending_upload: 'bg-gray-100 text-gray-600', uploaded: 'bg-violet-100 text-violet-700', approved: 'bg-violet-100 text-violet-700', rejected: 'bg-gray-100 text-gray-900' };
-const DOC_LABEL   = { pending_upload: 'Pending Upload', uploaded: 'Uploaded', approved: 'Approved', rejected: 'Rejected' };
+const DOC_STATUS = { pending_upload: 'bg-gray-100 text-gray-600', uploaded: 'bg-violet-100 text-violet-700', approved: 'bg-violet-100 text-violet-700', rejected: 'bg-gray-100 text-gray-900' };
+const DOC_LABEL = { pending_upload: 'Pending Upload', uploaded: 'Uploaded', approved: 'Approved', rejected: 'Rejected' };
 
 const roleLabel = (role) => ROLE_LABELS[role] || role;
 
@@ -33,11 +36,10 @@ const StatusDropdown = ({ emp, onChange }) => {
     <select
       value={active ? 'active' : 'inactive'}
       onChange={e => onChange(emp, e.target.value === 'active')}
-      className={`text-xs font-semibold rounded-lg border px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400 transition-colors ${
-        active
-          ? 'bg-green-50 text-green-700 border-green-200'
-          : 'bg-red-50 text-red-700 border-red-200'
-      }`}
+      className={`text-xs font-semibold rounded-lg border px-2 py-1 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-400 transition-colors ${active
+        ? 'bg-green-50 text-green-700 border-green-200'
+        : 'bg-red-50 text-red-700 border-red-200'
+        }`}
     >
       <option value="active">Active</option>
       <option value="inactive">Inactive</option>
@@ -49,16 +51,26 @@ const PRESET_ROLES = ['employee', 'sales', 'field_sales', 'hr', 'technical_assoc
 const EMPTY_FORM = { employeeId: '', name: '', email: '', role: 'employee', customRole: '', departmentId: '', designation: '', phone: '', joiningDate: '', basicSalary: '', employeeType: '', moduleAccess: [] };
 
 export default function HREmployees() {
-  const [employees, setEmployees]         = useState([]);
-  const [departments, setDepartments]     = useState([]);
-  const [showAddModal, setShowAddModal]       = useState(false);
-  const [showEditModal, setShowEditModal]     = useState(false);
-  const [showDocsModal, setShowDocsModal]     = useState(false);
+  const [employees, setEmployees] = useState([]);
+  const [departments, setDepartments] = useState([]);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showDocsModal, setShowDocsModal] = useState(false);
   const [showAttachModal, setShowAttachModal] = useState(false);
-  const [selectedEmp, setSelectedEmp]         = useState(null);
-  const [loading, setLoading]             = useState(false);
-  const [search, setSearch]               = useState('');
-  const [form, setForm]                   = useState(EMPTY_FORM);
+  const [selectedEmp, setSelectedEmp] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+
+
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [employeeTypeFilter, setEmployeeTypeFilter] = useState('');
+
+  const navigate = useNavigate();
+
+  const [form, setForm] = useState(EMPTY_FORM);
 
   const fetchAll = async () => {
     // Settle independently: departments is an admin/HR-only endpoint, so a
@@ -120,15 +132,44 @@ export default function HREmployees() {
     }
   };
 
-  const openEdit   = (emp) => { setSelectedEmp(emp); setShowEditModal(true); };
-  const openDocs   = (emp) => { setSelectedEmp(emp); setShowDocsModal(true); };
+  const openEdit = (emp) => { setSelectedEmp(emp); setShowEditModal(true); };
+  const openDocs = (emp) => { setSelectedEmp(emp); setShowDocsModal(true); };
   const openAttach = (emp) => { setSelectedEmp(emp); setShowAttachModal(true); };
 
-  const filtered = employees.filter(e =>
-    e.name.toLowerCase().includes(search.toLowerCase()) ||
-    (e.employeeId || '').includes(search) ||
-    e.email.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = employees.filter(emp => {
+
+    const matchesSearch =
+      emp.name.toLowerCase().includes(search.toLowerCase()) ||
+      (emp.employeeId || "").includes(search) ||
+      emp.email.toLowerCase().includes(search.toLowerCase());
+
+    const matchesRole =
+      roleFilter === "" ||
+      emp.role === roleFilter;
+
+    const matchesDepartment =
+      departmentFilter === "" ||
+      emp.department?._id === departmentFilter;
+
+    const matchesStatus =
+      statusFilter === "" ||
+      (statusFilter === "active"
+        ? emp.isActive
+        : !emp.isActive);
+
+    const matchesEmployeeType =
+      employeeTypeFilter === "" ||
+      emp.employeeType === employeeTypeFilter;
+
+    return (
+      matchesSearch &&
+      matchesRole &&
+      matchesDepartment &&
+      matchesStatus &&
+      matchesEmployeeType
+    );
+
+  });
 
   // Derive alerts from already-fetched employee list
   const employeeAlerts = (() => {
@@ -168,15 +209,99 @@ export default function HREmployees() {
         </button>
       </div>
 
-      {/* ── Search bar ── */}
-      <div className="bg-white border border-violet-100 rounded-2xl shadow-sm px-4 py-3">
-        <div className="relative max-w-sm">
-          <Ico d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none" />
-          <input
-            className="w-full pl-9 pr-4 py-2 border border-violet-200 rounded-xl text-sm bg-violet-50/40 focus:outline-none focus:ring-2 focus:ring-violet-400"
-            placeholder="Search by name, ID or email…"
-            value={search} onChange={e => setSearch(e.target.value)} />
+      {/* ── Search & Filters ── */}
+      <div className="bg-white border border-violet-100 rounded-2xl shadow-sm p-4">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-6 gap-3">
+
+          {/* Search */}
+          <div className="relative md:col-span-2 xl:col-span-2">
+            <Ico
+              d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+              className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-violet-400 pointer-events-none"
+            />
+
+            <input
+              type="text"
+              placeholder="Search by Name, ID or Email..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-9 pr-4 py-2.5 border border-violet-200 rounded-xl bg-violet-50/40 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+            />
+          </div>
+
+          {/* Role */}
+          <select
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+            className="w-full px-3 py-2.5 border border-violet-200 rounded-xl bg-violet-50/40 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          >
+            <option value="">All Roles</option>
+            <option value="employee">Employee</option>
+            <option value="hr">HR</option>
+            <option value="sales">Sales</option>
+            <option value="field_sales">Field Sales</option>
+            <option value="technical_associate">Technical Associate</option>
+            <option value="bda">BDA</option>
+            <option value="admin">Admin</option>
+          </select>
+
+          {/* Department */}
+          <select
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value)}
+            className="w-full px-3 py-2.5 border border-violet-200 rounded-xl bg-violet-50/40 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          >
+            <option value="">All Departments</option>
+
+            {departments.map(dep => (
+              <option
+                key={dep._id}
+                value={dep._id}
+              >
+                {dep.name}
+              </option>
+            ))}
+          </select>
+
+          {/* Status */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="w-full px-3 py-2.5 border border-violet-200 rounded-xl bg-violet-50/40 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          >
+            <option value="">All Status</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+          </select>
+
+          {/* Employee Type */}
+          <select
+            value={employeeTypeFilter}
+            onChange={(e) => setEmployeeTypeFilter(e.target.value)}
+            className="w-full px-3 py-2.5 border border-violet-200 rounded-xl bg-violet-50/40 text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          >
+            <option value="">All Types</option>
+            <option value="intern">Intern</option>
+            <option value="fulltime">Full Time</option>
+          </select>
+
+          {/* Clear Filters */}
+          <button
+            onClick={() => {
+              setSearch('');
+              setRoleFilter('');
+              setDepartmentFilter('');
+              setStatusFilter('');
+              setEmployeeTypeFilter('');
+            }}
+            className="bg-violet-600 hover:bg-violet-700 text-white rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors"
+          >
+            Clear
+          </button>
+
         </div>
+
       </div>
 
       {/* ── Empty state ── */}
@@ -191,7 +316,9 @@ export default function HREmployees() {
           {/* ── Mobile: Card list (hidden sm+) ── */}
           <div className="sm:hidden space-y-3">
             {filtered.map(emp => (
-              <div key={emp._id} className="bg-white border border-violet-100 rounded-2xl shadow-sm p-4 space-y-3">
+              <div key={emp._id} className="bg-white border border-violet-100 rounded-2xl shadow-sm p-4 space-y-3" onClick={() => {
+                navigate(`/hr/employees/${emp._id}`);
+              }}>
                 {/* Avatar + info */}
                 <div className="flex items-start gap-3">
                   <div className="w-11 h-11 rounded-xl bg-violet-200 text-violet-800 font-bold text-sm flex items-center justify-center flex-shrink-0">
@@ -215,10 +342,10 @@ export default function HREmployees() {
                 {/* Meta grid */}
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { label: 'Department',   value: emp.department?.name || '—' },
-                    { label: 'Designation',  value: emp.designation || '—' },
-                    { label: 'Salary',       value: emp.basicSalary > 0 ? formatCurrency(emp.basicSalary) : '—' },
-                    { label: 'Joined',       value: formatDate(emp.joiningDate) },
+                    { label: 'Department', value: emp.department?.name || '—' },
+                    { label: 'Designation', value: emp.designation || '—' },
+                    { label: 'Salary', value: emp.basicSalary > 0 ? formatCurrency(emp.basicSalary) : '—' },
+                    { label: 'Joined', value: formatDate(emp.joiningDate) },
                   ].map(({ label, value }) => (
                     <div key={label} className="bg-violet-50 rounded-xl px-3 py-2">
                       <p className="text-[10px] font-semibold text-violet-400 uppercase tracking-wide">{label}</p>
@@ -228,19 +355,19 @@ export default function HREmployees() {
                 </div>
                 {/* Action buttons */}
                 <div className="grid grid-cols-3 gap-2 pt-1 border-t border-violet-50">
-                  <button onClick={() => sendOffer(emp)}
+                  <button onClick={(e) => { e.stopPropagation(); sendOffer(emp) }}
                     className="col-span-1 text-xs py-2 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold transition-colors">Offer</button>
-                  <button onClick={() => sendCreds(emp)}
+                  <button onClick={(e) => { e.stopPropagation(); sendCreds(emp) }}
                     className="col-span-1 text-xs py-2 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold transition-colors">Creds</button>
-                  <button onClick={() => openEdit(emp)}
+                  <button onClick={(e) => { e.stopPropagation(); openEdit(emp) }}
                     className="col-span-1 text-xs py-2 rounded-xl bg-amber-50 text-amber-700 hover:bg-amber-100 font-semibold transition-colors">Edit</button>
-                  <button onClick={() => openAttach(emp)}
+                  <button onClick={(e) => { e.stopPropagation(); openAttach(emp) }}
                     className="col-span-1 text-xs py-2 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold transition-colors">Attach</button>
                   {emp.employeeType && (
-                    <button onClick={() => openDocs(emp)}
+                    <button onClick={(e) => { e.stopPropagation(); openDocs(emp); }}
                       className="col-span-1 text-xs py-2 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 font-semibold transition-colors">Review Docs</button>
                   )}
-                  <button onClick={() => handleDelete(emp)}
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(emp); }}
                     className="col-span-1 text-xs py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 font-semibold transition-colors">Delete</button>
                 </div>
               </div>
@@ -260,7 +387,11 @@ export default function HREmployees() {
                 </thead>
                 <tbody className="divide-y divide-violet-50">
                   {filtered.map(emp => (
-                    <tr key={emp._id} className="hover:bg-violet-50/40 transition-colors">
+
+                    <tr key={emp._id} className="cursor-pointer hover:bg-violet-50/40 transition-colors" onClick={() => {
+                      // console.log("Clicked:", emp._id);
+                      navigate(`/hr/employees/${emp._id}`);
+                    }}>
                       {/* Employee */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-3 min-w-0">
@@ -292,7 +423,9 @@ export default function HREmployees() {
                       </td>
                       {/* Status */}
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <StatusDropdown emp={emp} onChange={handleStatusChange} />
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <StatusDropdown emp={emp} onChange={handleStatusChange} />
+                        </div>
                       </td>
                       {/* Joining */}
                       <td className="px-4 py-3 text-sm text-violet-600 whitespace-nowrap">{formatDate(emp.joiningDate)}</td>
@@ -303,29 +436,29 @@ export default function HREmployees() {
                       {/* Actions */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <button onClick={() => sendOffer(emp)} title="Send offer letter"
+                          <button onClick={(e) => { e.stopPropagation(); sendOffer(emp); }} title="Send offer letter"
                             className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-100 transition-colors">
                             <Ico d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
                           </button>
-                          <button onClick={() => sendCreds(emp)} title="Send credentials"
+                          <button onClick={(e) => { e.stopPropagation(); sendCreds(emp); }} title="Send credentials"
                             className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-100 transition-colors">
                             <Ico d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                           </button>
                           {emp.employeeType && (
-                            <button onClick={() => openDocs(emp)} title="Review documents"
+                            <button onClick={(e) => { e.stopPropagation(); openDocs(emp); }} title="Review documents"
                               className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-colors">
                               <Ico d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                             </button>
                           )}
-                          <button onClick={() => openAttach(emp)} title="Attach joining letter / ID card"
+                          <button onClick={(e) => { e.stopPropagation(); openAttach(emp); }} title="Attach joining letter / ID card"
                             className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-colors">
                             <Ico d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                           </button>
-                          <button onClick={() => openEdit(emp)} title="Edit employee"
+                          <button onClick={(e) => { e.stopPropagation(); openEdit(emp); }} title="Edit employee"
                             className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors">
                             <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                           </button>
-                          <button onClick={() => handleDelete(emp)} title="Delete employee"
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(emp); }} title="Delete employee"
                             className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
                             <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                           </button>
@@ -345,8 +478,8 @@ export default function HREmployees() {
         <form onSubmit={handleCreate} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Field label="Employee ID *" required placeholder="e.g. EMP0001" value={form.employeeId} onChange={e => setForm(f => ({ ...f, employeeId: e.target.value }))} />
-            <Field label="Full Name *"   required placeholder="Full name"      value={form.name}       onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-            <Field label="Email *"       required placeholder="Email"          value={form.email}      onChange={e => setForm(f => ({ ...f, email: e.target.value }))} type="email" />
+            <Field label="Full Name *" required placeholder="Full name" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+            <Field label="Email *" required placeholder="Email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} type="email" />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
@@ -375,8 +508,8 @@ export default function HREmployees() {
             </SelectField>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Field label="Designation" placeholder="Job title"     value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} />
-            <Field label="Phone"       placeholder="Phone number"  value={form.phone}       onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
+            <Field label="Designation" placeholder="Job title" value={form.designation} onChange={e => setForm(f => ({ ...f, designation: e.target.value }))} />
+            <Field label="Phone" placeholder="Phone number" value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Field label="Joining Date" type="date" value={form.joiningDate} onChange={e => setForm(f => ({ ...f, joiningDate: e.target.value }))} />
@@ -500,12 +633,12 @@ function EditForm({ emp, departments, onDone }) {
   return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Name"        value={form.name}        onChange={f('name')} />
+        <Field label="Name" value={form.name} onChange={f('name')} />
         <Field label="Email *" type="email" required value={form.email} onChange={f('email')} placeholder="Login email" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Designation" value={form.designation} onChange={f('designation')} placeholder="Job title" />
-        <Field label="Phone"       value={form.phone}       onChange={f('phone')} placeholder="Phone number" />
+        <Field label="Phone" value={form.phone} onChange={f('phone')} placeholder="Phone number" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <SelectField label="Department" value={form.department} onChange={f('department')}>
@@ -514,7 +647,7 @@ function EditForm({ emp, departments, onDone }) {
         </SelectField>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        <Field label="Joining Date"    type="date"   value={form.joiningDate} onChange={f('joiningDate')} />
+        <Field label="Joining Date" type="date" value={form.joiningDate} onChange={f('joiningDate')} />
         <Field label="Basic Salary (₹)" type="number" value={form.basicSalary} onChange={e => setForm(p => ({ ...p, basicSalary: parseFloat(e.target.value) || 0 }))} />
       </div>
       <div>
@@ -594,7 +727,7 @@ function AttachDocsPanel({ emp, onDone }) {
 
   const rows = [
     { key: 'joiningLetter', label: 'Joining Letter', existing: emp.joiningLetter, accept: '.pdf,.jpg,.jpeg,.png' },
-    { key: 'idCard',        label: 'ID Card',        existing: emp.idCard,        accept: '.pdf,.jpg,.jpeg,.png' },
+    { key: 'idCard', label: 'ID Card', existing: emp.idCard, accept: '.pdf,.jpg,.jpeg,.png' },
   ];
 
   return (
@@ -638,8 +771,8 @@ function AttachDocsPanel({ emp, onDone }) {
 
 /* ── Document review panel ── */
 function DocumentReviewPanel({ emp }) {
-  const [data, setData]             = useState(null);
-  const [reviewing, setReviewing]   = useState(null);
+  const [data, setData] = useState(null);
+  const [reviewing, setReviewing] = useState(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showReject, setShowReject] = useState(null);
 
@@ -683,8 +816,8 @@ function DocumentReviewPanel({ emp }) {
   if (!data.employeeType) return <div className="text-center py-8 text-sm text-violet-400">No onboarding type set for this employee.</div>;
 
   const approved = data.docs.filter(d => d.status === 'approved').length;
-  const total    = data.docs.length;
-  const pct      = total > 0 ? Math.round((approved / total) * 100) : 0;
+  const total = data.docs.length;
+  const pct = total > 0 ? Math.round((approved / total) * 100) : 0;
 
   return (
     <div className="space-y-4">

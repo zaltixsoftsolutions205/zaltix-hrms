@@ -33,8 +33,8 @@ export const AuthProvider = ({ children }) => {
     return () => window.removeEventListener('auth:logout', handleForceLogout);
   }, []);
 
-  const login = async (email, password) => {
-    const { data } = await api.post('/auth/login', { email, password });
+  const login = async (login, password) => {
+    const { data } = await api.post('/auth/login', { login, password });
     localStorage.setItem('token', data.token);
     setUser(data.user);
     return data;

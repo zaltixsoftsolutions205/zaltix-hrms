@@ -20,13 +20,13 @@ const SI = ({ d, d2, size = 16, color }) => (
 const WEEK_DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 
 const STATUS_STYLE = {
-  present:    'bg-green-100 text-green-700 font-semibold',
-  absent:     'bg-red-100 text-red-700 font-semibold',
+  present: 'bg-green-100 text-green-700 font-semibold',
+  absent: 'bg-red-100 text-red-700 font-semibold',
   'half-day': 'bg-amber-100 text-amber-700 font-semibold',
 };
 
 const REG_BADGE = {
-  pending:  'bg-amber-100 text-amber-700',
+  pending: 'bg-amber-100 text-amber-700',
   approved: 'bg-green-100 text-green-700',
   rejected: 'bg-red-100 text-red-700',
 };
@@ -47,8 +47,8 @@ const MonthCalendar = ({ year, month, records }) => {
       {/* Legend */}
       <div className="flex flex-wrap gap-2 sm:gap-3 mb-4">
         {[
-          { label: 'Present',  cls: 'bg-green-100 text-green-700' },
-          { label: 'Absent',   cls: 'bg-red-100 text-red-700' },
+          { label: 'Present', cls: 'bg-green-100 text-green-700' },
+          { label: 'Absent', cls: 'bg-red-100 text-red-700' },
           { label: 'Half Day', cls: 'bg-amber-100 text-amber-700' },
         ].map(l => (
           <span key={l.label} className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full ${l.cls}`}>
@@ -94,8 +94,8 @@ const MonthCalendar = ({ year, month, records }) => {
             <div key={day}
               title={
                 isWeekend ? 'Weekend' :
-                effectiveStatus ? `${effectiveStatus.replace('-', ' ')}${hasIssue ? ' · Late/Early' : ''}` :
-                dateStr
+                  effectiveStatus ? `${effectiveStatus.replace('-', ' ')}${hasIssue ? ' · Late/Early' : ''}` :
+                    dateStr
               }
               className="aspect-square flex items-center justify-center relative">
               <span className={`w-7 h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs transition-all
@@ -117,24 +117,51 @@ const MonthCalendar = ({ year, month, records }) => {
 
 const getISTClock = () => new Date().toLocaleTimeString('en-IN', { timeZone: 'Asia/Kolkata', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
 
-const MONTH_NAMES = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 // Inline regularization form for a record row
 const RegularizeInline = ({ record, onDone }) => {
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState('');
+  const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const [regCheckIn, setRegCheckIn] = useState("");
+  const [regCheckOut, setRegCheckOut] = useState("");
+
   const submit = async () => {
-    if (!reason.trim()) return toast.error('Please enter a reason');
+    if (!reason.trim()) {
+      return toast.error("Please enter a reason");
+    }
+
+    const payload = {
+      attendanceId: record._id,
+      reason,
+    };
+
+    if (record.isLate) {
+      payload.checkIn = regCheckIn;
+    }
+
+    if (record.isEarlyLeave || !record.checkOut) {
+      payload.checkOut = regCheckOut;
+    }
+
     setLoading(true);
+
     try {
-      await api.post('/attendance/regularize', { attendanceId: record._id, reason });
-      toast.success('Regularization request submitted');
+      await api.post("/attendance/regularize", payload);
+
+      toast.success("Regularization request submitted");
+
       setOpen(false);
+      setReason("");
+      setRegCheckIn("");
+      setRegCheckOut("");
+
       onDone();
     } catch (err) {
-      toast.error(err.response?.data?.message || 'Failed to submit');
+      toast.error(
+        err.response?.data?.message || "Failed to submit request"
+      );
     } finally {
       setLoading(false);
     }
@@ -142,10 +169,13 @@ const RegularizeInline = ({ record, onDone }) => {
 
   if (record.regularizationStatus) {
     return (
-      <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${REG_BADGE[record.regularizationStatus]}`}>
-        {record.regularizationStatus === 'pending' && 'Pending HR'}
-        {record.regularizationStatus === 'approved' && 'Regularized'}
-        {record.regularizationStatus === 'rejected' && 'Rejected'}
+      <span
+        className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${REG_BADGE[record.regularizationStatus]
+          }`}
+      >
+        {record.regularizationStatus === "pending" && "Pending HR"}
+        {record.regularizationStatus === "approved" && "Regularized"}
+        {record.regularizationStatus === "rejected" && "Rejected"}
       </span>
     );
   }
@@ -153,26 +183,80 @@ const RegularizeInline = ({ record, onDone }) => {
   return (
     <div>
       {!open ? (
-        <button onClick={() => setOpen(true)}
-          className="text-xs text-gray-900 font-semibold hover:text-gray-900 underline underline-offset-2">
+        <button
+          onClick={() => setOpen(true)}
+          className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
+        >
           Request
         </button>
       ) : (
-        <div className="flex flex-col gap-1.5 min-w-[200px]">
-          <input
-            className="input-field text-xs py-1 px-2"
-            placeholder="Reason for late/early…"
+        <div className="flex flex-col gap-3 min-w-[250px]">
+
+          {/* Check In */}
+          {record.isLate && (
+            <>
+              <label className="text-xs font-semibold text-violet-700">
+                Correct Check-In Time
+              </label>
+
+              <input
+                type="time"
+                className="input-field"
+                value={regCheckIn}
+                onChange={(e) => setRegCheckIn(e.target.value)}
+              />
+            </>
+          )}
+
+          {/* Check Out */}
+          {(record.isEarlyLeave || !record.checkOut) && (
+            <>
+              <label className="text-xs font-semibold text-violet-700" >
+                {!record.checkOut
+                  ? "Correct Check-Out Time"
+                  : "Correct Early Leave Time"}
+              </label>
+
+              <input
+                type="time"
+                className="input-field"
+                value={regCheckOut}
+                onChange={(e) => setRegCheckOut(e.target.value)}
+              />
+            </>
+          )}
+
+          {/* Reason */}
+          <label className="text-xs font-semibold text-violet-700">
+            Reason
+          </label>
+
+          <textarea
+            rows={3}
+            className="input-field resize-none"
+            placeholder="Explain why you were late or left early..."
             value={reason}
-            onChange={e => setReason(e.target.value)}
-            autoFocus
+            onChange={(e) => setReason(e.target.value)}
           />
-          <div className="flex gap-1.5">
-            <button onClick={submit} disabled={loading}
-              className="btn-primary btn-xs text-xs px-2 py-1 flex-1">
-              {loading ? '…' : 'Submit'}
+
+          <div className="flex gap-2">
+            <button
+              onClick={submit}
+              disabled={loading}
+              className="btn-primary btn-xs flex-1"
+            >
+              {loading ? "Submitting..." : "Submit"}
             </button>
-            <button onClick={() => setOpen(false)}
-              className="btn-secondary btn-xs text-xs px-2 py-1">
+
+            <button
+              onClick={() => {
+                setOpen(false);
+                setReason("");
+                setRegCheckIn("");
+                setRegCheckOut("");
+              }}
+              className="btn-secondary btn-xs"
+            >
               Cancel
             </button>
           </div>
@@ -182,13 +266,15 @@ const RegularizeInline = ({ record, onDone }) => {
   );
 };
 
-const AttendancePage = () => {
+const AttendancePage = ({ employeeId = null }) => {
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [clock, setClock] = useState(getISTClock());
   const [regReason, setRegReason] = useState('');
+  const [regCheckIn, setRegCheckIn] = useState("");
+  const [regCheckOut, setRegCheckOut] = useState("");
   const [regLoading, setRegLoading] = useState(false);
   const [showRegForm, setShowRegForm] = useState(false);
   const [todayHoliday, setTodayHoliday] = useState(null);
@@ -205,7 +291,7 @@ const AttendancePage = () => {
         const found = holidays.find(h => h.date && h.date.slice(0, 10) === todayStr);
         setTodayHoliday(found || null);
       })
-      .catch(() => {});
+      .catch(() => { });
   }, []);
 
   useEffect(() => {
@@ -215,11 +301,20 @@ const AttendancePage = () => {
 
   const fetchAttendance = async () => {
     setLoading(true);
+
     try {
-      const res = await api.get(`/attendance/my?month=${filter.month}&year=${filter.year}`);
+      const url = employeeId
+        ? `/attendance/my/${employeeId}?month=${filter.month}&year=${filter.year}`
+        : `/attendance/my?month=${filter.month}&year=${filter.year}`;
+
+      const res = await api.get(url);
+
       setData(res.data);
-    } catch { toast.error('Failed to load attendance'); }
-    finally { setLoading(false); }
+    } catch (err) {
+      toast.error("Failed to load attendance");
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchAttendance(); }, [filter.month, filter.year]);
@@ -234,7 +329,7 @@ const AttendancePage = () => {
     if (!regReason.trim()) return toast.error('Please enter a reason');
     setRegLoading(true);
     try {
-      await api.post('/attendance/regularize', { attendanceId: today?._id, reason: regReason });
+      await api.post('/attendance/regularize', { attendanceId: today?._id, reason: regReason, checkIn: regCheckIn, checkOut: regCheckOut });
       toast.success('Regularization request submitted — awaiting HR approval');
       setShowRegForm(false);
       setRegReason('');
@@ -269,7 +364,7 @@ const AttendancePage = () => {
   })();
 
   return (
-    <div className="max-w-6xl mx-auto px-3 sm:px-4 space-y-4 animate-fade-in">
+    <div className="max-w-8xl mx-auto px-3 sm:px-4 space-y-4 animate-fade-in">
       <IntelligenceAlerts alerts={attendanceAlerts} />
 
       {/* Today's Attendance Card */}
@@ -289,7 +384,7 @@ const AttendancePage = () => {
         </div>
 
         {/* Late / Early Leave notice */}
-        {todayHasIssue && (
+        {!employeeId && todayHasIssue && (
           <div className="mt-3 flex flex-wrap gap-2">
             {today.isLate && (
               <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-900">
@@ -331,6 +426,29 @@ const AttendancePage = () => {
               value={regReason}
               onChange={e => setRegReason(e.target.value)}
             />
+            {today?.isLate && (
+              <>
+                <p className="text-xs font-semibold text-violet-700 mb-2">check-in {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
+                <input
+                  type="time"
+                  className="input-field w-full text-sm mb-3"
+                  value={regCheckIn}
+                  onChange={(e) => setRegCheckIn(e.target.value)}
+                />
+              </>
+            )}
+            {(today?.isEarlyLeave || !today?.checkOut) && (
+              <>
+                <p className="text-xs font-semibold text-violet-700 mb-2">check-out {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
+                <input
+                  type="time"
+                  className="input-field w-full text-sm mb-3"
+                  value={regCheckOut}
+                  onChange={(e) => setRegCheckOut(e.target.value)}
+                />
+              </>
+            )}
+
             <div className="flex gap-2 mt-2">
               <button onClick={handleRegularizeToday} disabled={regLoading}
                 className="btn-primary btn-sm flex-1">
@@ -372,7 +490,7 @@ const AttendancePage = () => {
             </div>
           )}
 
-          {!isAdmin && !todayHoliday && (
+          {!employeeId && !isAdmin && !todayHoliday && (
             <div className="flex gap-3 sm:ml-auto">
               {!today?.checkIn && (
                 <button onClick={handleCheckIn} disabled={actionLoading} className="btn-sm flex-1 sm:flex-none bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white font-semibold rounded-xl px-4 py-2 transition-colors">
@@ -402,9 +520,9 @@ const AttendancePage = () => {
 
       {/* Monthly KPI Summary */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
-        <KpiCard label="Present"     value={data?.summary?.present ?? '—'}     icon={<SI d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" size={14} color="text-violet-600" />} color="green" />
-        <KpiCard label="Absent"      value={data?.summary?.absent ?? '—'}      icon={<SI d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" size={14} color="text-gray-900" />} color="red" />
-        <KpiCard label="Half Day"    value={data?.summary?.halfDay ?? '—'}     icon={<SI d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" size={14} color="text-violet-500" />} color="golden" />
+        <KpiCard label="Present" value={data?.summary?.present ?? '—'} icon={<SI d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" size={14} color="text-violet-600" />} color="green" />
+        <KpiCard label="Absent" value={data?.summary?.absent ?? '—'} icon={<SI d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" size={14} color="text-gray-900" />} color="red" />
+        <KpiCard label="Half Day" value={data?.summary?.halfDay ?? '—'} icon={<SI d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" size={14} color="text-violet-500" />} color="golden" />
         <KpiCard label="Total Hours" value={data?.summary?.totalWorkHours ? `${data.summary.totalWorkHours}h` : '—'} icon={<SI d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" size={14} color="text-amber-500" />} color="violet" />
       </div>
 
