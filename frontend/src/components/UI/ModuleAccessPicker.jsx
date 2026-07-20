@@ -9,8 +9,12 @@ import { MODULE_GROUPS, BASELINE_MODULES, PERMISSIONS } from '../../constants/mo
  * Behavior:
  *  - Self-service baseline modules are shown as "Always on" and are not
  *    toggleable (every employee keeps their own attendance/leaves/etc).
- *  - Each non-baseline module has an access checkbox; editable modules also
- *    expose a View / Edit permission toggle (only when access is on).
+ *  - Editable modules expose two independent checkboxes: View and Edit.
+ *      · View only            → read-only access   ({ permission: 'view' })
+ *      · Edit (alone or +View) → full access        ({ permission: 'edit' })
+ *    Edit implies View (you can't edit a page you can't load), so ticking
+ *    Edit reads as full access. Storage still holds one permission per module.
+ *  - Read-only modules keep a single access checkbox.
  *  - An empty value means "use role defaults" — surfaced as a hint.
  */
 export default function ModuleAccessPicker({ value = [], onChange }) {
@@ -55,37 +59,58 @@ export default function ModuleAccessPicker({ value = [], onChange }) {
               {modules.map(m => {
                 const baseline = BASELINE_MODULES.includes(m.key);
                 const granted = isGranted(m.key);
+                const canEdit = granted && permOf(m.key) === PERMISSIONS.EDIT;
+
+                // View checkbox: represents "has access at all". Turning it off
+                // ungrants the module entirely (edit implies view, so there's no
+                // edit-without-view state). Turning it on grants view.
+                const onViewToggle = (checked) =>
+                  checked ? setGrant(m.key, true, PERMISSIONS.VIEW) : setGrant(m.key, false);
+
+                // Edit checkbox: upgrades to edit (implies view) or drops back to
+                // view-only. Ticking Edit on an ungranted module grants full access.
+                const onEditToggle = (checked) =>
+                  setGrant(m.key, true, checked ? PERMISSIONS.EDIT : PERMISSIONS.VIEW);
+
                 return (
                   <div key={m.key}
                     className="flex items-center justify-between gap-2 rounded-lg px-2.5 py-1.5 border border-violet-100 bg-white">
-                    <label className="flex items-center gap-2 cursor-pointer flex-1 min-w-0">
-                      <input
-                        type="checkbox"
-                        className="accent-violet-600 flex-shrink-0"
-                        checked={baseline || granted}
-                        disabled={baseline}
-                        onChange={e => setGrant(m.key, e.target.checked, permOf(m.key))}
-                      />
-                      <span className="text-xs text-violet-800 truncate">{m.label}</span>
-                    </label>
+                    <span className="text-xs text-violet-800 truncate flex-1 min-w-0">{m.label}</span>
 
                     {baseline ? (
                       <span className="text-[10px] text-violet-400 flex-shrink-0">Always on</span>
-                    ) : granted && m.editable ? (
-                      <div className="flex rounded-lg overflow-hidden border border-violet-200 flex-shrink-0">
-                        {[PERMISSIONS.VIEW, PERMISSIONS.EDIT].map(p => (
-                          <button key={p} type="button"
-                            onClick={() => setGrant(m.key, true, p)}
-                            className={`text-[10px] px-2 py-0.5 font-semibold capitalize transition-colors ${
-                              permOf(m.key) === p ? 'bg-violet-600 text-white' : 'bg-white text-violet-500 hover:bg-violet-50'
-                            }`}>
-                            {p}
-                          </button>
-                        ))}
+                    ) : m.editable ? (
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="accent-violet-600"
+                            checked={granted}
+                            onChange={e => onViewToggle(e.target.checked)}
+                          />
+                          <span className="text-[10px] font-semibold text-violet-600">View</span>
+                        </label>
+                        <label className="flex items-center gap-1 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            className="accent-violet-600"
+                            checked={canEdit}
+                            onChange={e => onEditToggle(e.target.checked)}
+                          />
+                          <span className="text-[10px] font-semibold text-violet-600">Edit</span>
+                        </label>
                       </div>
-                    ) : granted ? (
-                      <span className="text-[10px] text-violet-400 flex-shrink-0">View</span>
-                    ) : null}
+                    ) : (
+                      <label className="flex items-center gap-1 cursor-pointer flex-shrink-0">
+                        <input
+                          type="checkbox"
+                          className="accent-violet-600"
+                          checked={granted}
+                          onChange={e => setGrant(m.key, e.target.checked, PERMISSIONS.VIEW)}
+                        />
+                        <span className="text-[10px] font-semibold text-violet-600">View</span>
+                      </label>
+                    )}
                   </div>
                 );
               })}
