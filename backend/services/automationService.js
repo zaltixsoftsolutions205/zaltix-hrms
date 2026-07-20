@@ -7,6 +7,7 @@
  * Schedule summary:
  *  - Every hour        : Task deadline & overdue checks
  *  - Mon–Sat 08:30     : Morning work summary per employee
+ *  - Mon–Sat 09:30–10:30: Check-in reminders every 15 min until checked in
  *  - Mon–Sat 18:30     : Evening summary + missing checkout detection
  *  - Mon–Sat 09:30     : CRM + document compliance checks
  *  - Every Monday 09:00: Weekly performance report + productivity score
@@ -19,6 +20,8 @@ const User            = require('../models/User');
 const Task            = require('../models/Task');
 const Attendance      = require('../models/Attendance');
 const Lead            = require('../models/Lead');
+const Leave           = require('../models/Leave');
+const Holiday         = require('../models/Holiday');
 const Document        = require('../models/Document');
 const ProductivityScore = require('../models/ProductivityScore');
 const { notify, notifyMany } = require('./notificationService');
@@ -31,6 +34,15 @@ const todayStr = () => {
   const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
   return ist.toISOString().slice(0, 10);
 };
+
+/** Returns the current IST time as HH:mm */
+const istHM = () => {
+  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  return ist.toISOString().slice(11, 16);
+};
+
+/** Office start time (IST) — matches attendanceController's late detection */
+const OFFICE_START = '09:30';
 
 /** Returns { start, end } of a given ISO week label e.g. "2026-W10" */
 const weekBounds = (weekLabel) => {
@@ -185,6 +197,89 @@ async function checkMissingCheckout() {
     console.log(`[Automation] Missing checkout: ${records.length} employees`);
   } catch (err) {
     console.error('[Automation] checkMissingCheckout error:', err.message);
+  }
+}
+
+/**
+ * Runs every 15 minutes between 09:30 and 10:30 IST (Mon–Sat), i.e. at
+ * 09:30, 09:45, 10:00, 10:15 and 10:30. Reminds employees who have not
+ * checked in yet; the reminders stop as soon as they check in, and never
+ * run past 10:30.
+ *
+ * Skipped: public holidays, employees on approved leave, and admins.
+ */
+async function remindPendingCheckIn() {
+  try {
+    const today = todayStr();
+
+    // Nothing to chase on a public holiday.
+    const holiday = await Holiday.findOne({
+      date: { $gte: new Date(`${today}T00:00:00.000Z`), $lte: new Date(`${today}T23:59:59.999Z`) },
+    });
+    if (holiday) {
+      console.log(`[Automation] Check-in reminder skipped — holiday: ${holiday.name}`);
+      return;
+    }
+
+    const employees = await User.find({ isActive: true, role: { $ne: 'admin' } }, '_id name');
+    if (employees.length === 0) return;
+
+    const employeeIds = employees.map((e) => e._id);
+
+    // Anyone who already has a check-in time, or whom HR has already marked
+    // absent/half-day, should not be chased.
+    const records = await Attendance.find(
+      { employee: { $in: employeeIds }, date: today },
+      'employee checkIn status'
+    ).lean();
+    const settled = new Set(
+      records
+        .filter((r) => r.checkIn || r.status === 'absent' || r.status === 'half-day')
+        .map((r) => String(r.employee))
+    );
+
+    // Approved leave covering today. fromDate/toDate are Dates, so compare
+    // against the day's bounds rather than the YYYY-MM-DD string.
+    const dayStart = new Date(`${today}T00:00:00.000Z`);
+    const dayEnd = new Date(`${today}T23:59:59.999Z`);
+    const onLeave = await Leave.find(
+      {
+        employee: { $in: employeeIds },
+        status: 'approved',
+        fromDate: { $lte: dayEnd },
+        toDate: { $gte: dayStart },
+      },
+      'employee'
+    ).lean();
+    const onLeaveIds = new Set(onLeave.map((l) => String(l.employee)));
+
+    const pending = employees.filter(
+      (e) => !settled.has(String(e._id)) && !onLeaveIds.has(String(e._id))
+    );
+
+    // Past 09:30 the check-in would be recorded as late, so say so rather
+    // than repeating the same nudge. Strictly greater-than, matching
+    // attendanceController's own late detection — 09:30 exactly is on time.
+    const isLate = istHM() > OFFICE_START;
+
+    for (const emp of pending) {
+      await notify(emp._id, {
+        title: isLate ? '⏰ You are marked late' : '🕘 Check-In Reminder',
+        message: isLate
+          ? `You still haven't checked in. Office hours start at ${OFFICE_START} AM — please check in now.`
+          : `Good morning, ${emp.name.split(' ')[0]}! Please remember to check in for today.`,
+        type: 'general',
+        link: '/attendance',
+        // One reminder per 15-minute slot; the dedupKey keeps a restarted or
+        // double-scheduled job from sending the same slot twice.
+        dedupKey: `checkin-${emp._id}-${today}-${istHM()}`,
+        dedupWindowMs: 14 * 60 * 1000,
+      });
+    }
+
+    console.log(`[Automation] Check-in reminder (${istHM()}): ${pending.length} pending of ${employees.length}`);
+  } catch (err) {
+    console.error('[Automation] remindPendingCheckIn error:', err.message);
   }
 }
 
@@ -728,6 +823,12 @@ function startAutomation() {
   // Evening summary + missing checkout — Mon–Sat at 18:30
   cron.schedule('30 18 * * 1-6', sendEveningSummary, { timezone: 'Asia/Kolkata' });
 
+  // Check-in reminders — Mon–Sat at 09:30, 09:45, 10:00, 10:15, 10:30.
+  // Two expressions because the window straddles the hour; nothing fires
+  // after 10:30.
+  cron.schedule('30,45 9 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
+  cron.schedule('0,15,30 10 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
+
   // CRM alerts + document compliance — Mon–Sat at 09:30
   cron.schedule('30 9 * * 1-6', async () => {
     await checkCRMAlerts();
@@ -737,12 +838,13 @@ function startAutomation() {
   // Weekly report + productivity scores — every Monday at 09:00
   cron.schedule('0 9 * * 1', sendWeeklyReport, { timezone: 'Asia/Kolkata' });
 
-  console.log('[Automation] Scheduler started. 6 jobs active.');
+  console.log('[Automation] Scheduler started. 8 jobs active.');
 }
 
 module.exports = {
   startAutomation,
   checkTasks,
+  remindPendingCheckIn,
   checkMissingCheckout,
   checkAttendancePatterns,
   checkCRMAlerts,
