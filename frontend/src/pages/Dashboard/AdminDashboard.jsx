@@ -130,50 +130,65 @@ const getWeekStart = () => {
 };
 
 /* ── KPI card — outlined icon left · number right · label below ── */
-const WeeklyKPI = ({ label, value, icon, color, to, className = '' }) => {
-  const cls = {
-    violet: 'bg-violet-50 text-violet-500',
-    blue: 'bg-blue-50   text-blue-500',
-    indigo: 'bg-indigo-50 text-indigo-500',
-    amber: 'bg-amber-50  text-amber-500',
-    slate: 'bg-slate-50  text-slate-500',
-    green: 'bg-emerald-50 text-emerald-500',
-    rose: 'bg-rose-50   text-rose-500',
-  }[color] || 'bg-violet-50 text-violet-500';
+const WeeklyKPI = ({ label, value, icon, color, to, prev, className = '' }) => {
+  const t = {
+    violet: { card: 'bg-violet-50/70 border-violet-200/70 hover:border-violet-300', chip: 'bg-violet-100 text-violet-600', label: 'text-violet-900/60' },
+    blue:   { card: 'bg-blue-50/70 border-blue-200/70 hover:border-blue-300',       chip: 'bg-blue-100 text-blue-600',     label: 'text-blue-900/60' },
+    indigo: { card: 'bg-indigo-50/70 border-indigo-200/70 hover:border-indigo-300', chip: 'bg-indigo-100 text-indigo-600', label: 'text-indigo-900/60' },
+    amber:  { card: 'bg-amber-50/70 border-amber-200/70 hover:border-amber-300',    chip: 'bg-amber-100 text-amber-600',   label: 'text-amber-900/60' },
+    slate:  { card: 'bg-slate-50 border-slate-200/70 hover:border-slate-300',       chip: 'bg-slate-200 text-slate-600',   label: 'text-slate-900/60' },
+    green:  { card: 'bg-emerald-50/70 border-emerald-200/70 hover:border-emerald-300', chip: 'bg-emerald-100 text-emerald-600', label: 'text-emerald-900/60' },
+    rose:   { card: 'bg-rose-50/70 border-rose-200/70 hover:border-rose-300',       chip: 'bg-rose-100 text-rose-500',     label: 'text-rose-900/60' },
+  }[color] || { card: 'bg-violet-50/70 border-violet-200/70', chip: 'bg-violet-100 text-violet-600', label: 'text-violet-900/60' };
+
+  // Trend vs the previous period. Only meaningful when there is a prior
+  // figure to compare against — otherwise the badge is omitted entirely
+  // rather than showing a misleading 0%.
+  const hasTrend = typeof prev === 'number' && prev > 0 && typeof value === 'number';
+  const delta = hasTrend ? Math.round(((value - prev) / prev) * 100) : null;
+  const up = delta != null && delta >= 0;
 
   const inner = (
-    <div className="bg-white border border-gray-100 rounded-2xl px-4 py-4 hover:shadow-md hover:border-violet-100 transition-all duration-150 cursor-pointer group">
-      <div className="flex items-center justify-between gap-2 mb-2.5">
-        <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${cls}`}>
-          <Icon d={icon} size={14} sw={1.75} />
+    <div className={`border rounded-2xl px-3.5 py-3.5 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 cursor-pointer h-full ${t.card}`}>
+      <div className="flex items-center gap-2 mb-2.5">
+        <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${t.chip}`}>
+          <Icon d={icon} size={14} />
         </span>
-        <span className="text-base font-extrabold text-gray-900 tabular-nums leading-none group-hover:text-violet-700 transition-colors">
+        <p className={`text-[10px] font-bold leading-tight line-clamp-2 ${t.label}`} title={label}>{label}</p>
+      </div>
+      <div className="flex items-baseline gap-1.5">
+        <span className="text-[22px] font-extrabold text-gray-900 tabular-nums leading-none">
           {value ?? 0}
         </span>
+        {delta != null && (
+          <span className={`inline-flex items-center gap-0.5 text-[10px] font-bold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
+            {up ? '▲' : '▼'}{Math.abs(delta)}%
+          </span>
+        )}
       </div>
-      <p className="text-[11px] text-gray-400 font-medium leading-none truncate">{label}</p>
     </div>
   );
-  return to ? <Link to={to} className={`block ${className}`}>{inner}</Link> : <div className={className}>{inner}</div>;
+  return to ? <Link to={to} className={`block h-full ${className}`}>{inner}</Link> : <div className={className}>{inner}</div>;
 };
 
 /* ── Stat card (bottom stats row) ── */
 const StatCard = ({ label, value, icon, color, to, sub }) => {
   const c = {
-    violet: { iconBg: 'bg-violet-50 text-violet-600', val: 'text-gray-900' },
-    amber: { iconBg: 'bg-amber-50  text-amber-600', val: 'text-gray-900' },
-    green: { iconBg: 'bg-emerald-50 text-emerald-600', val: 'text-gray-900' },
-    red: { iconBg: 'bg-red-50    text-red-500', val: 'text-gray-900' },
-    blue: { iconBg: 'bg-blue-50   text-blue-600', val: 'text-gray-900' },
-  }[color] || { iconBg: 'bg-violet-50 text-violet-600', val: 'text-gray-900' };
+    violet: { card: 'bg-violet-50/70 border-violet-200/70 hover:border-violet-300', iconBg: 'bg-violet-100 text-violet-600', label: 'text-violet-900/60', sub: 'text-violet-400' },
+    amber: { card: 'bg-amber-50/70 border-amber-200/70 hover:border-amber-300', iconBg: 'bg-amber-100 text-amber-600', label: 'text-amber-900/60', sub: 'text-amber-400' },
+    green: { card: 'bg-emerald-50/70 border-emerald-200/70 hover:border-emerald-300', iconBg: 'bg-emerald-100 text-emerald-600', label: 'text-emerald-900/60', sub: 'text-emerald-400' },
+    red: { card: 'bg-rose-50/70 border-rose-200/70 hover:border-rose-300', iconBg: 'bg-rose-100 text-rose-500', label: 'text-rose-900/60', sub: 'text-rose-400' },
+    blue: { card: 'bg-blue-50/70 border-blue-200/70 hover:border-blue-300', iconBg: 'bg-blue-100 text-blue-600', label: 'text-blue-900/60', sub: 'text-blue-400' },
+    indigo: { card: 'bg-indigo-50/70 border-indigo-200/70 hover:border-indigo-300', iconBg: 'bg-indigo-100 text-indigo-600', label: 'text-indigo-900/60', sub: 'text-indigo-400' },
+  }[color] || { card: 'bg-violet-50/70 border-violet-200/70', iconBg: 'bg-violet-100 text-violet-600', label: 'text-violet-900/60', sub: 'text-violet-400' };
 
   const inner = (
-    <div className="bg-white border border-gray-100 rounded-2xl p-4 flex items-center gap-3 hover:shadow-md hover:-translate-y-0.5 transition-all duration-200">
+    <div className={`border rounded-2xl p-4 flex items-center gap-3 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 ${c.card}`}>
       <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${c.iconBg}`}>{icon}</div>
       <div className="min-w-0">
-        <p className={`text-xl font-bold leading-none ${c.val}`}>{value ?? '—'}</p>
-        <p className="text-xs text-gray-400 mt-0.5 font-medium truncate">{label}</p>
-        {sub && <p className="text-[10px] text-gray-300 mt-0.5">{sub}</p>}
+        <p className="text-xl font-extrabold leading-none text-gray-900 tabular-nums">{value ?? '—'}</p>
+        <p className={`text-xs mt-0.5 font-bold truncate ${c.label}`}>{label}</p>
+        {sub && <p className={`text-[10px] mt-0.5 ${c.sub}`}>{sub}</p>}
       </div>
     </div>
   );
@@ -206,7 +221,12 @@ const AdminDashboard = () => {
   const [attendanceLoading, setAttendanceLoading] = useState(true);
 
   const fetchMyTasks = () => api.get('/tasks/my').then(r => setMyTasks(r.data.tasks || [])).catch(() => { });
-  const fetchFocus = () => api.get('/tasks/active-self').then(r => setActiveFocus(r.data || null)).catch(() => setActiveFocus(null));
+  // The endpoint replies { active: null } or { active: {...} }, so unwrap it —
+  // storing the envelope makes activeFocus permanently truthy and renders an
+  // empty "Focus:" banner.
+  const fetchFocus = () => api.get('/tasks/active-self')
+    .then(r => setActiveFocus(r.data?.active ?? null))
+    .catch(() => setActiveFocus(null));
 
   useEffect(() => {
     const now = new Date();
@@ -258,12 +278,30 @@ const AdminDashboard = () => {
   const weekDeals = deals.filter(d => d.status === 'won' && new Date(d.updatedAt || d.createdAt) >= weekStart).length;
   const activeClients = clients.filter(c => c.status === 'active').length || clients.length;
 
+  /* ── previous week, for the KPI trend badges ── */
+  const prevWeekStart = new Date(weekStart.getTime() - 7 * 86400000);
+  const inPrevWeek = (d) => { const t = new Date(d); return t >= prevWeekStart && t < weekStart; };
+  const prevActivities = allLeads.flatMap(l => (l.activities || []).filter(a => inPrevWeek(a.date || a.createdAt)));
+  const prevWeek = {
+    leads: allLeads.filter(l => inPrevWeek(l.createdAt)).length,
+    calls: prevActivities.filter(a => a.type === 'call').length,
+    meetings: prevActivities.filter(a => a.type === 'meeting').length,
+    demos: prevActivities.filter(a => ['demo', 'Demo'].includes(a.type)).length,
+    proposals: prevActivities.filter(a => a.type === 'proposal' || (a.notes && a.notes.toLowerCase().includes('proposal'))).length,
+    deals: deals.filter(d => d.status === 'won' && inPrevWeek(d.updatedAt || d.createdAt)).length,
+  };
+
   /* ── finance derived ── */
   const netProfit = finance?.profit ?? null;
   const prevProfit = prevFinance?.profit ?? null;
   const profitGrowth = netProfit != null && prevProfit != null && prevProfit !== 0
     ? ((netProfit - prevProfit) / Math.abs(prevProfit)) * 100 : null;
   const isGrowing = profitGrowth != null ? profitGrowth >= 0 : null;
+  // A near-zero previous month makes the percentage explode (e.g. 52,986%),
+  // which reads as a glitch rather than a number. Cap the display.
+  const growthCapped = profitGrowth != null && Math.abs(profitGrowth) > 999;
+  const growthLabel = profitGrowth == null ? null
+    : growthCapped ? '>999%' : `${Math.abs(profitGrowth).toFixed(1)}%`;
 
   /* ── task handlers ── */
   const focusLocked = activeFocus && taskForm.duration;
@@ -313,6 +351,65 @@ const AdminDashboard = () => {
     { name: 'Converted', value: crmReport.totalConverted ?? 0 },
     { name: 'Not Converted', value: Math.max(0, (crmReport.totalLeads ?? 0) - (crmReport.totalConverted ?? 0)) },
   ] : [];
+
+  /* ── Sales overview: revenue from won deals, last 4 weeks ── */
+  const salesTrend = (() => {
+    const weeks = [];
+    for (let i = 3; i >= 0; i--) {
+      const start = new Date(weekStart.getTime() - i * 7 * 86400000);
+      const end = new Date(start.getTime() + 7 * 86400000);
+      const revenue = deals
+        .filter(d => d.status === 'won')
+        .filter(d => { const t = new Date(d.updatedAt || d.createdAt); return t >= start && t < end; })
+        .reduce((s, d) => s + (d.finalDealAmount || d.dealAmount || 0), 0);
+      weeks.push({
+        name: i === 0 ? 'This wk' : start.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }),
+        revenue,
+      });
+    }
+    return weeks;
+  })();
+  const hasSalesData = salesTrend.some(w => w.revenue > 0);
+
+  /* ── Pipeline breakdown by stage (mirrors the CRM's own stages) ── */
+  const PIPELINE_STAGES = [
+    { key: 'prospect', label: 'Prospect', color: '#8B5CF6' },
+    { key: 'qualified', label: 'Qualified', color: '#3B82F6' },
+    { key: 'proposal', label: 'Proposal', color: '#F59E0B' },
+    { key: 'negotiation', label: 'Negotiation', color: '#10B981' },
+    { key: 'closed-won', label: 'Closed Won', color: '#14B8A6' },
+    { key: 'closed-lost', label: 'Closed Lost', color: '#CBD5E1' },
+  ];
+  const pipelineData = PIPELINE_STAGES
+    .map(s => ({ ...s, value: allLeads.filter(l => (l.pipelineStage || 'prospect') === s.key).length }))
+    .filter(s => s.value > 0);
+  const pipelineTotal = pipelineData.reduce((s, x) => s + x.value, 0);
+
+  /* ── Recent activity feed across all leads ── */
+  const recentActivities = allLeads
+    .flatMap(l => (l.activities || []).map(a => ({
+      ...a,
+      leadName: l.name,
+      when: a.date || a.createdAt ? new Date(a.date || a.createdAt) : null,
+    })))
+    // Drop undated entries — falling back to epoch 0 would render "1 Jan 1970".
+    .filter(a => a.when && !isNaN(a.when))
+    .sort((a, b) => b.when - a.when)
+    .slice(0, 5);
+
+  /* ── Top performers: won-deal value by owner ── */
+  const topPerformers = (() => {
+    const byUser = {};
+    for (const d of deals.filter(x => x.status === 'won')) {
+      const owner = d.assignedTo;
+      if (!owner?._id) continue;
+      const id = String(owner._id);
+      if (!byUser[id]) byUser[id] = { name: owner.name || 'Unknown', count: 0, value: 0 };
+      byUser[id].count += 1;
+      byUser[id].value += d.finalDealAmount || d.dealAmount || 0;
+    }
+    return Object.values(byUser).sort((a, b) => b.value - a.value).slice(0, 5);
+  })();
 
   /* payroll trend */
   const payrollBarData = (payroll?.payslips || []).slice(0, 8).map(p => ({
@@ -367,20 +464,48 @@ const AdminDashboard = () => {
             </p>
           </div>
 
-          {/* Net profit pill */}
-          <div className="flex-shrink-0 bg-gray-50 border border-gray-100 rounded-xl px-2.5 sm:px-5 py-2 sm:py-3 text-right">
-            <p className="text-[10px] sm:text-[11px] text-gray-400 font-semibold uppercase tracking-wide whitespace-nowrap">Net Profit · This Month</p>
-            <p className={`text-base sm:text-xl font-extrabold mt-0.5 ${netProfit == null ? 'text-gray-300' : netProfit >= 0 ? 'text-violet-700' : 'text-red-500'}`}>
-              {netProfit != null ? formatCurrency(netProfit) : '—'}
-            </p>
-            {profitGrowth != null && (
-              <div className={`inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${isGrowing ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'
-                }`}>
-                <span>{isGrowing ? '▲' : '▼'}</span>
-                <span>{Math.abs(profitGrowth).toFixed(1)}%</span>
+          {/* Net profit card */}
+          <Link to="/admin/finance"
+            className="flex-shrink-0 bg-white border border-gray-100 rounded-2xl px-3 sm:px-5 py-2.5 sm:py-3.5 shadow-sm hover:shadow-md hover:border-violet-100 transition-all duration-200 group">
+            <div className="flex items-center gap-3 sm:gap-5">
+              <div className="text-right">
+                <p className="text-[10px] sm:text-[11px] text-gray-400 font-semibold uppercase tracking-wide whitespace-nowrap">Net Profit · This Month</p>
+                <p className={`text-lg sm:text-2xl font-extrabold mt-1 tabular-nums tracking-tight ${netProfit == null ? 'text-gray-300' : netProfit >= 0 ? 'text-gray-900' : 'text-red-500'}`}>
+                  {netProfit != null ? formatCurrency(netProfit) : '—'}
+                </p>
+                {growthLabel && (
+                  <div className={`inline-flex items-center gap-1 mt-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${isGrowing ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}
+                    title={growthCapped ? `Actual: ${profitGrowth.toFixed(1)}% — last month's profit was near zero` : undefined}>
+                    <span>{isGrowing ? '▲' : '▼'}</span>
+                    <span>{growthLabel}</span>
+                    <span className="font-medium text-[9px] opacity-70">vs last month</span>
+                  </div>
+                )}
               </div>
-            )}
-          </div>
+              {/* Income vs expense — labelled rows, readable even when one side is ₹0 */}
+              {finance && (finance.totalIncome > 0 || finance.totalExpense > 0) && (
+                <div className="hidden sm:block border-l border-gray-100 pl-4 space-y-2 min-w-[110px]">
+                  {(() => {
+                    const max = Math.max(finance.totalIncome || 0, finance.totalExpense || 0, 1);
+                    return [
+                      { v: finance.totalIncome || 0, cls: 'bg-violet-400', label: 'Income' },
+                      { v: finance.totalExpense || 0, cls: 'bg-rose-300', label: 'Expense' },
+                    ].map(({ v, cls, label }) => (
+                      <div key={label}>
+                        <div className="flex items-baseline justify-between gap-2">
+                          <span className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">{label}</span>
+                          <span className="text-[10px] font-bold text-gray-700 tabular-nums">{formatCurrency(v)}</span>
+                        </div>
+                        <div className="h-1.5 bg-gray-100 rounded-full mt-1 overflow-hidden">
+                          <div className={`h-full rounded-full ${cls}`} style={{ width: `${Math.max(2, (v / max) * 100)}%` }} />
+                        </div>
+                      </div>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+          </Link>
         </div>
       </motion.div>
 
@@ -397,13 +522,13 @@ const AdminDashboard = () => {
             Full CRM Report <Icon d={IC.arrow} size={13} />
           </Link>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-          <WeeklyKPI label="Leads Generated" value={weekLeads.length} icon={IC.lead} color="violet" to="/admin/crm" />
-          <WeeklyKPI label="Calls Made" value={weekCallsMade} icon={IC.phone} color="blue" to="/admin/crm" />
-          <WeeklyKPI label="Meetings Booked" value={weekMeetings} icon={IC.calendar} color="indigo" to="/admin/crm" />
-          <WeeklyKPI label="Demos Completed" value={weekDemos} icon={IC.video} color="amber" to="/admin/crm" />
-          <WeeklyKPI label="Proposals Sent" value={weekProposals} icon={IC.doc} color="slate" to="/admin/crm" />
-          <WeeklyKPI label="Deals Closed" value={weekDeals} icon={IC.deal} color="green" to="/admin/crm" />
+        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5">
+          <WeeklyKPI label="Leads Generated" value={weekLeads.length} prev={prevWeek.leads} icon={IC.lead} color="violet" to="/admin/crm" />
+          <WeeklyKPI label="Calls Made" value={weekCallsMade} prev={prevWeek.calls} icon={IC.phone} color="blue" to="/admin/crm" />
+          <WeeklyKPI label="Meetings Booked" value={weekMeetings} prev={prevWeek.meetings} icon={IC.calendar} color="indigo" to="/admin/crm" />
+          <WeeklyKPI label="Demos Completed" value={weekDemos} prev={prevWeek.demos} icon={IC.video} color="amber" to="/admin/crm" />
+          <WeeklyKPI label="Proposals Sent" value={weekProposals} prev={prevWeek.proposals} icon={IC.doc} color="slate" to="/admin/crm" />
+          <WeeklyKPI label="Deals Closed" value={weekDeals} prev={prevWeek.deals} icon={IC.deal} color="green" to="/admin/crm" />
           <WeeklyKPI label="Active Clients" value={activeClients} icon={IC.client} color="rose" to="/crm?tab=clients" className="col-span-2 sm:col-span-1 lg:col-span-1" />
         </div>
       </motion.div>
@@ -487,11 +612,11 @@ const AdminDashboard = () => {
       </motion.div>
 
       {/* ═══ MY TASKS + QUICK ACTIONS ═══ */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 items-stretch">
 
         {/* My Tasks — 3/5 */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
-          className="lg:col-span-3 bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
+          className="lg:col-span-3 bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 bg-violet-50 rounded-xl flex items-center justify-center">
@@ -516,8 +641,8 @@ const AdminDashboard = () => {
             </div>
           </div>
 
-          {/* Focus lock */}
-          {activeFocus && (
+          {/* Focus lock — only when there is a real task to name */}
+          {activeFocus?.title && (
             <div className="mb-3 flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-100 rounded-xl text-xs text-amber-700">
               <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse flex-shrink-0" />
               <span className="font-semibold truncate">Focus: {activeFocus.title}</span>
@@ -583,12 +708,25 @@ const AdminDashboard = () => {
             ))}
           </div>
 
-          {/* Task list */}
-          <div className="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+          {/* Task list — scrolls once it outgrows the column */}
+          <div className="space-y-1.5 flex-1 max-h-96 overflow-y-auto pr-1">
             {filteredTasks.length === 0 ? (
-              <div className="text-center py-6">
-                <Icon d={IC.task} size={28} className="mx-auto text-gray-200 mb-2" />
-                <p className="text-xs text-gray-400">{taskFilter === 'completed' ? 'No completed tasks' : 'No active tasks'}</p>
+              <div className="h-full min-h-[13rem] flex flex-col items-center justify-center text-center">
+                <span className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                  <Icon d={IC.task} size={22} className="text-violet-300" />
+                </span>
+                <p className="text-sm font-semibold text-gray-500">
+                  {taskFilter === 'completed' ? 'Nothing completed yet' : 'No active tasks'}
+                </p>
+                <p className="text-[11px] text-gray-400 mt-1">
+                  {taskFilter === 'completed' ? 'Finished tasks will show up here.' : 'You’re all caught up.'}
+                </p>
+                {taskFilter !== 'completed' && (
+                  <button onClick={() => setShowTaskForm(true)}
+                    className="mt-3 text-xs font-semibold text-violet-600 hover:text-violet-700">
+                    + Add a task
+                  </button>
+                )}
               </div>
             ) : (
               <AnimatePresence>
@@ -651,9 +789,9 @@ const AdminDashboard = () => {
 
         {/* Quick Actions — 2/5 */}
         <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.12 }}
-          className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm">
+          className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-4 sm:p-5 shadow-sm flex flex-col">
           <p className="font-bold text-gray-900 text-sm mb-4">Quick Actions</p>
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 content-start">
             {[
               { label: 'New Lead', path: '/crm', icon: IC.lead, bg: 'bg-violet-50 text-violet-600 hover:bg-violet-100' },
               { label: 'Schedule Demo', path: '/crm', icon: IC.video, bg: 'bg-blue-50 text-blue-600 hover:bg-blue-100' },
@@ -677,8 +815,8 @@ const AdminDashboard = () => {
             })}
           </div>
 
-          {/* HR stats summary */}
-          <div className="mt-4 pt-4 border-t border-gray-50 grid grid-cols-3 gap-2">
+          {/* HR stats summary — pinned to the bottom of the stretched column */}
+          <div className="mt-auto pt-4 border-t border-gray-50 grid grid-cols-3 gap-2">
             {[
               { label: 'Employees', value: stats?.totalEmployees, color: 'text-violet-700' },
               { label: 'Present', value: stats?.presentToday, color: 'text-emerald-600' },
@@ -748,9 +886,187 @@ const AdminDashboard = () => {
         <StatCard label="Present Today" value={stats?.presentToday} icon={<Icon d={IC.check} size={18} />} color="green" to="/admin/attendance" sub={`of ${stats?.totalEmployees ?? '?'}`} />
         <StatCard label="Active Clients" value={activeClients || '—'} icon={<Icon d={IC.client} size={18} />} color="blue" to="/crm?tab=clients" />
         <StatCard label="Monthly Revenue" value={finance?.totalIncome != null ? formatCurrency(finance.totalIncome) : '—'} icon={<Icon d={IC.money} size={18} />} color="amber" to="/admin/finance" />
-        <StatCard label="Total Leads" value={crmReport?.totalLeads || '—'} icon={<Icon d={IC.lead} size={18} />} color="violet" to="/admin/crm" />
+        <StatCard label="Total Leads" value={crmReport?.totalLeads || '—'} icon={<Icon d={IC.lead} size={18} />} color="indigo" to="/admin/crm" />
         <StatCard label="Pending Leaves" value={stats?.pendingLeaves ?? '—'} icon={<Icon d={IC.clock} size={18} />} color="red" to="/admin/leaves" />
       </motion.div>
+
+      {/* ═══ SALES OVERVIEW · PIPELINE · RECENT ACTIVITY ═══ */}
+      <div className="grid lg:grid-cols-3 gap-4 items-stretch">
+
+        {/* Sales overview — revenue from won deals over the last 4 weeks */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+          className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="font-bold text-gray-900 text-sm">Sales Overview</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Revenue from won deals · last 4 weeks</p>
+            </div>
+            <Link to="/admin/crm" className="text-xs font-semibold text-violet-600 hover:text-violet-700 flex items-center gap-1">
+              Details <Icon d={IC.arrow} size={13} />
+            </Link>
+          </div>
+          {hasSalesData ? (
+            <ResponsiveContainer width="100%" height={210}>
+              <BarChart data={salesTrend} barSize={38}>
+                <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                <YAxis tick={{ fontSize: 10, fill: '#D1D5DB' }} axisLine={false} tickLine={false}
+                  tickFormatter={v => v >= 100000 ? `₹${(v / 100000).toFixed(1)}L` : `₹${(v / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  formatter={v => [formatCurrency(v), 'Revenue']}
+                  contentStyle={{ borderRadius: 10, border: '1px solid #F3F4F6', fontSize: 11, boxShadow: '0 4px 12px -2px rgba(0,0,0,0.08)' }}
+                  cursor={{ fill: '#F5F3FF' }} />
+                <Bar dataKey="revenue" fill="#8B5CF6" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="flex flex-col items-center justify-center h-[210px] text-center">
+              <span className="w-11 h-11 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                <Icon d={IC.chart} size={20} className="text-violet-300" />
+              </span>
+              <p className="text-sm font-semibold text-gray-500">No revenue yet</p>
+              <p className="text-[11px] text-gray-400 mt-1 max-w-[220px]">Deals marked “won” will appear here as weekly revenue.</p>
+              <Link to="/admin/crm" className="mt-3 text-xs font-semibold text-violet-600 hover:text-violet-700">Go to CRM →</Link>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Pipeline overview — leads by stage */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.16 }}
+          className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <p className="font-bold text-gray-900 text-sm">Pipeline Overview</p>
+              <p className="text-[11px] text-gray-400 mt-0.5">Leads by stage</p>
+            </div>
+            <Link to="/admin/crm" className="text-xs font-semibold text-violet-600 hover:text-violet-700">All →</Link>
+          </div>
+          {pipelineTotal > 0 ? (
+            <div className="flex items-center gap-3 flex-1">
+              <div className="relative flex-shrink-0">
+                <PieChart width={132} height={132}>
+                  <Pie data={pipelineData} cx={62} cy={62} innerRadius={40} outerRadius={62}
+                    dataKey="value" paddingAngle={2} strokeWidth={0}>
+                    {pipelineData.map(s => <Cell key={s.key} fill={s.color} />)}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #F3F4F6', fontSize: 11 }} />
+                </PieChart>
+                <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                  <span className="text-[9px] text-gray-400 font-medium leading-none">Total</span>
+                  <span className="text-lg font-extrabold text-gray-900 leading-tight">{pipelineTotal}</span>
+                </div>
+              </div>
+              <div className="flex-1 min-w-0 space-y-1.5">
+                {pipelineData.map(s => (
+                  <div key={s.key} className="flex items-center gap-1.5 text-[11px]">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: s.color }} />
+                    <span className="text-gray-500 truncate flex-1">{s.label}</span>
+                    <span className="font-bold text-gray-800 tabular-nums">{s.value}</span>
+                    <span className="text-gray-300 tabular-nums w-9 text-right">
+                      {Math.round((s.value / pipelineTotal) * 100)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center flex-1 min-h-[210px] text-center">
+              <span className="w-11 h-11 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                <Icon d={IC.lead} size={20} className="text-violet-300" />
+              </span>
+              <p className="text-sm font-semibold text-gray-500">No pipeline data</p>
+              <p className="text-[11px] text-gray-400 mt-1 max-w-[200px]">Leads appear here once they move through stages.</p>
+            </div>
+          )}
+        </motion.div>
+
+        {/* Recent activities */}
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.17 }}
+          className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <p className="font-bold text-gray-900 text-sm">Recent Activities</p>
+            <Link to="/admin/crm" className="text-xs font-semibold text-violet-600 hover:text-violet-700">View all →</Link>
+          </div>
+          {recentActivities.length > 0 ? (
+            <div className="space-y-3 flex-1">
+              {recentActivities.map((a, i) => {
+                const tone = {
+                  call: 'bg-blue-50 text-blue-500', meeting: 'bg-indigo-50 text-indigo-500',
+                  demo: 'bg-amber-50 text-amber-500', proposal: 'bg-violet-50 text-violet-500',
+                }[a.type] || 'bg-gray-50 text-gray-400';
+                const glyph = { call: IC.phone, meeting: IC.calendar, demo: IC.video, proposal: IC.doc }[a.type] || IC.lead;
+                return (
+                  <div key={i} className="flex items-start gap-2.5">
+                    <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${tone}`}>
+                      <Icon d={glyph} size={13} />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-gray-800 truncate capitalize">
+                        {a.type || 'Activity'} — {a.leadName || 'Unknown lead'}
+                      </p>
+                      {a.notes && <p className="text-[10px] text-gray-400 truncate mt-0.5">{a.notes}</p>}
+                    </div>
+                    <span className="text-[10px] text-gray-300 flex-shrink-0 mt-1">{formatDate(a.when)}</span>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center flex-1 min-h-[210px] text-center">
+              <span className="w-11 h-11 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                <Icon d={IC.clock} size={20} className="text-violet-300" />
+              </span>
+              <p className="text-sm font-semibold text-gray-500">No activity yet</p>
+              <p className="text-[11px] text-gray-400 mt-1 max-w-[200px]">Calls, meetings and demos will show up here.</p>
+            </div>
+          )}
+        </motion.div>
+      </div>
+
+      {/* ═══ TOP PERFORMERS ═══ */}
+      <div className="grid lg:grid-cols-3 gap-4">
+        <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.18 }}
+          className="lg:col-span-3 bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <p className="font-bold text-gray-900 text-sm">Top Performers</p>
+            <span className="text-[10px] text-gray-400 font-medium">By deal value</span>
+          </div>
+          {topPerformers.length > 0 ? (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-3">
+              {topPerformers.map((p, i) => {
+                const max = topPerformers[0].value || 1;
+                const palette = ['bg-violet-500', 'bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-rose-400'];
+                return (
+                  <div key={p.name + i} className="flex items-center gap-3">
+                    <span className={`w-8 h-8 rounded-full ${palette[i % 5]} text-white text-[11px] font-bold flex items-center justify-center flex-shrink-0`}>
+                      {p.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-baseline justify-between gap-2">
+                        <p className="text-xs font-semibold text-gray-800 truncate">{p.name}</p>
+                        <p className="text-xs font-bold text-gray-900 tabular-nums flex-shrink-0">{formatCurrency(p.value)}</p>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <div className="h-1.5 bg-gray-100 rounded-full flex-1 overflow-hidden">
+                          <div className={`h-full rounded-full ${palette[i % 5]}`} style={{ width: `${Math.max(6, (p.value / max) * 100)}%` }} />
+                        </div>
+                        <span className="text-[10px] text-gray-400 font-medium flex-shrink-0">{p.count} deal{p.count > 1 ? 's' : ''}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center py-10 text-center">
+              <span className="w-11 h-11 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                <Icon d={IC.deal} size={20} className="text-violet-300" />
+              </span>
+              <p className="text-sm font-semibold text-gray-500">No closed deals yet</p>
+              <p className="text-[11px] text-gray-400 mt-1 max-w-[260px]">The leaderboard ranks your team once deals are won.</p>
+            </div>
+          )}
+        </motion.div>
+      </div>
 
       {/* ═══ CHARTS ═══ */}
       <div className="grid lg:grid-cols-2 gap-4">
@@ -779,7 +1095,13 @@ const AdminDashboard = () => {
               </BarChart>
             </ResponsiveContainer>
           ) : (
-            <div className="flex items-center justify-center h-48 text-gray-300 text-sm">No payslip data this month</div>
+            <div className="flex flex-col items-center justify-center h-48 text-center">
+              <span className="w-11 h-11 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                <Icon d={IC.money} size={20} className="text-violet-300" />
+              </span>
+              <p className="text-sm font-semibold text-gray-500">No payslips this month</p>
+              <p className="text-[11px] text-gray-400 mt-1">Generate payroll to see the salary breakdown.</p>
+            </div>
           )}
         </motion.div>
 
@@ -812,7 +1134,14 @@ const AdminDashboard = () => {
               </div>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-48 text-gray-300 text-sm">No CRM data available</div>
+            <div className="flex flex-col items-center justify-center h-48 text-center">
+              <span className="w-11 h-11 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                <Icon d={IC.lead} size={20} className="text-violet-300" />
+              </span>
+              <p className="text-sm font-semibold text-gray-500">No leads yet</p>
+              <p className="text-[11px] text-gray-400 mt-1">Conversion appears once leads are added.</p>
+              <Link to="/admin/crm" className="mt-3 text-xs font-semibold text-violet-600 hover:text-violet-700">Add a lead →</Link>
+            </div>
           )}
         </motion.div>
       </div>

@@ -3,8 +3,9 @@
  * CEO Employee Management hub — embeds actual HR/Admin pages.
  * Hub grid → click card → full HR page rendered inline.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import api from '../../utils/api';
 
 /* ── Real HR / Admin pages ── */
 import HREmployees     from '../HR/HREmployees';
@@ -92,36 +93,46 @@ const SECTIONS = [
 
 /* ── accent color map ── */
 const ACCENT = {
-  violet:  { icon: 'bg-violet-50  text-violet-600  border-violet-100'  },
-  blue:    { icon: 'bg-blue-50    text-blue-600    border-blue-100'    },
-  emerald: { icon: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-  amber:   { icon: 'bg-amber-50   text-amber-600   border-amber-100'   },
-  indigo:  { icon: 'bg-indigo-50  text-indigo-600  border-indigo-100'  },
-  rose:    { icon: 'bg-rose-50    text-rose-600    border-rose-100'    },
+  violet:  { icon: 'bg-violet-100  text-violet-600',  cta: 'text-violet-600',  hover: 'hover:border-violet-300',  glow: 'group-hover:bg-violet-50/60'  },
+  blue:    { icon: 'bg-blue-100    text-blue-600',    cta: 'text-blue-600',    hover: 'hover:border-blue-300',    glow: 'group-hover:bg-blue-50/60'    },
+  emerald: { icon: 'bg-emerald-100 text-emerald-600', cta: 'text-emerald-600', hover: 'hover:border-emerald-300', glow: 'group-hover:bg-emerald-50/60' },
+  amber:   { icon: 'bg-amber-100   text-amber-600',   cta: 'text-amber-600',   hover: 'hover:border-amber-300',   glow: 'group-hover:bg-amber-50/60'   },
+  indigo:  { icon: 'bg-indigo-100  text-indigo-600',  cta: 'text-indigo-600',  hover: 'hover:border-indigo-300',  glow: 'group-hover:bg-indigo-50/60'  },
+  rose:    { icon: 'bg-rose-100    text-rose-500',    cta: 'text-rose-500',    hover: 'hover:border-rose-300',    glow: 'group-hover:bg-rose-50/60'    },
 };
 
 /* ── Hub card ── */
-const SectionCard = ({ section, onClick }) => {
+// NOTE: index.css applies `justify-content:center` to every <button>, which
+// centres this card's contents. `items-start` + `justify-start` override it
+// so the layout stays left-aligned like the rest of the app.
+const SectionCard = ({ section, onClick, wide = false }) => {
   const ac = ACCENT[section.accent] || ACCENT.violet;
   return (
     <motion.button
       onClick={onClick}
       whileHover={{ y: -2 }}
       whileTap={{ scale: 0.98 }}
-      className="w-full text-left bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md hover:border-gray-200 transition-all duration-200 group flex flex-col">
-      {/* icon */}
-      <div className={`w-10 h-10 rounded-xl border flex items-center justify-center flex-shrink-0 mb-4 ${ac.icon}`}>
-        <Icon d={section.icon} size={18} />
+      className={`w-full h-full text-left bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-lg transition-all duration-200 group flex flex-col !items-start !justify-start relative overflow-hidden ${ac.hover}`}>
+      {/* soft tint that blooms on hover */}
+      <span className={`absolute inset-0 bg-transparent transition-colors duration-200 pointer-events-none ${ac.glow}`} />
+
+      <div className={`relative z-10 flex w-full ${wide ? 'items-center gap-4' : 'flex-col items-start'}`}>
+        {/* icon */}
+        <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${wide ? '' : 'mb-4'} ${ac.icon}`}>
+          <Icon d={section.icon} size={19} />
+        </div>
+
+        {/* label + desc */}
+        <div className="min-w-0 text-left">
+          <p className="font-bold text-gray-900 text-[15px] mb-1 text-left">{section.label}</p>
+          <p className="text-xs text-gray-400 leading-relaxed text-left">{section.desc}</p>
+        </div>
       </div>
 
-      {/* label + desc */}
-      <p className="font-bold text-gray-900 text-sm mb-1">{section.label}</p>
-      <p className="text-xs text-gray-400 leading-relaxed flex-1">{section.desc}</p>
-
       {/* open cta */}
-      <div className="mt-4 pt-4 border-t border-gray-50 flex items-center gap-1 text-xs font-semibold text-violet-500 group-hover:text-violet-700 transition-colors">
+      <div className={`relative z-10 mt-auto pt-4 flex items-center gap-1 text-xs font-bold ${ac.cta}`}>
         <span>Open</span>
-        <Icon d={IC.chevron} size={12} className="transition-transform group-hover:translate-x-0.5" />
+        <Icon d={IC.chevron} size={12} className="transition-transform group-hover:translate-x-1" />
       </div>
     </motion.button>
   );
@@ -132,6 +143,18 @@ const SectionCard = ({ section, onClick }) => {
 ════════════════════════════════════════════════════════════════ */
 const AdminEmployeeHub = () => {
   const [active, setActive] = useState(null); // null = hub grid
+  const [stats, setStats] = useState(null);
+  const [deptCount, setDeptCount] = useState(null);
+
+  useEffect(() => {
+    api.get('/admin/dashboard-stats').then(r => setStats(r.data)).catch(() => { });
+    api.get('/admin/departments').then(r => setDeptCount((r.data || []).length)).catch(() => { });
+  }, []);
+
+  // Attendance rate for today, guarded against a zero headcount.
+  const attendanceRate = stats?.totalEmployees > 0
+    ? Math.round((stats.presentToday / stats.totalEmployees) * 100)
+    : null;
 
   const renderSection = () => {
     switch (active) {
@@ -186,24 +209,80 @@ const AdminEmployeeHub = () => {
 
   /* ───────────────── HUB GRID VIEW ───────────────── */
   return (
-    <div className="max-w-6xl mx-auto px-4 space-y-6">
+    <div className="max-w-7xl mx-auto px-4 space-y-5 animate-fade-in">
 
-      {/* Page header */}
-      <div>
-        <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Employee Management</h2>
-        <p className="text-sm text-gray-400 mt-0.5">Select a section to manage</p>
-      </div>
+      {/* ═══ HERO BANNER ═══ */}
+      <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-100 via-violet-50 to-indigo-50 border border-violet-200/60 px-4 sm:px-5 py-3.5">
+        {/* decorative arcs */}
+        <svg className="absolute right-0 top-0 h-full w-1/3 opacity-30 pointer-events-none" viewBox="0 0 400 200" fill="none" preserveAspectRatio="xMaxYMid slice">
+          <circle cx="330" cy="60" r="120" stroke="#A78BFA" strokeWidth="1" fill="none" />
+          <circle cx="360" cy="140" r="90" stroke="#818CF8" strokeWidth="1" fill="none" />
+          <circle cx="300" cy="180" r="140" stroke="#C4B5FD" strokeWidth="1" fill="none" />
+        </svg>
 
-      {/* Cards grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {SECTIONS.map((sec, i) => (
-          <motion.div key={sec.key}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.04, duration: 0.2 }}>
-            <SectionCard section={sec} onClick={() => setActive(sec.key)} />
-          </motion.div>
-        ))}
+        <div className="relative flex flex-col lg:flex-row lg:items-center gap-3 lg:gap-6">
+          {/* title block */}
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <span className="w-10 h-10 rounded-xl bg-violet-200/70 text-violet-700 flex items-center justify-center flex-shrink-0">
+              <Icon d={IC.employees} size={19} sw={1.6} />
+            </span>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-lg font-extrabold text-gray-900 tracking-tight leading-tight">Employee Management</h2>
+              <p className="text-[11px] sm:text-xs text-violet-900/50 mt-0.5 truncate">Manage your workforce effectively and efficiently</p>
+            </div>
+          </div>
+
+          {/* live stats */}
+          <div className="grid grid-cols-3 gap-2.5 sm:gap-3 flex-shrink-0">
+            {[
+              {
+                label: 'Total Employees', value: stats?.totalEmployees, icon: IC.employees,
+                chip: 'bg-violet-100 text-violet-600',
+                sub: stats?.totalEmployees != null ? 'Active headcount' : null,
+              },
+              {
+                label: 'Departments', value: deptCount, icon: IC.departments,
+                chip: 'bg-blue-100 text-blue-600',
+                sub: 'Active departments',
+              },
+              {
+                label: 'Attendance Rate', value: attendanceRate != null ? `${attendanceRate}%` : null, icon: IC.attendance,
+                chip: 'bg-emerald-100 text-emerald-600',
+                sub: stats?.presentToday != null ? `${stats.presentToday} present today` : null,
+              },
+            ].map(s => (
+              <div key={s.label} title={s.sub || s.label}
+                className="bg-white/80 backdrop-blur rounded-xl px-2.5 sm:px-3 py-2 shadow-sm border border-white/60 flex items-center gap-2 min-w-0">
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${s.chip}`}>
+                  <Icon d={s.icon} size={13} />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-base sm:text-lg font-extrabold text-gray-900 leading-none tabular-nums">
+                    {s.value ?? '—'}
+                  </p>
+                  <p className="text-[9px] sm:text-[10px] text-gray-500 font-semibold mt-0.5 leading-tight truncate">{s.label}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Cards grid — Announcements spans the full width, as in the design */}
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-stretch">
+        {SECTIONS.map((sec, i) => {
+          const wide = sec.key === 'announcements';
+          return (
+            <motion.div key={sec.key}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.04, duration: 0.2 }}
+              className={wide ? 'sm:col-span-2 lg:col-span-3' : ''}>
+              <SectionCard section={sec} onClick={() => setActive(sec.key)} wide={wide} />
+            </motion.div>
+          );
+        })}
       </div>
     </div>
   );

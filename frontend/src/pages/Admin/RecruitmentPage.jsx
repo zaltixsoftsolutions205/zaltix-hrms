@@ -128,48 +128,68 @@ export default function RecruitmentPage() {
       {projects.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: 'Total Jobs',      value: totalJobs,      icon: IC.job,   bg: 'bg-violet-50 border-violet-100', text: 'text-violet-700' },
-            { label: 'Total Resumes',   value: totalResumes,   icon: IC.users, bg: 'bg-blue-50   border-blue-100',   text: 'text-blue-700'   },
-            { label: 'Shortlisted',     value: totalShortlist, icon: IC.star,  bg: 'bg-amber-50  border-amber-100',  text: 'text-amber-700'  },
-          ].map(s => (
-            <div key={s.label} className={`bg-white border border-gray-100 rounded-2xl p-5 shadow-sm`}>
-              <div className={`w-9 h-9 rounded-xl border flex items-center justify-center mb-3 ${s.bg} ${s.text}`}>
-                <Icon d={s.icon} size={16} />
-              </div>
-              <p className={`text-3xl font-extrabold leading-none ${s.text}`}>{s.value}</p>
-              <p className="text-xs text-gray-400 font-medium mt-1">{s.label}</p>
-              {/* Pipeline bar */}
-              {totalResumes > 0 && s.label !== 'Total Jobs' && (
-                <div className="mt-3 h-1 bg-gray-100 rounded-full">
-                  <div className={`h-full rounded-full ${s.text.replace('text', 'bg')} transition-all duration-700`}
-                    style={{ width: `${Math.min(100, (s.value / totalResumes) * 100)}%` }} />
+            // Bar colours are written out in full: deriving them from the text
+            // class (e.g. "text-blue-700" -> "bg-blue-700") produced classes
+            // Tailwind never generated, so the bars rendered invisible.
+            { label: 'Total Jobs',    value: totalJobs,      icon: IC.job,   card: 'bg-violet-50/70 border-violet-200/70', chip: 'bg-violet-100 text-violet-600', text: 'text-violet-700', label_: 'text-violet-900/60', bar: 'bg-violet-500', showBar: false },
+            { label: 'Total Resumes', value: totalResumes,   icon: IC.users, card: 'bg-blue-50/70 border-blue-200/70',     chip: 'bg-blue-100 text-blue-600',     text: 'text-blue-700',   label_: 'text-blue-900/60',   bar: 'bg-blue-500',   showBar: true },
+            { label: 'Shortlisted',   value: totalShortlist, icon: IC.star,  card: 'bg-amber-50/70 border-amber-200/70',   chip: 'bg-amber-100 text-amber-600',   text: 'text-amber-700',  label_: 'text-amber-900/60',  bar: 'bg-amber-500',  showBar: true },
+          ].map(s => {
+            const pctOfResumes = totalResumes > 0 ? Math.min(100, (s.value / totalResumes) * 100) : 0;
+            return (
+              <div key={s.label} className={`border rounded-2xl px-4 py-3.5 shadow-sm hover:shadow-md transition-all duration-200 ${s.card}`}>
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${s.chip}`}>
+                    <Icon d={s.icon} size={16} />
+                  </span>
+                  <div className="min-w-0">
+                    <p className={`text-2xl font-extrabold leading-none tabular-nums ${s.text}`}>{s.value}</p>
+                    <p className={`text-[11px] font-bold mt-0.5 ${s.label_}`}>{s.label}</p>
+                  </div>
                 </div>
-              )}
-            </div>
-          ))}
+                {totalResumes > 0 && s.showBar && (
+                  <div className="mt-2.5">
+                    <div className="h-1.5 bg-white/70 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${s.bar} transition-all duration-700`}
+                        style={{ width: `${pctOfResumes}%` }} />
+                    </div>
+                    <p className={`text-[10px] mt-1 font-medium ${s.label_}`}>{pctOfResumes.toFixed(0)}% of resumes</p>
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
 
       {/* ── Hiring pipeline visualization (when projects exist) ── */}
       {projects.length > 0 && (
         <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-          <p className="font-bold text-gray-900 text-sm mb-4">Hiring Funnel</p>
-          <div className="flex items-stretch gap-2">
+          <div className="flex items-baseline justify-between gap-3 mb-4">
+            <p className="font-bold text-gray-900 text-sm">Hiring Funnel</p>
+            <p className="text-[11px] text-gray-400">
+              {projects.length} project{projects.length !== 1 ? 's' : ''} · {totalJobs} open role{totalJobs !== 1 ? 's' : ''}
+            </p>
+          </div>
+          {/* Genuine funnel stages only — each is a subset of the one before,
+              so the bars are comparable. Jobs/Projects are different units and
+              are shown as context in the header instead. */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
             {[
-              { label: 'Applied',     value: totalResumes,                     pct: 100,                                          color: 'bg-violet-100 text-violet-700',    bar: 'bg-violet-500' },
-              { label: 'Shortlisted', value: totalShortlist,                   pct: totalResumes > 0 ? (totalShortlist / totalResumes) * 100 : 0,  color: 'bg-amber-100 text-amber-700',      bar: 'bg-amber-500'  },
-              { label: 'Jobs Open',   value: totalJobs,                        pct: null,                                         color: 'bg-blue-100 text-blue-700',        bar: 'bg-blue-500'   },
-              { label: 'Projects',    value: projects.length,                  pct: null,                                         color: 'bg-gray-100 text-gray-600',        bar: 'bg-gray-400'   },
-            ].map((stage, i) => (
-              <div key={stage.label} className={`flex-1 rounded-xl px-3 py-3 ${stage.color}`}>
-                <p className="text-2xl font-extrabold leading-none">{stage.value}</p>
-                <p className="text-[10px] font-semibold mt-1 opacity-70">{stage.label}</p>
-                {stage.pct !== null && (
-                  <div className="mt-2 h-0.5 bg-white/50 rounded-full">
-                    <div className={`h-full rounded-full ${stage.bar} transition-all duration-700`}
-                      style={{ width: `${stage.pct}%` }} />
-                  </div>
-                )}
+              { label: 'Applied', value: totalResumes, pct: 100, card: 'bg-violet-50/80 border-violet-200/70', text: 'text-violet-700', muted: 'text-violet-900/50', bar: 'bg-violet-500' },
+              { label: 'Shortlisted', value: totalShortlist, pct: totalResumes > 0 ? Math.min(100, (totalShortlist / totalResumes) * 100) : 0, card: 'bg-amber-50/80 border-amber-200/70', text: 'text-amber-700', muted: 'text-amber-900/50', bar: 'bg-amber-500' },
+              { label: 'Not shortlisted', value: Math.max(0, totalResumes - totalShortlist), pct: totalResumes > 0 ? ((totalResumes - totalShortlist) / totalResumes) * 100 : 0, card: 'bg-slate-50 border-slate-200/70', text: 'text-slate-600', muted: 'text-slate-900/50', bar: 'bg-slate-400' },
+            ].map(stage => (
+              <div key={stage.label} className={`border rounded-xl px-3.5 py-3 ${stage.card}`}>
+                <div className="flex items-baseline justify-between gap-2">
+                  <p className={`text-2xl font-extrabold leading-none tabular-nums ${stage.text}`}>{stage.value}</p>
+                  <span className={`text-[11px] font-bold ${stage.muted}`}>{stage.pct.toFixed(0)}%</span>
+                </div>
+                <p className={`text-[11px] font-bold mt-1 ${stage.muted}`}>{stage.label}</p>
+                <div className="mt-2 h-1.5 bg-white/70 rounded-full overflow-hidden">
+                  <div className={`h-full rounded-full ${stage.bar} transition-all duration-700`}
+                    style={{ width: `${stage.pct}%` }} />
+                </div>
               </div>
             ))}
           </div>
