@@ -189,6 +189,7 @@ app.use('/api/documents', require('./routes/documents'));
 app.use('/api/deals', require('./routes/deals'));
 app.use('/api/clients', require('./routes/clients'));
 app.use('/api/finance', require('./routes/finance'));
+app.use('/api/expense-claims', require('./routes/expenseClaims'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/holidays', require('./routes/holidays'));
 app.use('/api/quotations', require('./routes/quotations'));
