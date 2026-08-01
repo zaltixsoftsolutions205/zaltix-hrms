@@ -200,6 +200,54 @@ async function checkMissingCheckout() {
   }
 }
 
+/** Returns tomorrow's date string in YYYY-MM-DD (IST-safe). */
+const tomorrowStr = () => {
+  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  ist.setUTCDate(ist.getUTCDate() + 1);
+  return ist.toISOString().slice(0, 10);
+};
+
+/**
+ * Runs each evening. If TOMORROW is a public holiday, notify every active
+ * employee today. Only actual entries in the Holiday collection count — a
+ * plain Sunday with no holiday record is deliberately ignored, so there is no
+ * weekend spam.
+ */
+async function remindUpcomingHoliday() {
+  try {
+    const ymd = tomorrowStr();
+    const holiday = await Holiday.findOne({
+      date: { $gte: new Date(`${ymd}T00:00:00.000Z`), $lte: new Date(`${ymd}T23:59:59.999Z`) },
+    });
+    if (!holiday) {
+      console.log('[Automation] Holiday reminder: tomorrow is not a holiday');
+      return;
+    }
+
+    const employees = await User.find({ isActive: true }, '_id');
+    if (employees.length === 0) return;
+
+    const prettyDate = new Date(`${ymd}T00:00:00.000Z`)
+      .toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+
+    await notifyMany(employees.map((e) => e._id), {
+      title: '🎉 Holiday Tomorrow',
+      message: `Tomorrow (${prettyDate}) is a holiday: ${holiday.name}. Enjoy your day off!`,
+      type: 'general',
+      // Everyone can see upcoming holidays on the dashboard widget; there is
+      // no employee-facing /holidays route (only the admin one).
+      link: '/dashboard',
+      // One notice per holiday per employee, even if the job somehow runs twice.
+      dedupKey: `holiday-${ymd}`,
+      dedupWindowMs: 20 * 60 * 60 * 1000,
+    });
+
+    console.log(`[Automation] Holiday reminder sent to ${employees.length} employees for "${holiday.name}" (${ymd})`);
+  } catch (err) {
+    console.error('[Automation] remindUpcomingHoliday error:', err.message);
+  }
+}
+
 /**
  * Runs every 15 minutes between 09:30 and 10:30 IST (Mon–Sat), i.e. at
  * 09:30, 09:45, 10:00, 10:15 and 10:30. Reminds employees who have not
@@ -838,13 +886,18 @@ function startAutomation() {
   // Weekly report + productivity scores — every Monday at 09:00
   cron.schedule('0 9 * * 1', sendWeeklyReport, { timezone: 'Asia/Kolkata' });
 
-  console.log('[Automation] Scheduler started. 8 jobs active.');
+  // Holiday reminder — every evening at 18:00: if tomorrow is a holiday,
+  // tell everyone. Runs all 7 days so a holiday before a Sunday is covered.
+  cron.schedule('0 18 * * *', remindUpcomingHoliday, { timezone: 'Asia/Kolkata' });
+
+  console.log('[Automation] Scheduler started. 9 jobs active.');
 }
 
 module.exports = {
   startAutomation,
   checkTasks,
   remindPendingCheckIn,
+  remindUpcomingHoliday,
   checkMissingCheckout,
   checkAttendancePatterns,
   checkCRMAlerts,

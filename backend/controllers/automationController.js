@@ -8,6 +8,7 @@ const ProductivityScore = require('../models/ProductivityScore');
 const {
   checkTasks,
   remindPendingCheckIn,
+  remindUpcomingHoliday,
   checkMissingCheckout,
   checkAttendancePatterns,
   checkCRMAlerts,
@@ -185,6 +186,7 @@ exports.runJob = async (req, res) => {
   const jobs = {
     tasks:               checkTasks,
     checkin:             remindPendingCheckIn,
+    holiday:             remindUpcomingHoliday,
     checkout:            checkMissingCheckout,
     attendance:          checkAttendancePatterns,
     crm:                 checkCRMAlerts,
