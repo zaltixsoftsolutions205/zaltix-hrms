@@ -300,3 +300,43 @@ exports.downloadPayslip = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// HR preview: stream ANY employee's payslip PDF inline. Reachable only via the
+// hr_payslips-gated route, so anyone with Payslips (HR) view or edit can preview
+// every payslip — none of the employee ownership / photo / document locks apply.
+exports.previewPayslip = async (req, res) => {
+  try {
+    const payslip = await Payslip.findById(req.params.id).populate('employee');
+    if (!payslip) return res.status(404).json({ message: 'Payslip not found' });
+
+    const toAbs = (p) => path.join(__dirname, '..', (p || '').replace(/^[/\\]/, ''));
+    // Regenerate to pick up the latest template + account details.
+    const employee = await User.findById(payslip.employee._id).populate('department');
+    const ps = payslip.toObject();
+    const pStart = moment(`${ps.year}-${String(ps.month).padStart(2, '0')}-25`).subtract(1, 'month').format('YYYY-MM-DD');
+    const pEnd   = moment(`${ps.year}-${String(ps.month).padStart(2, '0')}-24`).format('YYYY-MM-DD');
+    const pdfPath = await generatePayslipPDF({
+      ...ps, employee, periodStart: pStart, periodEnd: pEnd,
+      accountNumber: employee.accountNumber || '',
+      ifscCode: employee.ifscCode || '',
+      uanNumber: employee.uanNumber || '',
+      panNumber: employee.panNumber || '',
+    });
+    payslip.pdfPath = pdfPath;
+    await payslip.save();
+
+    const absolutePath = toAbs(payslip.pdfPath);
+    if (!fs.existsSync(absolutePath)) {
+      return res.status(500).json({ message: 'PDF generation failed' });
+    }
+    const fullMonthNames = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+    const filename = `Payslip_${fullMonthNames[payslip.month - 1]}_${payslip.year}_${payslip.employee.employeeId}.pdf`;
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `inline; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    fs.createReadStream(absolutePath).pipe(res);
+  } catch (err) {
+    console.error('previewPayslip error:', err);
+    res.status(500).json({ message: err.message });
+  }
+};

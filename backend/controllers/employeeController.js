@@ -159,6 +159,24 @@ exports.getAllEmployees = async (req, res) => {
   }
 };
 
+// Lean employee list for the payslip generator. Returns only the fields the
+// payslip form needs to prefill, so this can be gated by hr_payslips instead
+// of the broader hr_employees module (viewing/generating payslips must not
+// require employee-management access).
+exports.getEmployeesForPayslips = async (req, res) => {
+  try {
+    const employees = await User.find(
+      { role: { $ne: 'admin' } },
+      'name employeeId role designation location panNumber basicSalary da hra otherAllowance'
+    )
+      .populate('department', 'name')
+      .sort({ employeeId: 1 });
+    res.json(employees);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Get single employee
 exports.getEmployee = async (req, res) => {
   try {
