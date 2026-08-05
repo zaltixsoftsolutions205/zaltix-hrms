@@ -56,6 +56,7 @@ router.delete('/jobs/:id', recruitEdit,   ctrl.deleteJobPosting);
 router.get('/applicants',              recruitAccess, ctrl.getApplicants);
 router.post('/applicants',             recruitEdit,   upload.single('resume'), ctrl.createApplicant);
 router.put('/applicants/:id/status',   recruitEdit,   ctrl.updateStatus);
+router.put('/applicants/:id/comment',  recruitEdit,   ctrl.updateComment);
 router.delete('/applicants/:id',       recruitEdit,   ctrl.deleteApplicant);
 
 module.exports = router;

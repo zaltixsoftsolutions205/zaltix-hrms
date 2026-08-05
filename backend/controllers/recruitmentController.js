@@ -116,13 +116,14 @@ exports.getApplicants = async (req, res) => {
 
 exports.createApplicant = async (req, res) => {
   try {
-    const { jobPosting, name, status, yearsOfExperience } = req.body;
+    const { jobPosting, name, status, yearsOfExperience, comment } = req.body;
     if (!jobPosting || !name) return res.status(400).json({ message: 'Job posting and name required' });
     const resumeUrl = req.file ? 'uploads/resumes/' + req.file.filename : '';
     const applicant = await Applicant.create({
       jobPosting, name,
       yearsOfExperience: yearsOfExperience != null && yearsOfExperience !== '' ? Number(yearsOfExperience) : null,
       resumeUrl,
+      comment: comment || '',
       status: status || 'interested',
       createdBy: req.user._id,
     });
@@ -135,6 +136,16 @@ exports.updateStatus = async (req, res) => {
   try {
     const { status } = req.body;
     const applicant = await Applicant.findByIdAndUpdate(req.params.id, { status }, { new: true })
+      .populate('jobPosting', 'title department');
+    if (!applicant) return res.status(404).json({ message: 'Not found' });
+    res.json(applicant);
+  } catch (err) { res.status(500).json({ message: err.message }); }
+};
+
+exports.updateComment = async (req, res) => {
+  try {
+    const comment = (req.body.comment || '').slice(0, 1000);
+    const applicant = await Applicant.findByIdAndUpdate(req.params.id, { comment }, { new: true })
       .populate('jobPosting', 'title department');
     if (!applicant) return res.status(404).json({ message: 'Not found' });
     res.json(applicant);
