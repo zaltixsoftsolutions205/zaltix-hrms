@@ -12,7 +12,7 @@ const fs = require('fs');
 
 // HR / Admin: Create employee
 exports.createEmployee = async (req, res) => {
-  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess } = req.body;
+  const { name, email, role, departmentId, designation, phone, joiningDate, exitDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess } = req.body;
   try {
     if (!employeeId || !employeeId.trim()) return res.status(400).json({ message: 'Employee ID is required' });
 
@@ -28,6 +28,7 @@ exports.createEmployee = async (req, res) => {
       name, email, password: tempPassword, role: role || 'employee',
       department: departmentId || null, designation, phone,
       joiningDate: joiningDate ? new Date(joiningDate) : null,
+      exitDate: exitDate ? new Date(exitDate) : null,
       basicSalary: basicSalary || 0,
       allowances: allowances || [],
       deductions: deductions || [],
@@ -190,15 +191,22 @@ exports.getEmployee = async (req, res) => {
 
 // HR / Admin: Update employee
 exports.updateEmployee = async (req, res) => {
-  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role'];
+  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'exitDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role'];
   const { email, sendNewCredentials } = req.body;
   try {
     const employee = await User.findById(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
-    
+
     allowed.forEach(field => {
       if (req.body[field] !== undefined) {
-        employee[field] = field === 'department' ? req.body[field] || null : req.body[field];
+        if (field === 'department') {
+          employee.department = req.body[field] || null;
+        } else if (field === 'joiningDate' || field === 'exitDate') {
+          // Empty string clears the date (e.g. un-exiting a rejoined employee).
+          employee[field] = req.body[field] ? new Date(req.body[field]) : null;
+        } else {
+          employee[field] = req.body[field];
+        }
       }
     });
 

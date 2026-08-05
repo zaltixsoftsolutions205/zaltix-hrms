@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     address: { type: String, default: '' },
     joiningDate: { type: Date, default: null },
+    exitDate: { type: Date, default: null }, // last working day; null = still employed
     basicSalary: { type: Number, default: 0 },
     allowances: [{ name: String, amount: Number }],
     deductions: [{ name: String, amount: Number }],
