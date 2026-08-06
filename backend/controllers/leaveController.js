@@ -19,7 +19,18 @@ const getWorkingDays = (fromDate, toDate) => {
 
 // Get leave balance for an employee
 const getLeaveBalance = async (userId, year) => {
-  const policy = await LeavePolicy.findOne({ year, appliesTo: 'all' });
+  // Leave cycle runs 1 August → 31 March of the following year (not the
+  // calendar year). Only leaves taken inside the current cycle count against
+  // the balance, so anything before 1 Aug is ignored. For a date in Jan–Jul
+  // the active cycle started the previous August.
+  const now = new Date();
+  const cycleStartYear = now.getMonth() >= 7 ? now.getFullYear() : now.getFullYear() - 1; // month 7 = August
+
+  // Policy is keyed by year. Try the requested year first, then fall back to
+  // the cycle-start year so the same policy governs the whole Aug–Mar cycle
+  // even after the calendar rolls into the next year.
+  const policy = (await LeavePolicy.findOne({ year, appliesTo: 'all' }))
+    || (await LeavePolicy.findOne({ year: cycleStartYear, appliesTo: 'all' }));
   if (!policy) return {
     casual: { total: 0, used: 0, remaining: 0 },
     sick: { total: 0, used: 0, remaining: 0 },
@@ -27,9 +38,9 @@ const getLeaveBalance = async (userId, year) => {
     lop: { total: null, used: 0, remaining: null },
   };
 
-  const startOfYear = new Date(`${year}-01-01`);
-  const endOfYear = new Date(`${year}-12-31`);
-  const approvedLeaves = await Leave.find({ employee: userId, status: 'approved', fromDate: { $gte: startOfYear, $lte: endOfYear } });
+  const windowStart = new Date(`${cycleStartYear}-08-01T00:00:00.000Z`);
+  const windowEnd = new Date(`${cycleStartYear + 1}-03-31T23:59:59.999Z`);
+  const approvedLeaves = await Leave.find({ employee: userId, status: 'approved', fromDate: { $gte: windowStart, $lte: windowEnd } });
 
   const used = { casual: 0, sick: 0, other: 0, lop: 0 };
   approvedLeaves.forEach(l => { used[l.type] = (used[l.type] || 0) + l.totalDays; });
