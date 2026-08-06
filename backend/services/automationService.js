@@ -200,49 +200,84 @@ async function checkMissingCheckout() {
   }
 }
 
-/** Returns tomorrow's date string in YYYY-MM-DD (IST-safe). */
-const tomorrowStr = () => {
-  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
-  ist.setUTCDate(ist.getUTCDate() + 1);
-  return ist.toISOString().slice(0, 10);
+/** IST-adjusted Date for "now". */
+const istNow = () => new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+
+/** YYYY-MM-DD for an IST Date. */
+const ymdOf = (d) => d.toISOString().slice(0, 10);
+
+/** Whole-day UTC bounds for a YYYY-MM-DD, for matching Holiday.date. */
+const dayBounds = (ymd) => ({
+  $gte: new Date(`${ymd}T00:00:00.000Z`),
+  $lte: new Date(`${ymd}T23:59:59.999Z`),
+});
+
+/**
+ * The next working day strictly after `fromIst` (Mon–Sat; Sunday is skipped as
+ * the weekly off). Returns an IST Date at that day.
+ */
+const nextWorkingDay = (fromIst) => {
+  const d = new Date(fromIst);
+  do {
+    d.setUTCDate(d.getUTCDate() + 1);
+  } while (d.getUTCDay() === 0); // 0 = Sunday
+  return d;
 };
 
 /**
- * Runs each evening. If TOMORROW is a public holiday, notify every active
- * employee today. Only actual entries in the Holiday collection count — a
- * plain Sunday with no holiday record is deliberately ignored, so there is no
- * weekend spam.
+ * Runs each evening. Reminds employees the evening of the LAST WORKING DAY
+ * before a holiday — not literally the calendar day before. So a Monday
+ * holiday reminds on Saturday evening (Sunday is the weekly off and people
+ * aren't working), while Tue–Sat holidays still remind the day before.
+ *
+ * Mechanism: look at the next working day after today; if that day is a
+ * holiday, tonight is the right time to remind. The job does not fire its
+ * notice on Sundays. Only actual Holiday records count, so a plain Sunday is
+ * never treated as a holiday.
  */
 async function remindUpcomingHoliday() {
   try {
-    const ymd = tomorrowStr();
-    const holiday = await Holiday.findOne({
-      date: { $gte: new Date(`${ymd}T00:00:00.000Z`), $lte: new Date(`${ymd}T23:59:59.999Z`) },
-    });
+    const today = istNow();
+    // Don't run the reminder on a Sunday — nobody's at work to see it, and the
+    // Saturday run already covered a Monday holiday.
+    if (today.getUTCDay() === 0) {
+      console.log('[Automation] Holiday reminder skipped — Sunday (off day)');
+      return;
+    }
+
+    const target = nextWorkingDay(today);
+    const targetYmd = ymdOf(target);
+    const holiday = await Holiday.findOne({ date: dayBounds(targetYmd) });
     if (!holiday) {
-      console.log('[Automation] Holiday reminder: tomorrow is not a holiday');
+      console.log('[Automation] Holiday reminder: next working day is not a holiday');
       return;
     }
 
     const employees = await User.find({ isActive: true }, '_id');
     if (employees.length === 0) return;
 
-    const prettyDate = new Date(`${ymd}T00:00:00.000Z`)
+    // "tomorrow" vs "on Monday" — word it by how far off the holiday is.
+    const todayYmd = ymdOf(today);
+    const dayGap = Math.round(
+      (new Date(`${targetYmd}T00:00:00Z`) - new Date(`${todayYmd}T00:00:00Z`)) / 86400000
+    );
+    const weekday = new Date(`${targetYmd}T00:00:00.000Z`)
       .toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+    const whenWord = dayGap === 1 ? 'Tomorrow' : `On ${weekday.split(',')[0]}`;
 
     await notifyMany(employees.map((e) => e._id), {
-      title: '🎉 Holiday Tomorrow',
-      message: `Tomorrow (${prettyDate}) is a holiday: ${holiday.name}. Enjoy your day off!`,
+      title: '🎉 Holiday Coming Up',
+      message: `${whenWord} (${weekday}) is a holiday: ${holiday.name}. Enjoy your day off!`,
       type: 'general',
       // Everyone can see upcoming holidays on the dashboard widget; there is
       // no employee-facing /holidays route (only the admin one).
       link: '/dashboard',
-      // One notice per holiday per employee, even if the job somehow runs twice.
-      dedupKey: `holiday-${ymd}`,
-      dedupWindowMs: 20 * 60 * 60 * 1000,
+      // One notice per holiday per employee, even if the job runs twice.
+      dedupKey: `holiday-${targetYmd}`,
+      dedupWindowMs: 30 * 60 * 60 * 1000,
     });
 
-    console.log(`[Automation] Holiday reminder sent to ${employees.length} employees for "${holiday.name}" (${ymd})`);
+    console.log(`[Automation] Holiday reminder sent to ${employees.length} employees for "${holiday.name}" (${targetYmd}, ${dayGap}d ahead)`);
   } catch (err) {
     console.error('[Automation] remindUpcomingHoliday error:', err.message);
   }
