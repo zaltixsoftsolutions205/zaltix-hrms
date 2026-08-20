@@ -139,11 +139,20 @@ const generatePayslipPDF = (payslipData) => {
       // column widths: label=120, value=137, label=118, value=140 → 515
       const EC1 = 120, EC2 = 137, EC3 = 118, EC4 = CW - EC1 - EC2 - EC3;
 
+      // Date of joining, from the employee record, as DD MMM YYYY.
+      const fmtDate = (d) => {
+        if (!d) return '—';
+        const dt = new Date(d);
+        if (isNaN(dt)) return '—';
+        const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getUTCMonth()];
+        return `${String(dt.getUTCDate()).padStart(2, '0')} ${mon} ${dt.getUTCFullYear()}`;
+      };
+
       const empRows = [
         ['Employee Code', employee.employeeId,          'Employee Name', employee.name],
         ['Designation',   employee.designation || '—',  'Department',    employee.department?.name || '—'],
         ['Working Days',  String(wdDays),               'Present Days',  String(prsDays)],
-        ['Loss of Pay',   String(lopDays),              'PAN Number',    panNumber || '—'],
+        ['Loss of Pay',   String(lopDays),              'Date of Joining', fmtDate(employee.joiningDate)],
       ];
 
       empRows.forEach(([l1, v1, l2, v2]) => {
@@ -173,7 +182,9 @@ const generatePayslipPDF = (payslipData) => {
       y += RH;
       cell('UAN Number',     ML,             y, AD1, RH, { fsize: 8, color: '#555555', bg: SUB_BG });
       cell(uanNumber || '—',                 ML + AD1,             y, AD2, RH, { fsize: 8.5, bold: true });
-      cell('',               ML + AD1 + AD2, y, AD3 + AD4, RH, { bg: null });
+      // PAN sits below IFSC, in the right column of the UAN row.
+      cell('PAN Number',     ML + AD1 + AD2, y, AD3, RH, { fsize: 8, color: '#555555', bg: SUB_BG });
+      cell(panNumber || '—',                 ML + AD1 + AD2 + AD3, y, AD4, RH, { fsize: 8.5, bold: true });
       y += RH + 12;
 
       /* ════════════════════════════════════════
