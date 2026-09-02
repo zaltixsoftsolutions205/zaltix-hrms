@@ -73,6 +73,8 @@ import RecruitmentJobPage from './pages/Admin/RecruitmentJobPage';
 import AutomationPage from './pages/Admin/AutomationPage';
 import AdminEmployeeHub from './pages/Admin/AdminEmployeeHub';
 import FieldLeadsPage from './pages/FieldSales/FieldLeadsPage';
+import ExpenseClaimsPage from './pages/FieldSales/ExpenseClaimsPage';
+import ExpenseClaimsReview from './pages/Admin/ExpenseClaimsReview';
 import AdminFieldSales from './pages/Admin/AdminFieldSales';
 import AdminKnowledgeCenter from './pages/Admin/KnowledgeCenter';
 import HRKnowledgeCenter from './pages/HR/HRKnowledgeCenter';
@@ -126,6 +128,9 @@ const AppRoutes = () => {
         <Route path="/knowledge-center" element={<KnowledgeCenter />} />
         <Route path="/crm" element={<ProtectedRoute module="crm"><CRMPage /></ProtectedRoute>} />
         <Route path="/field-sales/leads" element={<ProtectedRoute module="field_sales"><FieldLeadsPage /></ProtectedRoute>} />
+        {/* Expense claims: only field-sales editors may submit. */}
+        <Route path="/field-sales/expense-claims" element={<ProtectedRoute module="field_sales" requireEdit><ExpenseClaimsPage /></ProtectedRoute>} />
+        <Route path="/expense-claims" element={<ProtectedRoute module="field_sales" requireEdit><ExpenseClaimsPage /></ProtectedRoute>} />
         <Route path="/crm/products/:productId" element={<ProtectedRoute module="crm"><ProductDetailPage /></ProtectedRoute>} />
         <Route path="/queries" element={<ProtectedRoute module="query_management"><QueryManagement /></ProtectedRoute>} />
 
@@ -149,6 +154,7 @@ const AppRoutes = () => {
         <Route path="/admin/reports" element={<ProtectedRoute module="reports"><AdminReports /></ProtectedRoute>} />
         <Route path="/admin/crm" element={<ProtectedRoute roles={['admin']}><AdminCRM /></ProtectedRoute>} />
         <Route path="/admin/field-sales" element={<ProtectedRoute roles={['admin']}><AdminFieldSales /></ProtectedRoute>} />
+        <Route path="/admin/expense-claims" element={<ProtectedRoute roles={['admin', 'hr']}><ExpenseClaimsReview /></ProtectedRoute>} />
         <Route path="/admin/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />
         <Route path="/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />
         <Route path="/admin/announcements" element={<ProtectedRoute module="announcements"><AnnouncementsPage /></ProtectedRoute>} />

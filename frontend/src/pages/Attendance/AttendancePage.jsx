@@ -31,11 +31,18 @@ const REG_BADGE = {
   rejected: 'bg-red-100 text-red-700',
 };
 
-const MonthCalendar = ({ year, month, records }) => {
+const MonthCalendar = ({ year, month, records, holidays = [] }) => {
   const dayMap = {};
   records?.forEach(r => {
     const key = r.date?.split('T')[0];
     if (key) dayMap[key] = { status: r.status, isLate: r.isLate, isEarlyLeave: r.isEarlyLeave };
+  });
+
+  // Map of YYYY-MM-DD → holiday name, for coloring holiday cells.
+  const holidayMap = {};
+  holidays?.forEach(h => {
+    const key = h.date?.split('T')[0];
+    if (key) holidayMap[key] = h.name || 'Holiday';
   });
 
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
@@ -55,6 +62,9 @@ const MonthCalendar = ({ year, month, records }) => {
             <span className="w-1.5 h-1.5 rounded-full bg-current" />{l.label}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+          <span className="w-1.5 h-1.5 rounded-full bg-current" />Holiday
+        </span>
         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-600">
           <span className="w-1.5 h-1.5 rounded-full border-2 border-violet-500" />Today
         </span>
@@ -86,20 +96,24 @@ const MonthCalendar = ({ year, month, records }) => {
           const isPast = dateStr < todayStr;
           const dayOfWeek = new Date(year, month - 1, day).getDay();
           const isWeekend = dayOfWeek === 0; // Only Sunday is off; Saturday is a working day
+          const holidayName = holidayMap[dateStr];
 
-          // Past weekday with no record → treat as absent
-          const effectiveStatus = status || (isPast && !isWeekend ? 'absent' : null);
+          // A holiday is a day off, so it never counts as absent even if past.
+          const effectiveStatus = status || (isPast && !isWeekend && !holidayName ? 'absent' : null);
 
           return (
             <div key={day}
               title={
-                isWeekend ? 'Weekend' :
-                  effectiveStatus ? `${effectiveStatus.replace('-', ' ')}${hasIssue ? ' · Late/Early' : ''}` :
-                    dateStr
+                holidayName ? `Holiday: ${holidayName}` :
+                  isWeekend ? 'Weekend' :
+                    effectiveStatus ? `${effectiveStatus.replace('-', ' ')}${hasIssue ? ' · Late/Early' : ''}` :
+                      dateStr
               }
               className="aspect-square flex items-center justify-center relative">
               <span className={`w-7 h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs transition-all
-                ${isWeekend ? 'text-gray-300' : effectiveStatus ? STATUS_STYLE[effectiveStatus] : 'text-violet-300'}
+                ${holidayName ? 'bg-indigo-100 text-indigo-700 font-semibold'
+                  : isWeekend ? 'text-gray-300'
+                    : effectiveStatus ? STATUS_STYLE[effectiveStatus] : 'text-violet-300'}
                 ${isToday ? 'ring-2 ring-violet-500 ring-offset-1' : ''}
               `}>
                 {day}
@@ -278,21 +292,24 @@ const AttendancePage = ({ employeeId = null }) => {
   const [regLoading, setRegLoading] = useState(false);
   const [showRegForm, setShowRegForm] = useState(false);
   const [todayHoliday, setTodayHoliday] = useState(null);
+  const [holidays, setHolidays] = useState([]); // full list, reused by banner + calendar
   const now = new Date();
   const [filter, setFilter] = useState({ month: now.getMonth() + 1, year: now.getFullYear() });
 
+  // Fetch holidays for the year currently shown in the calendar.
   useEffect(() => {
     // IST calendar date (matches the backend's istDate()), so the holiday banner
     // shows on the correct local day regardless of the user's browser timezone.
     const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    api.get('/holidays', { params: { year: new Date().getFullYear() } })
+    api.get('/holidays', { params: { year: filter.year } })
       .then(({ data }) => {
-        const holidays = Array.isArray(data) ? data : (data.holidays || []);
-        const found = holidays.find(h => h.date && h.date.slice(0, 10) === todayStr);
+        const list = Array.isArray(data) ? data : (data.holidays || []);
+        setHolidays(list);
+        const found = list.find(h => h.date && h.date.slice(0, 10) === todayStr);
         setTodayHoliday(found || null);
       })
       .catch(() => { });
-  }, []);
+  }, [filter.year]);
 
   useEffect(() => {
     const timer = setInterval(() => setClock(getISTClock()), 1000);
@@ -554,7 +571,7 @@ const AttendancePage = ({ employeeId = null }) => {
             <div className="lg:flex lg:gap-6">
               {/* ── Calendar (compact on desktop) ── */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="lg:w-64 lg:flex-shrink-0">
-                <MonthCalendar year={filter.year} month={filter.month} records={data?.records} />
+                <MonthCalendar year={filter.year} month={filter.month} records={data?.records} holidays={holidays} />
               </motion.div>
 
               {/* Divider */}

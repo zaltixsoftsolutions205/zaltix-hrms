@@ -48,7 +48,7 @@ const StatusDropdown = ({ emp, onChange }) => {
 };
 
 const PRESET_ROLES = ['employee', 'sales', 'field_sales', 'hr', 'technical_associate', 'bda'];
-const EMPTY_FORM = { employeeId: '', name: '', email: '', role: 'employee', customRole: '', departmentId: '', designation: '', phone: '', joiningDate: '', basicSalary: '', employeeType: '', moduleAccess: [] };
+const EMPTY_FORM = { employeeId: '', name: '', email: '', role: 'employee', customRole: '', departmentId: '', designation: '', phone: '', joiningDate: '', exitDate: '', basicSalary: '', employeeType: '', moduleAccess: [] };
 
 export default function HREmployees() {
   const [employees, setEmployees] = useState([]);
@@ -427,8 +427,15 @@ export default function HREmployees() {
                           <StatusDropdown emp={emp} onChange={handleStatusChange} />
                         </div>
                       </td>
-                      {/* Joining */}
-                      <td className="px-4 py-3 text-sm text-violet-600 whitespace-nowrap">{formatDate(emp.joiningDate)}</td>
+                      {/* Joining (+ exit date if the employee has left) */}
+                      <td className="px-4 py-3 text-sm text-violet-600 whitespace-nowrap">
+                        {formatDate(emp.joiningDate)}
+                        {emp.exitDate && (
+                          <span className="block text-[11px] font-semibold text-rose-500 mt-0.5">
+                            Exited: {formatDate(emp.exitDate)}
+                          </span>
+                        )}
+                      </td>
                       {/* Salary */}
                       <td className="px-4 py-3 text-sm font-semibold text-violet-800 whitespace-nowrap">
                         {emp.basicSalary > 0 ? formatCurrency(emp.basicSalary) : <span className="text-violet-300 font-normal">—</span>}
@@ -599,6 +606,7 @@ function EditForm({ emp, departments, onDone }) {
     phone: emp.phone || '',
     department: emp.department?._id || '',
     joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().split('T')[0] : '',
+    exitDate: emp.exitDate ? new Date(emp.exitDate).toISOString().split('T')[0] : '',
     basicSalary: emp.basicSalary || 0,
     role: isPreset ? emp.role : 'custom',
     customRole: isPreset ? '' : emp.role,
@@ -649,6 +657,18 @@ function EditForm({ emp, departments, onDone }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Joining Date" type="date" value={form.joiningDate} onChange={f('joiningDate')} />
         <Field label="Basic Salary (₹)" type="number" value={form.basicSalary} onChange={e => setForm(p => ({ ...p, basicSalary: parseFloat(e.target.value) || 0 }))} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <Field label="Exit Date" type="date" value={form.exitDate} min={form.joiningDate || undefined} onChange={f('exitDate')} />
+          <p className="text-[11px] text-gray-400 mt-1">Last working day. Leave blank if still employed.</p>
+        </div>
+        {form.exitDate && (
+          <button type="button" onClick={() => setForm(p => ({ ...p, exitDate: '' }))}
+            className="self-end mb-6 text-xs font-semibold text-rose-500 hover:text-rose-600 text-left">
+            Clear exit date
+          </button>
+        )}
       </div>
       <div>
         <SelectField label="Role" value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value, customRole: '' }))}>

@@ -98,7 +98,7 @@ export const ROLE_DEFAULT_MODULES = {
   employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
   sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
   field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
-  hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets'],
+  hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm'],
 };
 
 const GROUP_ORDER = ['General', 'Self-service', 'Sales', 'HR Management', 'Admin'];

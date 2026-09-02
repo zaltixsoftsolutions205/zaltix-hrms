@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { getInitials } from '../../utils/helpers';
-import { MODULES, resolveModuleKeys } from '../../constants/modules';
+import { MODULES, resolveModuleKeys, canEditModule } from '../../constants/modules';
 
 /* ── SVG icon helper ── */
 const Svg = ({ d, size = 15, className = '' }) => (
@@ -46,6 +46,11 @@ const ADMIN_NAV = [
     path: '/admin/payslips',
     label: 'Payroll',
     icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z",
+  },
+  {
+    path: '/admin/expense-claims',
+    label: 'Expense Claims',
+    icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m-3-4a2 2 0 100 4h5V9h-5zm.5 2h.01",
   },
   {
     path: '/admin/recruitment',
@@ -129,6 +134,7 @@ const ROLE_NAV = {
     { path: '/hr/employees',       label: 'Employees',       icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
     { path: '/hr/attendance',      label: 'Attendance',      icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
     { path: '/hr/leaves',          label: 'Leave Approvals', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4" },
+    { path: '/admin/expense-claims', label: 'Expense Claims',  icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m-3-4a2 2 0 100 4h5V9h-5zm.5 2h.01" },
     { path: '/hr/tasks',           label: 'Work & KPI',      icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
     { path: '/hr/payslips',        label: 'Payslips',        icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
     { path: '/hr/knowledge-center',label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
@@ -226,6 +232,22 @@ const Sidebar = ({ isOpen, onClose }) => {
       String(user.department.headOf) === String(user?._id || user?.id);
     if (isTechLead && !finalItems.some(i => i.path === TIMESHEET_APPROVALS_NAV.path)) {
       finalItems = [...finalItems, TIMESHEET_APPROVALS_NAV];
+    }
+  }
+
+  /* Expense Claims is available to anyone who can EDIT field sales — it rides
+     on that permission rather than being its own module. Insert it right after
+     the Field Sales / My Pipeline link if it isn't already present. */
+  if (!isAdmin && canEditModule(user, 'field_sales')) {
+    const claimsItem = {
+      path: '/field-sales/expense-claims',
+      label: 'Expense Claims',
+      icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m-3-4a2 2 0 100 4h5V9h-5zm.5 2h.01",
+    };
+    if (!finalItems.some(i => i.path === claimsItem.path)) {
+      const anchor = finalItems.findIndex(i => i.path === '/field-sales/leads');
+      if (anchor >= 0) finalItems = [...finalItems.slice(0, anchor + 1), claimsItem, ...finalItems.slice(anchor + 1)];
+      else finalItems = [...finalItems, claimsItem];
     }
   }
 
