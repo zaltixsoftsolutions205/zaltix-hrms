@@ -370,7 +370,7 @@ const AttendancePage = ({ employeeId = null }) => {
     const missingCheckout = records.filter(r => r.checkIn && !r.checkOut && r.status === 'present').length;
     const alerts = [];
     if (lateDays >= 5)
-      alerts.push({ level: 'error', message: `You have been late ${lateDays} times this month. This is affecting your attendance score. Please maintain office hours (9:30 AM).` });
+      alerts.push({ level: 'error', message: `You have been late ${lateDays} times this month. This is affecting your attendance score. Please maintain office hours (9:00 AM).` });
     else if (lateDays >= 3)
       alerts.push({ level: 'warning', message: `You have ${lateDays} late check-ins this month. 5 or more will impact your performance score.` });
     if (earlyDays >= 3)

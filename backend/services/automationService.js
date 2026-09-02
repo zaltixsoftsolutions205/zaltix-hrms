@@ -7,8 +7,8 @@
  * Schedule summary:
  *  - Every hour        : Task deadline & overdue checks
  *  - Mon–Sat 08:30     : Morning work summary per employee
- *  - Mon–Sat 09:30–10:30: Check-in reminders every 15 min until checked in
- *  - Mon–Sat 18:30     : Evening summary + missing checkout detection
+ *  - Mon–Sat 09:00–10:00: Check-in reminders every 15 min until checked in
+ *  - Mon–Sat 18:00     : Evening summary + missing checkout detection
  *  - Mon–Sat 09:30     : CRM + document compliance checks
  *  - Every Monday 09:00: Weekly performance report + productivity score
  */
@@ -42,7 +42,7 @@ const istHM = () => {
 };
 
 /** Office start time (IST) — matches attendanceController's late detection */
-const OFFICE_START = '09:30';
+const OFFICE_START = '09:00';
 
 /** Returns { start, end } of a given ISO week label e.g. "2026-W10" */
 const weekBounds = (weekLabel) => {
@@ -284,10 +284,10 @@ async function remindUpcomingHoliday() {
 }
 
 /**
- * Runs every 15 minutes between 09:30 and 10:30 IST (Mon–Sat), i.e. at
- * 09:30, 09:45, 10:00, 10:15 and 10:30. Reminds employees who have not
+ * Runs every 15 minutes between 09:00 and 10:00 IST (Mon–Sat), i.e. at
+ * 09:00, 09:15, 09:30, 09:45 and 10:00. Reminds employees who have not
  * checked in yet; the reminders stop as soon as they check in, and never
- * run past 10:30.
+ * run past 10:00.
  *
  * Skipped: public holidays, employees on approved leave, and admins.
  */
@@ -340,9 +340,9 @@ async function remindPendingCheckIn() {
       (e) => !settled.has(String(e._id)) && !onLeaveIds.has(String(e._id))
     );
 
-    // Past 09:30 the check-in would be recorded as late, so say so rather
+    // Past 09:00 the check-in would be recorded as late, so say so rather
     // than repeating the same nudge. Strictly greater-than, matching
-    // attendanceController's own late detection — 09:30 exactly is on time.
+    // attendanceController's own late detection — 09:00 exactly is on time.
     const isLate = istHM() > OFFICE_START;
 
     for (const emp of pending) {
@@ -903,14 +903,12 @@ function startAutomation() {
   // Morning summary — Mon–Sat at 08:30
   cron.schedule('30 8 * * 1-6', sendMorningSummary, { timezone: 'Asia/Kolkata' });
 
-  // Evening summary + missing checkout — Mon–Sat at 18:30
-  cron.schedule('30 18 * * 1-6', sendEveningSummary, { timezone: 'Asia/Kolkata' });
+  // Evening summary + missing checkout — Mon–Sat at 18:00
+  cron.schedule('0 18 * * 1-6', sendEveningSummary, { timezone: 'Asia/Kolkata' });
 
-  // Check-in reminders — Mon–Sat at 09:30, 09:45, 10:00, 10:15, 10:30.
-  // Two expressions because the window straddles the hour; nothing fires
-  // after 10:30.
-  cron.schedule('30,45 9 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
-  cron.schedule('0,15,30 10 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
+  // Check-in reminders — Mon–Sat at 09:00, 09:15, 09:30, 09:45, 10:00.
+  cron.schedule('0,15,30,45 9 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
+  cron.schedule('0 10 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
 
   // CRM alerts + document compliance — Mon–Sat at 09:30
   cron.schedule('30 9 * * 1-6', async () => {

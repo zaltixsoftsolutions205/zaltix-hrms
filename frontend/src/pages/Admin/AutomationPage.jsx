@@ -361,11 +361,11 @@ export default function AutomationPage() {
               {[
                 { key: 'tasks',      icon: '⏰', label: 'Task Monitoring',       schedule: 'Every hour',          desc: 'Detects overdue & upcoming deadlines, notifies employees and admins.' },
                 { key: 'morning',    icon: '☀️', label: 'Morning Summary',        schedule: 'Mon–Sat at 8:30 AM',  desc: 'Sends each employee their pending tasks and follow-ups for the day.' },
-                { key: 'evening',    icon: '🌙', label: 'Evening Summary',        schedule: 'Mon–Sat at 6:30 PM',  desc: 'Sends task completion summary + detects missing check-outs.' },
+                { key: 'evening',    icon: '🌙', label: 'Evening Summary',        schedule: 'Mon–Sat at 6:00 PM',  desc: 'Sends task completion summary + detects missing check-outs.' },
                 { key: 'crm',        icon: '📞', label: 'CRM Alerts',             schedule: 'Mon–Sat at 9:30 AM',  desc: 'Flags stale leads, overdue follow-ups, and sales target alerts.' },
                 { key: 'documents',  icon: '📄', label: 'Document Compliance',    schedule: 'Mon–Sat at 9:30 AM',  desc: 'Reminds employees to upload missing onboarding documents.' },
                 { key: 'attendance', icon: '📋', label: 'Attendance Pattern',     schedule: 'Every Monday 9:00 AM',desc: 'Checks last 10 days for late/absent patterns and alerts HR.' },
-                { key: 'checkout',   icon: '🕐', label: 'Missing Checkout',       schedule: 'Mon–Sat at 6:30 PM',  desc: 'Detects employees who checked in but forgot to check out.' },
+                { key: 'checkout',   icon: '🕐', label: 'Missing Checkout',       schedule: 'Mon–Sat at 6:00 PM',  desc: 'Detects employees who checked in but forgot to check out.' },
                 { key: 'scores',     icon: '📊', label: 'Productivity Scores',    schedule: 'Every Monday 9:00 AM',desc: 'Calculates weekly score: Tasks 40% + Attendance 40% + CRM 20%.' },
                 { key: 'weekly',     icon: '📈', label: 'Weekly Report',          schedule: 'Every Monday 9:00 AM',desc: 'Sends personal performance report to each employee and team summary to admin.' },
               ].map(({ key, icon, label, schedule, desc }) => (

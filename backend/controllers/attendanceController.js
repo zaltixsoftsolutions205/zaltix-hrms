@@ -11,7 +11,7 @@ const istDate = () => istNow().toISOString().slice(0, 10);   // YYYY-MM-DD
 const istTime = () => istNow().toISOString().slice(11, 16);  // HH:mm
 
 // Office hours (IST)
-const OFFICE_START = '09:30'; // late if check-in after this
+const OFFICE_START = '09:00'; // late if check-in after this
 const OFFICE_END = '18:30'; // early leave if check-out before this
 
 // Find a holiday falling on the given IST calendar date (YYYY-MM-DD).
