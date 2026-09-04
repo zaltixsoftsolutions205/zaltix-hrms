@@ -12,7 +12,7 @@ const istTime = () => istNow().toISOString().slice(11, 16);  // HH:mm
 
 // Office hours (IST)
 const OFFICE_START = '09:00'; // late if check-in after this
-const OFFICE_END = '18:30'; // early leave if check-out before this
+const OFFICE_END = '18:00'; // early leave if check-out before this
 
 // Find a holiday falling on the given IST calendar date (YYYY-MM-DD).
 // Holiday.date is stored as a Date (often midnight UTC), so we match by a
@@ -398,7 +398,7 @@ function calculateWorkHours(checkIn, checkOut) {
 exports.reviewRegularization = async (req, res) => {
   const { status, comment } = req.body;
   const OFFICE_START = process.env.OFFICE_START || "09:00";
-  const OFFICE_END = process.env.OFFICE_END || "18:30";
+  const OFFICE_END = process.env.OFFICE_END || "18:00";
 
   try {
     if (!["approved", "rejected"].includes(status)) {

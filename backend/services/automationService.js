@@ -169,7 +169,7 @@ async function checkTasks() {
 }
 
 // ─── 2. ATTENDANCE MONITORING ─────────────────────────────────────────────────
-// Runs Mon–Sat at 18:30. Detects missing checkouts.
+// Runs Mon–Sat at 18:00. Detects missing checkouts.
 // Attendance pattern analysis runs on Mon at 09:00 (weekly).
 
 async function checkMissingCheckout() {
@@ -621,7 +621,7 @@ async function sendMorningSummary() {
 }
 
 // ─── 6. EVENING SUMMARY ───────────────────────────────────────────────────────
-// Runs Mon–Sat at 18:30. Shows today's completed vs pending.
+// Runs Mon–Sat at 18:00. Shows today's completed vs pending.
 
 async function sendEveningSummary() {
   try {

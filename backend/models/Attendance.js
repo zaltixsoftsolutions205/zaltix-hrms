@@ -9,7 +9,7 @@ const attendanceSchema = new mongoose.Schema(
     status: { type: String, enum: ['present', 'absent', 'half-day'], default: 'present' },
     workHours: { type: Number, default: 0 }, // in hours
     notes: { type: String, default: '' },
-    // Late / early detection (office: 09:30 – 18:30)
+    // Late / early detection (office: 09:00 – 18:00)
     isLate: { type: Boolean, default: false },
     isEarlyLeave: { type: Boolean, default: false },
     // Location at check-in
