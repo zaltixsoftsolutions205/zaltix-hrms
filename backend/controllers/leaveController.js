@@ -11,7 +11,7 @@ const getWorkingDays = (fromDate, toDate) => {
   const current = moment(fromDate);
   const end = moment(toDate);
   while (current <= end) {
-    if (current.day() !== 0 && current.day() !== 6) count++;
+    if (current.day() !== 0) count++; // Sunday is the only weekly off; Saturday is a working day
     current.add(1, 'days');
   }
   return count;

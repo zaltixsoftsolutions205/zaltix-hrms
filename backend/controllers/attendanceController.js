@@ -195,13 +195,13 @@ exports.getMyAttendance = async (req, res) => {
         ? moment(today).subtract(1, "day").format("YYYY-MM-DD")
         : end;
 
-    // Count Mon–Fri working days
+    // Count working days — Sunday is the only weekly off; Saturday is worked
     let workingDays = 0;
     const cur = moment(start);
     const endM = moment(absentCalcEnd);
 
     while (cur.isSameOrBefore(endM)) {
-      if (cur.day() !== 0 && cur.day() !== 6) {
+      if (cur.day() !== 0) {
         workingDays++;
       }
       cur.add(1, "day");
