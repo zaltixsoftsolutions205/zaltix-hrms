@@ -342,6 +342,16 @@ exports.applyRegularization = async (req, res) => {
       });
     }
 
+    // A missing or early checkout must be corrected with an actual leaving
+    // time — otherwise approval later computes 0 work hours and the whole
+    // day gets marked absent even though the employee was clearly present.
+    if ((!record.checkOut || record.isEarlyLeave) && !checkOut) {
+      return res.status(400).json({ message: "Please provide your check-out (leaving) time" });
+    }
+    if (record.isLate && !checkIn) {
+      return res.status(400).json({ message: "Please provide your check-in time" });
+    }
+
     record.regularizationStatus = "pending";
     record.regularizationReason = reason.trim();
 

@@ -146,6 +146,14 @@ const RegularizeInline = ({ record, onDone }) => {
       return toast.error("Please enter a reason");
     }
 
+    if (record.isLate && !regCheckIn) {
+      return toast.error("Please enter your check-in time");
+    }
+
+    if ((record.isEarlyLeave || !record.checkOut) && !regCheckOut) {
+      return toast.error("Please enter your check-out (leaving) time");
+    }
+
     const payload = {
       attendanceId: record._id,
       reason,
@@ -227,12 +235,13 @@ const RegularizeInline = ({ record, onDone }) => {
             <>
               <label className="text-xs font-semibold text-violet-700" >
                 {!record.checkOut
-                  ? "Correct Check-Out Time"
+                  ? "Check-Out (Leaving) Time — required"
                   : "Correct Early Leave Time"}
               </label>
 
               <input
                 type="time"
+                required
                 className="input-field"
                 value={regCheckOut}
                 onChange={(e) => setRegCheckOut(e.target.value)}
@@ -344,6 +353,8 @@ const AttendancePage = ({ employeeId = null }) => {
 
   const handleRegularizeToday = async () => {
     if (!regReason.trim()) return toast.error('Please enter a reason');
+    if (today?.isLate && !regCheckIn) return toast.error('Please enter your check-in time');
+    if ((today?.isEarlyLeave || todayMissingCheckout) && !regCheckOut) return toast.error('Please enter your check-out (leaving) time');
     setRegLoading(true);
     try {
       await api.post('/attendance/regularize', { attendanceId: today?._id, reason: regReason, checkIn: regCheckIn, checkOut: regCheckOut });
@@ -359,7 +370,8 @@ const AttendancePage = ({ employeeId = null }) => {
   };
 
   const today = data?.todayRecord;
-  const todayHasIssue = today?.isLate || today?.isEarlyLeave;
+  const todayMissingCheckout = !!today?.checkIn && !today?.checkOut;
+  const todayHasIssue = today?.isLate || today?.isEarlyLeave || todayMissingCheckout;
 
   // Derive attendance intelligence from existing records — no extra API call
   const attendanceAlerts = (() => {
@@ -415,6 +427,12 @@ const AttendancePage = ({ employeeId = null }) => {
                 Early Leave ({formatTime12(today.checkOut)})
               </span>
             )}
+            {todayMissingCheckout && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-900">
+                <SI d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={13} color="text-gray-900" />
+                Missing Check-Out
+              </span>
+            )}
             {/* Regularization status / action */}
             {today.regularizationStatus ? (
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${REG_BADGE[today.regularizationStatus]}`}>
@@ -435,7 +453,9 @@ const AttendancePage = ({ employeeId = null }) => {
         {/* Regularization form */}
         {showRegForm && !today?.regularizationStatus && todayHasIssue && (
           <div className="mt-3 p-3 bg-violet-50 rounded-xl border border-violet-100">
-            <p className="text-xs font-semibold text-violet-700 mb-2">Reason for {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
+            <p className="text-xs font-semibold text-violet-700 mb-2">
+              Reason for {[today?.isLate && 'late arrival', today?.isEarlyLeave && 'early leave', todayMissingCheckout && 'missing check-out'].filter(Boolean).join(' & ')}:
+            </p>
             <textarea
               className="input-field w-full text-sm resize-none"
               rows={2}
@@ -445,7 +465,7 @@ const AttendancePage = ({ employeeId = null }) => {
             />
             {today?.isLate && (
               <>
-                <p className="text-xs font-semibold text-violet-700 mb-2">check-in {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
+                <p className="text-xs font-semibold text-violet-700 mb-2">Correct check-in time:</p>
                 <input
                   type="time"
                   className="input-field w-full text-sm mb-3"
@@ -454,11 +474,14 @@ const AttendancePage = ({ employeeId = null }) => {
                 />
               </>
             )}
-            {(today?.isEarlyLeave || !today?.checkOut) && (
+            {(today?.isEarlyLeave || todayMissingCheckout) && (
               <>
-                <p className="text-xs font-semibold text-violet-700 mb-2">check-out {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
+                <p className="text-xs font-semibold text-violet-700 mb-2">
+                  {todayMissingCheckout ? 'Check-out (leaving) time — required:' : 'Correct check-out time:'}
+                </p>
                 <input
                   type="time"
+                  required
                   className="input-field w-full text-sm mb-3"
                   value={regCheckOut}
                   onChange={(e) => setRegCheckOut(e.target.value)}
