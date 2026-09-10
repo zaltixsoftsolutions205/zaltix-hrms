@@ -153,7 +153,7 @@ const generatePayslipPDF = (payslipData) => {
         ['Employee Code', employee.employeeId,          'Employee Name', employee.name],
         ['Designation',   employee.designation || '—',  'Department',    employee.department?.name || '—'],
         ['Working Days',  String(wdDays),               'Present Days',  String(prsDays)],
-        ['LWP',   String(lopDays),              'Date of Joining', fmtDate(employee.joiningDate)],
+        ['LWP Days',   String(lopDays),              'Date of Joining', fmtDate(employee.joiningDate)],
       ];
 
       empRows.forEach(([l1, v1, l2, v2]) => {
