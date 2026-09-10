@@ -189,7 +189,7 @@ const RegularizeInline = ({ record, onDone }) => {
     }
   };
 
-  if (record.regularizationStatus) {
+  if (record.regularizationStatus && record.regularizationStatus !== "rejected") {
     return (
       <span
         className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${REG_BADGE[record.regularizationStatus]
@@ -197,7 +197,6 @@ const RegularizeInline = ({ record, onDone }) => {
       >
         {record.regularizationStatus === "pending" && "Pending HR"}
         {record.regularizationStatus === "approved" && "Regularized"}
-        {record.regularizationStatus === "rejected" && "Rejected"}
       </span>
     );
   }
@@ -205,12 +204,29 @@ const RegularizeInline = ({ record, onDone }) => {
   return (
     <div>
       {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
-        >
-          Request
-        </button>
+        record.regularizationStatus === "rejected" ? (
+          <div className="flex flex-col gap-1 items-start">
+            <span
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${REG_BADGE.rejected}`}
+              title={record.regularizationComment || undefined}
+            >
+              Rejected{record.regularizationComment ? ` — ${record.regularizationComment}` : ""}
+            </span>
+            <button
+              onClick={() => setOpen(true)}
+              className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
+            >
+              Reapply
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setOpen(true)}
+            className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
+          >
+            Request
+          </button>
+        )
       ) : (
         <div className="flex flex-col gap-3 min-w-[250px]">
 
@@ -434,24 +450,30 @@ const AttendancePage = ({ employeeId = null }) => {
               </span>
             )}
             {/* Regularization status / action */}
-            {today.regularizationStatus ? (
+            {today.regularizationStatus && today.regularizationStatus !== 'rejected' ? (
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${REG_BADGE[today.regularizationStatus]}`}>
                 {today.regularizationStatus === 'pending' && 'Regularization Pending HR'}
                 {today.regularizationStatus === 'approved' && 'Regularization Approved'}
-                {today.regularizationStatus === 'rejected' && `Regularization Rejected${today.regularizationComment ? ` — ${today.regularizationComment}` : ''}`}
               </span>
             ) : (
-              <button onClick={() => setShowRegForm(v => !v)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
-                <SI d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={12} />
-                Request Regularization
-              </button>
+              <>
+                {today.regularizationStatus === 'rejected' && (
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${REG_BADGE.rejected}`}>
+                    Regularization Rejected{today.regularizationComment ? ` — ${today.regularizationComment}` : ''}
+                  </span>
+                )}
+                <button onClick={() => setShowRegForm(v => !v)}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
+                  <SI d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={12} />
+                  {today.regularizationStatus === 'rejected' ? 'Reapply for Regularization' : 'Request Regularization'}
+                </button>
+              </>
             )}
           </div>
         )}
 
         {/* Regularization form */}
-        {showRegForm && !today?.regularizationStatus && todayHasIssue && (
+        {showRegForm && (!today?.regularizationStatus || today.regularizationStatus === 'rejected') && todayHasIssue && (
           <div className="mt-3 p-3 bg-violet-50 rounded-xl border border-violet-100">
             <p className="text-xs font-semibold text-violet-700 mb-2">
               Reason for {[today?.isLate && 'late arrival', today?.isEarlyLeave && 'early leave', todayMissingCheckout && 'missing check-out'].filter(Boolean).join(' & ')}:

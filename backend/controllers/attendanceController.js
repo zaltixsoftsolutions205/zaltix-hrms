@@ -336,7 +336,9 @@ exports.applyRegularization = async (req, res) => {
       });
     }
 
-    if (record.regularizationStatus) {
+    // Block only while a request is pending or already approved. A rejected
+    // request can be corrected and resubmitted.
+    if (record.regularizationStatus === "pending" || record.regularizationStatus === "approved") {
       return res.status(400).json({
         message: "Regularization already submitted",
       });
@@ -354,6 +356,7 @@ exports.applyRegularization = async (req, res) => {
 
     record.regularizationStatus = "pending";
     record.regularizationReason = reason.trim();
+    record.regularizationComment = ""; // clear any prior rejection note
 
     // Employee requested timings
     record.regularizedCheckIn = checkIn || null;
