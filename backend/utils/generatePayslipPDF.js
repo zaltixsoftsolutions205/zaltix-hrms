@@ -109,8 +109,8 @@ const generatePayslipPDF = (payslipData) => {
       doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
          .text('Zaltix Soft Solutions Private Limited', infoX, y + 2, { width: infoW, align: 'center' });
       doc.fillColor('#333333').fontSize(7.5).font('Helvetica')
-         .text('Swarnakanchi Road, Green Hills Colony Rd No.3, above Vajra Food Court,', infoX, y + 20, { width: infoW, align: 'center' });
-      doc.text('Green Hills Colony, Kothapet, Hyderabad, Telangana - 500102', infoX, y + 30, { width: infoW, align: 'center' });
+         .text('Plot - 63,64, Opp Police Station, near TCS Adibatla,', infoX, y + 20, { width: infoW, align: 'center' });
+      doc.text('Hyderabad, Telangana, 501510', infoX, y + 30, { width: infoW, align: 'center' });
       doc.text('Email : hr@zaltixsoftsolutions.com   |   Phone : 9966653131', infoX, y + 40, { width: infoW, align: 'center' });
 
       y += 62;
