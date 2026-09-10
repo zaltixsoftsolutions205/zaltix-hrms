@@ -36,9 +36,10 @@ const generateQuotationPDF = (quotation, res) => {
      .text('Zaltix Soft Solutions', ML + 118, y + 2, { width: CW - 118, align: 'center' });
   doc.fillColor(GRAY).fontSize(7.5).font('Helvetica')
      .text('Plot Number- 63,64, Opposite Police Station, near TCS Adibatla, Hyderabad, Telangana - 501510', ML + 118, y + 20, { width: CW - 118, align: 'center' })
-     .text('Email: hr@zaltixsoftsolutions.com  |  Phone: 9966653131', ML + 118, y + 30, { width: CW - 118, align: 'center' });
+     .text('Email: hr@zaltixsoftsolutions.com  |  Phone: +91 9966653131', ML + 118, y + 30, { width: CW - 118, align: 'center' })
+     .text('Visit us at : www.zaltixsoftsolutions.com', ML + 118, y + 40, { width: CW - 118, align: 'center' });
 
-  y += 62;
+  y += 72;
   doc.moveTo(ML, y).lineTo(MR, y).strokeColor(VIOLET).lineWidth(1.5).stroke();
   y += 12;
 

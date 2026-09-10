@@ -111,9 +111,10 @@ const generatePayslipPDF = (payslipData) => {
       doc.fillColor('#333333').fontSize(7.5).font('Helvetica')
          .text('Plot Number- 63,64, Opposite Police Station, near TCS Adibatla,', infoX, y + 20, { width: infoW, align: 'center' });
       doc.text('Hyderabad, Telangana, 501510', infoX, y + 30, { width: infoW, align: 'center' });
-      doc.text('Email : hr@zaltixsoftsolutions.com   |   Phone : 9966653131', infoX, y + 40, { width: infoW, align: 'center' });
+      doc.text('Email : hr@zaltixsoftsolutions.com   |   Phone : +91 9966653131', infoX, y + 40, { width: infoW, align: 'center' });
+      doc.text('Visit us at : www.zaltixsoftsolutions.com', infoX, y + 50, { width: infoW, align: 'center' });
 
-      y += 62;
+      y += 72;
       doc.moveTo(ML, y).lineTo(MR, y).strokeColor('#000000').lineWidth(1.2).stroke();
       y += 10;
 
@@ -152,7 +153,7 @@ const generatePayslipPDF = (payslipData) => {
         ['Employee Code', employee.employeeId,          'Employee Name', employee.name],
         ['Designation',   employee.designation || '—',  'Department',    employee.department?.name || '—'],
         ['Working Days',  String(wdDays),               'Present Days',  String(prsDays)],
-        ['Loss of Pay',   String(lopDays),              'Date of Joining', fmtDate(employee.joiningDate)],
+        ['LWP',   String(lopDays),              'Date of Joining', fmtDate(employee.joiningDate)],
       ];
 
       empRows.forEach(([l1, v1, l2, v2]) => {
