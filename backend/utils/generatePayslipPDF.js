@@ -109,7 +109,7 @@ const generatePayslipPDF = (payslipData) => {
       doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
          .text('Zaltix Soft Solutions Private Limited', infoX, y + 2, { width: infoW, align: 'center' });
       doc.fillColor('#333333').fontSize(7.5).font('Helvetica')
-         .text('Plot - 63,64, Opp Police Station, near TCS Adibatla,', infoX, y + 20, { width: infoW, align: 'center' });
+         .text('Plot Number- 63,64, Opposite Police Station, near TCS Adibatla,', infoX, y + 20, { width: infoW, align: 'center' });
       doc.text('Hyderabad, Telangana, 501510', infoX, y + 30, { width: infoW, align: 'center' });
       doc.text('Email : hr@zaltixsoftsolutions.com   |   Phone : 9966653131', infoX, y + 40, { width: infoW, align: 'center' });
 
