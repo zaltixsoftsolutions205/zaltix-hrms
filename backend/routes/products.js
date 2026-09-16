@@ -12,6 +12,9 @@ router.post('/',         protect, crmAccess, ctrl.createProduct);
 router.put('/:id',       protect, crmAccess, ctrl.updateProduct);
 router.delete('/:id',    protect, crmAccess, ctrl.deleteProduct);
 
+// Locations under a product
+router.post('/:productId/locations', protect, crmAccess, ctrl.addLocation);
+
 // Prospects under a product
 router.get('/:productId/prospects',              protect, crmAccess, ctrl.getProspects);
 router.post('/:productId/prospects',             protect, crmAccess, ctrl.createProspect);

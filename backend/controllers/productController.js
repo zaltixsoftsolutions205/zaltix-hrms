@@ -117,6 +117,7 @@ exports.bulkSetLocation = async (req, res) => {
     const { productId } = req.params;
     const { fromLocation, toLocation } = req.body;
     if (!toLocation?.trim()) return res.status(400).json({ message: 'New location is required' });
+    const to = toLocation.trim();
 
     const filter = { product: productId };
     if (fromLocation) {
@@ -125,8 +126,36 @@ exports.bulkSetLocation = async (req, res) => {
       filter.$or = [{ location: '' }, { location: null }, { location: { $exists: false } }];
     }
 
-    const result = await ProductProspect.updateMany(filter, { location: toLocation.trim() });
+    const result = await ProductProspect.updateMany(filter, { location: to });
+
+    // Keep the product's tracked location list in sync: drop the old name
+    // (if it was a real, non-empty location) and ensure the new one is present.
+    const pull = fromLocation ? { locations: fromLocation } : {};
+    if (fromLocation) await Product.findByIdAndUpdate(productId, { $pull: pull });
+    await Product.findByIdAndUpdate(productId, { $addToSet: { locations: to } });
+
     res.json({ updated: result.modifiedCount });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Create an empty, selectable location for this product before any
+// customer has that location yet.
+exports.addLocation = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { name } = req.body;
+    if (!name?.trim()) return res.status(400).json({ message: 'Location name is required' });
+
+    const product = await Product.findByIdAndUpdate(
+      productId,
+      { $addToSet: { locations: name.trim() } },
+      { new: true }
+    );
+    if (!product) return res.status(404).json({ message: 'Product not found' });
+
+    res.status(201).json({ locations: product.locations });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

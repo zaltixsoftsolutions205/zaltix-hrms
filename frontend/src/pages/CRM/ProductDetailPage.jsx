@@ -58,9 +58,11 @@ const STATUS_CFG = {
 const STANDARD_TYPES = ['Private Limited', 'Public Limited', 'LLP', 'Partnership', 'Sole Proprietorship', 'NGO', 'Government'];
 const COMPANY_SIZES = ['1-10', '11-50', '51-200', '201-500', '500+'];
 
-const EXCEL_COLUMNS = ['Company Name', 'Address', 'Website', 'Contact Number', 'Email ID', 'Company Type', 'Company Size', 'Remarks'];
+const EXCEL_COLUMNS = ['Company Name', 'Location', 'Address', 'Website', 'Contact Number', 'Email ID', 'Company Type', 'Company Size', 'Remarks'];
 
-const EMPTY_FORM = { companyName: '', address: '', website: '', contactNumber: '', emailId: '', linkedinUrl: '', companyType: '', companySize: '', remarks: '', status: 'new' };
+const EMPTY_FORM = { companyName: '', location: '', address: '', website: '', contactNumber: '', emailId: '', linkedinUrl: '', companyType: '', companySize: '', remarks: '', status: 'new' };
+
+const UNSPECIFIED_LOCATION = 'Unspecified';
 
 export default function ProductDetailPage() {
   const { productId } = useParams();
@@ -78,6 +80,13 @@ export default function ProductDetailPage() {
   const [uploading, setUploading] = useState(false);
   const [isOtherType, setIsOtherType] = useState(false);
   const [search, setSearch] = useState('');
+  const [selectedLocation, setSelectedLocation] = useState(null);
+  const [assigningLocation, setAssigningLocation] = useState(null); // location name being reassigned
+  const [newLocationName, setNewLocationName] = useState('');
+  const [assigning, setAssigning] = useState(false);
+  const [addingLocation, setAddingLocation] = useState(false); // showing the "add location" form
+  const [addLocationName, setAddLocationName] = useState('');
+  const [savingLocation, setSavingLocation] = useState(false);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -97,7 +106,7 @@ export default function ProductDetailPage() {
 
   const openAdd = () => {
     setEditProspect(null);
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, location: selectedLocation && selectedLocation !== UNSPECIFIED_LOCATION ? selectedLocation : '' });
     setIsOtherType(false);
     setShowForm(true);
   };
@@ -106,7 +115,7 @@ export default function ProductDetailPage() {
     const isOther = !!pr.companyType && !STANDARD_TYPES.includes(pr.companyType);
     setIsOtherType(isOther);
     setForm({
-      companyName: pr.companyName, address: pr.address, website: pr.website,
+      companyName: pr.companyName, location: pr.location || '', address: pr.address, website: pr.website,
       contactNumber: pr.contactNumber, emailId: pr.emailId, linkedinUrl: pr.linkedinUrl || '',
       companyType: pr.companyType, companySize: pr.companySize,
       remarks: pr.remarks, status: pr.status,
@@ -150,6 +159,38 @@ export default function ProductDetailPage() {
     } catch { toast.error('Failed'); }
   };
 
+  const handleAssignLocation = async (e) => {
+    e.preventDefault();
+    if (!newLocationName.trim()) return toast.error('Enter a location name');
+    setAssigning(true);
+    try {
+      const fromLocation = assigningLocation === UNSPECIFIED_LOCATION ? '' : assigningLocation;
+      const { data } = await api.post(`/products/${productId}/prospects/bulk-location`, {
+        fromLocation, toLocation: newLocationName.trim(),
+      });
+      toast.success(`Updated ${data.updated} customer${data.updated !== 1 ? 's' : ''}`);
+      setAssigningLocation(null);
+      setNewLocationName('');
+      fetchAll();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    finally { setAssigning(false); }
+  };
+
+  const handleAddLocation = async (e) => {
+    e.preventDefault();
+    const name = addLocationName.trim();
+    if (!name) return toast.error('Enter a location name');
+    setSavingLocation(true);
+    try {
+      await api.post(`/products/${productId}/locations`, { name });
+      toast.success('Location added');
+      setAddingLocation(false);
+      setAddLocationName('');
+      fetchAll();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    finally { setSavingLocation(false); }
+  };
+
   const handleConvertToLead = async (id) => {
     try {
       const { data } = await api.post(`/products/${productId}/prospects/${id}/convert-to-lead`);
@@ -174,6 +215,7 @@ export default function ProductDetailPage() {
       const header = rows[0].map(h => String(h || '').toLowerCase().trim());
       const idx = {
         companyName:   header.findIndex(h => h.includes('company') && h.includes('name')),
+        location:      header.findIndex(h => h.includes('location')),
         address:       header.findIndex(h => h.includes('address')),
         website:       header.findIndex(h => h.includes('website') || h.includes('web')),
         contactNumber: header.findIndex(h => h.includes('contact') || h.includes('phone') || h.includes('mobile')),
@@ -187,13 +229,14 @@ export default function ProductDetailPage() {
         .filter(row => row.length > 0 && row[idx.companyName >= 0 ? idx.companyName : 0])
         .map((row, i) => ({
           companyName:   String(row[idx.companyName >= 0 ? idx.companyName : 0] || '').trim(),
-          address:       String(row[idx.address >= 0 ? idx.address : 1] || '').trim(),
-          website:       String(row[idx.website >= 0 ? idx.website : 2] || '').trim(),
-          contactNumber: String(row[idx.contactNumber >= 0 ? idx.contactNumber : 3] || '').trim(),
-          emailId:       String(row[idx.emailId >= 0 ? idx.emailId : 4] || '').trim(),
-          companyType:   String(row[idx.companyType >= 0 ? idx.companyType : 5] || '').trim(),
-          companySize:   String(row[idx.companySize >= 0 ? idx.companySize : 6] || '').trim(),
-          remarks:       String(row[idx.remarks >= 0 ? idx.remarks : 7] || '').trim(),
+          location:      String(row[idx.location >= 0 ? idx.location : 1] || '').trim(),
+          address:       String(row[idx.address >= 0 ? idx.address : 2] || '').trim(),
+          website:       String(row[idx.website >= 0 ? idx.website : 3] || '').trim(),
+          contactNumber: String(row[idx.contactNumber >= 0 ? idx.contactNumber : 4] || '').trim(),
+          emailId:       String(row[idx.emailId >= 0 ? idx.emailId : 5] || '').trim(),
+          companyType:   String(row[idx.companyType >= 0 ? idx.companyType : 6] || '').trim(),
+          companySize:   String(row[idx.companySize >= 0 ? idx.companySize : 7] || '').trim(),
+          remarks:       String(row[idx.remarks >= 0 ? idx.remarks : 8] || '').trim(),
         }))
         .filter(p => p.companyName);
 
@@ -209,7 +252,7 @@ export default function ProductDetailPage() {
   const downloadTemplate = () => {
     const ws = XLSX.utils.aoa_to_sheet([
       EXCEL_COLUMNS,
-      ['ABC Corp', '123 Main St, Mumbai', 'www.abccorp.com', '9876543210', 'contact@abccorp.com', 'Private Limited', '51-200', 'Interested in demo'],
+      ['ABC Corp', 'Mumbai', '123 Main St, Mumbai', 'www.abccorp.com', '9876543210', 'contact@abccorp.com', 'Private Limited', '51-200', 'Interested in demo'],
     ]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Customers');
@@ -219,9 +262,10 @@ export default function ProductDetailPage() {
   const downloadData = (all = false) => {
     const rows = all ? prospects : filtered;
     if (rows.length === 0) { toast.error('No data to download'); return; }
-    const headers = ['Company Name', 'Contact Number', 'Email ID', 'LinkedIn', 'Website', 'Address', 'Company Type', 'Company Size', 'Status', 'Remarks', 'Added Date'];
+    const headers = ['Company Name', 'Location', 'Contact Number', 'Email ID', 'LinkedIn', 'Website', 'Address', 'Company Type', 'Company Size', 'Status', 'Remarks', 'Added Date'];
     const data = rows.map(p => [
       p.companyName,
+      p.location || '',
       p.contactNumber || '',
       p.emailId || '',
       p.linkedinUrl || '',
@@ -235,7 +279,7 @@ export default function ProductDetailPage() {
     ]);
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     // Auto column widths
-    ws['!cols'] = [28, 18, 28, 30, 24, 32, 20, 14, 14, 28, 14].map(w => ({ wch: w }));
+    ws['!cols'] = [28, 16, 18, 28, 30, 24, 32, 20, 14, 14, 28, 14].map(w => ({ wch: w }));
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Customers');
     const label = all ? 'all' : (statusFilter || 'filtered');
@@ -244,7 +288,25 @@ export default function ProductDetailPage() {
     toast.success(`Downloaded ${rows.length} customer${rows.length !== 1 ? 's' : ''}`);
   };
 
-  const filtered = prospects.filter(p => {
+  const locationOf = (p) => (p.location || '').trim() || UNSPECIFIED_LOCATION;
+
+  const locations = Object.values(
+    prospects.reduce((acc, p) => {
+      const loc = locationOf(p);
+      if (!acc[loc]) acc[loc] = { name: loc, count: 0 };
+      acc[loc].count += 1;
+      return acc;
+    }, (product?.locations || []).reduce((acc, name) => {
+      // Seed with locations that exist on the product but have no
+      // customers yet, so they show up as selectable (empty) cards.
+      if (name?.trim()) acc[name] = { name, count: 0 };
+      return acc;
+    }, {}))
+  ).sort((a, b) => a.name === UNSPECIFIED_LOCATION ? 1 : b.name === UNSPECIFIED_LOCATION ? -1 : a.name.localeCompare(b.name));
+
+  const scoped = selectedLocation ? prospects.filter(p => locationOf(p) === selectedLocation) : prospects;
+
+  const filtered = scoped.filter(p => {
     if (statusFilter && p.status !== statusFilter) return false;
     if (!search.trim()) return true;
     const q = search.toLowerCase();
@@ -259,7 +321,7 @@ export default function ProductDetailPage() {
     );
   });
   const counts = Object.keys(STATUS_CFG).reduce((acc, k) => {
-    acc[k] = prospects.filter(p => p.status === k).length;
+    acc[k] = scoped.filter(p => p.status === k).length;
     return acc;
   }, {});
 
@@ -309,10 +371,121 @@ export default function ProductDetailPage() {
                 Export All
               </button>
             )}
-            <button onClick={openAdd} className="btn-primary btn-sm">+ Add Customer</button>
+            {!selectedLocation && (
+              <button onClick={() => { setAddingLocation(true); setAddLocationName(''); }} className="btn-secondary btn-sm">
+                + Add Location
+              </button>
+            )}
+            <button onClick={openAdd} disabled={!selectedLocation} title={!selectedLocation ? 'Select a location first' : undefined}
+              className="btn-primary btn-sm disabled:opacity-40 disabled:cursor-not-allowed">
+              + Add Customer
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Add location form */}
+      <AnimatePresence>
+        {addingLocation && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="glass-card p-4">
+            <h3 className="font-bold text-gray-900 mb-3">Add Location</h3>
+            <form onSubmit={handleAddLocation} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div className="flex-1">
+                <label className="label-text">Location name</label>
+                <input className="input-field" placeholder="e.g. Mumbai" value={addLocationName} autoFocus
+                  onChange={e => setAddLocationName(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setAddingLocation(false); setAddLocationName(''); }} className="btn-secondary btn-sm">Cancel</button>
+                <button type="submit" disabled={savingLocation} className="btn-primary btn-sm">{savingLocation ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Location Cards (top level) */}
+      {!selectedLocation && (
+        locations.length === 0 ? (
+          <div className="glass-card p-10 text-center">
+            <p className="text-gray-500 font-semibold">No locations yet</p>
+            <p className="text-sm text-gray-400 mt-1">Add a location to get started, then add customers to it.</p>
+          </div>
+        ) : (
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {locations.map(loc => (
+              <motion.div key={loc.name} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                onClick={() => setSelectedLocation(loc.name)}
+                className="glass-card p-4 cursor-pointer hover:shadow-md hover:-translate-y-0.5 transition-all group">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg className="w-4 h-4 text-violet-400 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                    <h3 className="font-bold text-gray-900 group-hover:text-violet-700 transition-colors truncate">{loc.name}</h3>
+                  </div>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setAssigningLocation(loc.name); setNewLocationName(loc.name === UNSPECIFIED_LOCATION ? '' : loc.name); }}
+                    title={loc.name === UNSPECIFIED_LOCATION ? 'Assign a location' : 'Rename location'}
+                    className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-violet-100 text-violet-400 hover:text-violet-600 transition-colors flex-shrink-0 ml-2">
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                  </button>
+                </div>
+
+                <div className="pt-3 border-t border-gray-100">
+                  <p className="text-2xl font-bold text-violet-700 leading-none">{loc.count}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">customer{loc.count !== 1 ? 's' : ''}</p>
+                </div>
+
+                <div className="mt-2 flex items-center justify-end">
+                  <span className="text-[10px] text-violet-500 font-semibold group-hover:underline">View Customers →</span>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )
+      )}
+
+      {/* Assign / rename location form */}
+      <AnimatePresence>
+        {assigningLocation && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
+            className="glass-card p-4">
+            <h3 className="font-bold text-gray-900 mb-3">
+              {assigningLocation === UNSPECIFIED_LOCATION ? 'Assign Location' : `Rename "${assigningLocation}"`}
+            </h3>
+            <form onSubmit={handleAssignLocation} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div className="flex-1">
+                <label className="label-text">
+                  {assigningLocation === UNSPECIFIED_LOCATION
+                    ? 'Set this location for all customers currently marked Unspecified'
+                    : `New name for all customers currently under "${assigningLocation}"`}
+                </label>
+                <input className="input-field" placeholder="e.g. Mumbai" value={newLocationName} autoFocus
+                  onChange={e => setNewLocationName(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setAssigningLocation(null); setNewLocationName(''); }} className="btn-secondary btn-sm">Cancel</button>
+                <button type="submit" disabled={assigning} className="btn-primary btn-sm">{assigning ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {selectedLocation && (
+        <>
+      <button onClick={() => { setSelectedLocation(null); setStatusFilter(''); setSearch(''); }}
+        className="inline-flex items-center gap-1.5 text-sm text-violet-500 hover:text-violet-700 font-semibold transition-colors">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
+        </svg>
+        All Locations
+        <span className="text-gray-400 font-normal">/ {selectedLocation}</span>
+      </button>
 
       {/* Status Stats */}
       <div className="flex gap-1.5 overflow-x-auto pb-0.5 sm:grid sm:grid-cols-5 sm:gap-2">
@@ -337,6 +510,11 @@ export default function ProductDetailPage() {
                   <label className="label-text">Company Name *</label>
                   <input className="input-field" placeholder="e.g. ABC Pvt Ltd" value={form.companyName}
                     onChange={e => setForm(f => ({ ...f, companyName: e.target.value }))} />
+                </div>
+                <div>
+                  <label className="label-text">Location *</label>
+                  <input className="input-field" placeholder="e.g. Mumbai" value={form.location}
+                    onChange={e => setForm(f => ({ ...f, location: e.target.value }))} />
                 </div>
                 <div>
                   <label className="label-text">Contact Number</label>
@@ -485,111 +663,76 @@ export default function ProductDetailPage() {
             )}
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
-            {filtered.map(pr => (
-              <div key={pr._id} className="px-4 py-3 hover:bg-violet-50/30 transition-colors">
-                {/* Mobile-first: stack vertically, row on sm+ */}
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
-                  {/* Left: company info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center flex-wrap gap-1.5 mb-1">
-                      <p className="font-semibold text-gray-900 text-sm">{pr.companyName}</p>
-                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_CFG[pr.status]?.cls}`}>
-                        {STATUS_CFG[pr.status]?.label}
-                      </span>
-                      {pr.convertedToLead && (
-                        <span className="text-[10px] bg-violet-100 text-violet-700 px-2 py-0.5 rounded-full font-semibold">Lead Created</span>
-                      )}
-                      {pr.companyType && (
-                        <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{pr.companyType}</span>
-                      )}
-                      {pr.companySize && (
-                        <span className="text-[10px] text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full">{pr.companySize} emp</span>
-                      )}
-                    </div>
-
-                    <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-                      {pr.contactNumber && (
-                        <a href={`tel:${pr.contactNumber}`} onClick={e => e.stopPropagation()}
-                          className="flex items-center gap-1 hover:text-violet-600 active:text-violet-700">
-                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  {['Company Name', 'Location', 'Contact', 'Email', 'Website', 'Address', 'Type', 'Size', 'Status', 'Remarks', 'Actions'].map(h => (
+                    <th key={h} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100 last:border-r-0">
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((pr, i) => (
+                  <tr key={pr._id} className={`border-b border-gray-100 hover:bg-violet-50/40 transition-colors ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                    <td className="px-3 py-2 border-r border-gray-100 whitespace-nowrap">
+                      <p className="font-semibold text-gray-900">{pr.companyName}</p>
+                      {pr.convertedToLead && <span className="text-[9px] text-violet-600 font-semibold">Lead Created</span>}
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 whitespace-nowrap text-gray-600">{pr.location || '—'}</td>
+                    <td className="px-3 py-2 border-r border-gray-100 whitespace-nowrap text-gray-600">
+                      {pr.contactNumber ? <a href={`tel:${pr.contactNumber}`} className="hover:text-violet-600">{pr.contactNumber}</a> : '—'}
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 text-gray-600 max-w-[180px] truncate" title={pr.emailId}>
+                      {pr.emailId || '—'}
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 text-gray-600 max-w-[140px] truncate" title={pr.website}>
+                      {pr.website || '—'}
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 text-gray-600 max-w-[180px] truncate" title={pr.address}>
+                      {pr.address || '—'}
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 whitespace-nowrap text-gray-600">{pr.companyType || '—'}</td>
+                    <td className="px-3 py-2 border-r border-gray-100 whitespace-nowrap text-gray-600">{pr.companySize || '—'}</td>
+                    <td className="px-3 py-2 border-r border-gray-100 whitespace-nowrap">
+                      <select value={pr.status} onChange={e => handleStatusChange(pr._id, e.target.value)}
+                        className={`text-[10px] font-semibold px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_CFG[pr.status]?.cls}`}>
+                        {Object.entries(STATUS_CFG).map(([k, v]) => (
+                          <option key={k} value={k}>{v.label}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-3 py-2 border-r border-gray-100 text-gray-500 italic max-w-[180px] truncate" title={pr.remarks}>
+                      {pr.remarks || '—'}
+                    </td>
+                    <td className="px-3 py-2 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        {!pr.convertedToLead && pr.status !== 'converted' && (
+                          <button onClick={() => handleConvertToLead(pr._id)} title="Add to Leads"
+                            className="text-[10px] font-semibold px-2 py-1 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors whitespace-nowrap">
+                            → Lead
+                          </button>
+                        )}
+                        <button onClick={() => openEdit(pr)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-violet-100 text-violet-400 hover:text-violet-600 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
                           </svg>
-                          {pr.contactNumber}
-                        </a>
-                      )}
-                      {pr.emailId && pr.emailId.split(',').map(e => e.trim()).filter(Boolean).map((email, i) => (
-                        <a key={i} href={`mailto:${email}`} onClick={e => e.stopPropagation()}
-                          className="flex items-center gap-1 hover:text-violet-600 min-w-0">
-                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                          </svg>
-                          <span className="truncate max-w-[160px]">{email}</span>
-                        </a>
-                      ))}
-                      {pr.website && (
-                        <a href={pr.website.startsWith('http') ? pr.website : `https://${pr.website}`}
-                          target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                          className="flex items-center gap-1 hover:text-violet-600">
-                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
-                          </svg>
-                          <span className="truncate max-w-[120px]">{pr.website}</span>
-                        </a>
-                      )}
-                      {pr.linkedinUrl && pr.linkedinUrl.split(',').map(u => u.trim()).filter(Boolean).map((url, i) => (
-                        <a key={i} href={url.startsWith('http') ? url : `https://${url}`}
-                          target="_blank" rel="noreferrer" onClick={e => e.stopPropagation()}
-                          className="flex items-center gap-1 hover:text-blue-600 text-blue-500">
-                          <svg className="w-3 h-3 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 01-2.063-2.065 2.064 2.064 0 112.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
-                          </svg>
-                          LinkedIn{pr.linkedinUrl.split(',').filter(Boolean).length > 1 ? ` ${i + 1}` : ''}
-                        </a>
-                      ))}
-                      {pr.address && (
-                        <span className="flex items-center gap-1">
-                          <svg className="w-3 h-3 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                          <span className="truncate max-w-[160px]">{pr.address}</span>
-                        </span>
-                      )}
-                    </div>
-                    {pr.remarks && <p className="text-xs text-gray-400 mt-1 line-clamp-1 italic">{pr.remarks}</p>}
-                  </div>
-
-                  {/* Right: actions — row on mobile, column on sm+ */}
-                  <div className="flex sm:flex-col items-center sm:items-end gap-1.5 flex-shrink-0 pt-1 sm:pt-0">
-                    <select value={pr.status} onChange={e => handleStatusChange(pr._id, e.target.value)}
-                      className={`text-[10px] font-semibold px-2 py-1 rounded-lg border-0 cursor-pointer ${STATUS_CFG[pr.status]?.cls}`}
-                      onClick={e => e.stopPropagation()}>
-                      {Object.entries(STATUS_CFG).map(([k, v]) => (
-                        <option key={k} value={k}>{v.label}</option>
-                      ))}
-                    </select>
-                    <div className="flex items-center gap-1">
-                      {!pr.convertedToLead && pr.status !== 'converted' && (
-                        <button onClick={() => handleConvertToLead(pr._id)} title="Add to Leads"
-                          className="text-xs font-semibold px-2 py-1 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors whitespace-nowrap">
-                          → Lead
                         </button>
-                      )}
-                      <button onClick={() => openEdit(pr)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-violet-100 text-violet-400 hover:text-violet-600 transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                        </svg>
-                      </button>
-                      <button onClick={() => handleDelete(pr._id)}
-                        className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
-                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                        </svg>
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+                        <button onClick={() => handleDelete(pr._id)}
+                          className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         )}
       </div>
@@ -597,6 +740,8 @@ export default function ProductDetailPage() {
       <p className="text-xs text-gray-400 text-center">
         Excel columns: <span className="font-medium">{EXCEL_COLUMNS.join(' · ')}</span> — Click "Template" to download a sample file.
       </p>
+        </>
+      )}
     </div>
   );
 }
