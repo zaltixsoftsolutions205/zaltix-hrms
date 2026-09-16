@@ -81,10 +81,10 @@ exports.getProspects = async (req, res) => {
 exports.createProspect = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { companyName, address, website, contactNumber, emailId, companyType, companySize, remarks, status } = req.body;
+    const { companyName, location, address, website, contactNumber, emailId, companyType, companySize, remarks, status } = req.body;
     if (!companyName?.trim()) return res.status(400).json({ message: 'Company name is required' });
     const prospect = await ProductProspect.create({
-      product: productId, companyName, address, website, contactNumber, emailId, companyType, companySize, remarks,
+      product: productId, companyName, location, address, website, contactNumber, emailId, companyType, companySize, remarks,
       status: status || 'new',
       addedBy: req.user._id,
     });
@@ -107,6 +107,26 @@ exports.bulkCreateProspects = async (req, res) => {
 
     const created = await ProductProspect.insertMany(docs);
     res.status(201).json({ count: created.length });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.bulkSetLocation = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { fromLocation, toLocation } = req.body;
+    if (!toLocation?.trim()) return res.status(400).json({ message: 'New location is required' });
+
+    const filter = { product: productId };
+    if (fromLocation) {
+      filter.location = fromLocation;
+    } else {
+      filter.$or = [{ location: '' }, { location: null }, { location: { $exists: false } }];
+    }
+
+    const result = await ProductProspect.updateMany(filter, { location: toLocation.trim() });
+    res.json({ updated: result.modifiedCount });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -83,6 +83,52 @@ exports.createJobPosting = async (req, res) => {
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
 
+const VALID_JOB_TYPES = ['full-time', 'part-time', 'contract', 'internship'];
+
+exports.bulkCreateJobPostings = async (req, res) => {
+  try {
+    const { project, rows } = req.body;
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ message: 'No rows to import' });
+
+    const errors = [];
+    const docs = [];
+    rows.forEach((row, idx) => {
+      const rowNum = idx + 2; // +1 header row, +1 for 1-based
+      const title = (row.title || '').toString().trim();
+      if (!title) { errors.push({ row: rowNum, message: 'Title is required' }); return; }
+
+      let type = (row.type || 'full-time').toString().trim().toLowerCase();
+      if (!VALID_JOB_TYPES.includes(type)) {
+        errors.push({ row: rowNum, message: `Invalid type "${row.type}" — defaulted to "full-time"` });
+        type = 'full-time';
+      }
+
+      let openings = 1;
+      if (row.openings !== undefined && row.openings !== null && row.openings !== '') {
+        const n = Number(row.openings);
+        if (!Number.isNaN(n) && n >= 1) openings = n;
+      }
+
+      docs.push({
+        title,
+        department: (row.department || '').toString().trim(),
+        location: (row.location || '').toString().trim(),
+        type,
+        openings,
+        description: (row.description || '').toString().trim(),
+        requirements: (row.requirements || '').toString().trim(),
+        project: project || null,
+        createdBy: req.user._id,
+      });
+    });
+
+    if (docs.length === 0) return res.status(400).json({ message: 'No valid rows to import', errors });
+
+    const created = await JobPosting.insertMany(docs);
+    res.status(201).json({ created: created.length, skipped: rows.length - docs.length, errors });
+  } catch (err) { res.status(500).json({ message: err.message }); }
+};
+
 exports.updateJobPosting = async (req, res) => {
   try {
     const job = await JobPosting.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -149,6 +195,53 @@ exports.updateComment = async (req, res) => {
       .populate('jobPosting', 'title department');
     if (!applicant) return res.status(404).json({ message: 'Not found' });
     res.json(applicant);
+  } catch (err) { res.status(500).json({ message: err.message }); }
+};
+
+const VALID_STATUSES = ['interested', 'not-interested', 'shortlisted', 'processed', 'rejected', 'onboarded', 'joined'];
+
+exports.bulkCreateApplicants = async (req, res) => {
+  try {
+    const { jobPosting, rows } = req.body;
+    if (!jobPosting) return res.status(400).json({ message: 'Job posting required' });
+    if (!Array.isArray(rows) || rows.length === 0) return res.status(400).json({ message: 'No rows to import' });
+
+    const job = await JobPosting.findById(jobPosting);
+    if (!job) return res.status(404).json({ message: 'Job posting not found' });
+
+    const errors = [];
+    const docs = [];
+    rows.forEach((row, idx) => {
+      const rowNum = idx + 2; // +1 header row, +1 for 1-based
+      const name = (row.name || '').toString().trim();
+      if (!name) { errors.push({ row: rowNum, message: 'Name is required' }); return; }
+
+      let status = (row.status || 'interested').toString().trim().toLowerCase();
+      if (!VALID_STATUSES.includes(status)) {
+        errors.push({ row: rowNum, message: `Invalid status "${row.status}" — defaulted to "interested"` });
+        status = 'interested';
+      }
+
+      let yearsOfExperience = null;
+      if (row.yearsOfExperience !== undefined && row.yearsOfExperience !== null && row.yearsOfExperience !== '') {
+        const n = Number(row.yearsOfExperience);
+        if (!Number.isNaN(n)) yearsOfExperience = n;
+      }
+
+      docs.push({
+        jobPosting,
+        name,
+        yearsOfExperience,
+        comment: (row.comment || '').toString().trim().slice(0, 1000),
+        status,
+        createdBy: req.user._id,
+      });
+    });
+
+    if (docs.length === 0) return res.status(400).json({ message: 'No valid rows to import', errors });
+
+    const created = await Applicant.insertMany(docs);
+    res.status(201).json({ created: created.length, skipped: rows.length - docs.length, errors });
   } catch (err) { res.status(500).json({ message: err.message }); }
 };
 

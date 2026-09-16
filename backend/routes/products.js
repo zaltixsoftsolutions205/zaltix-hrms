@@ -16,6 +16,7 @@ router.delete('/:id',    protect, crmAccess, ctrl.deleteProduct);
 router.get('/:productId/prospects',              protect, crmAccess, ctrl.getProspects);
 router.post('/:productId/prospects',             protect, crmAccess, ctrl.createProspect);
 router.post('/:productId/prospects/bulk',        protect, crmAccess, ctrl.bulkCreateProspects);
+router.post('/:productId/prospects/bulk-location', protect, crmAccess, ctrl.bulkSetLocation);
 router.put('/:productId/prospects/:prospectId',  protect, crmAccess, ctrl.updateProspect);
 router.delete('/:productId/prospects/:prospectId', protect, crmAccess, ctrl.deleteProspect);
 router.post('/:productId/prospects/:prospectId/convert-to-lead', protect, crmAccess, ctrl.convertToLead);

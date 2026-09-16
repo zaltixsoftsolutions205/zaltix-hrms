@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const prospectSchema = new mongoose.Schema({
   product:      { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
   companyName:  { type: String, required: true, trim: true },
+  location:     { type: String, default: '', trim: true },
   address:      { type: String, default: '' },
   website:      { type: String, default: '' },
   contactNumber:{ type: String, default: '' },

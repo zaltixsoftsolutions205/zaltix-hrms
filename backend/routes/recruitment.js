@@ -49,12 +49,14 @@ router.get('/stats', recruitAccess, ctrl.getStats);
 // Job Postings
 router.get('/jobs',        recruitAccess, ctrl.getJobPostings);
 router.post('/jobs',       recruitEdit,   ctrl.createJobPosting);
+router.post('/jobs/bulk',  recruitEdit,   ctrl.bulkCreateJobPostings);
 router.put('/jobs/:id',    recruitEdit,   ctrl.updateJobPosting);
 router.delete('/jobs/:id', recruitEdit,   ctrl.deleteJobPosting);
 
 // Applicants
 router.get('/applicants',              recruitAccess, ctrl.getApplicants);
 router.post('/applicants',             recruitEdit,   upload.single('resume'), ctrl.createApplicant);
+router.post('/applicants/bulk',        recruitEdit,   ctrl.bulkCreateApplicants);
 router.put('/applicants/:id/status',   recruitEdit,   ctrl.updateStatus);
 router.put('/applicants/:id/comment',  recruitEdit,   ctrl.updateComment);
 router.delete('/applicants/:id',       recruitEdit,   ctrl.deleteApplicant);
