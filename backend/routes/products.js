@@ -4,6 +4,7 @@ const { protect } = require('../middleware/auth');
 const { roleCheck } = require('../middleware/roleCheck');
 const ctrl       = require('../controllers/productController');
 const locCtrl    = require('../controllers/productLocationController');
+const catCtrl    = require('../controllers/productCategoryController');
 
 const crmAccess = roleCheck('admin', 'sales', 'hr');
 
@@ -19,6 +20,14 @@ router.post('/:productId/locations',                 protect, crmAccess, locCtrl
 router.post('/:productId/locations/bulk-move',        protect, crmAccess, locCtrl.bulkSetLocation);
 router.put('/:productId/locations/:locationId',       protect, crmAccess, locCtrl.renameLocation);
 router.delete('/:productId/locations/:locationId',    protect, crmAccess, locCtrl.deleteLocation);
+
+// Category rows — 'schools'-type products only; a category node's data
+router.get('/:productId/categories/:categoryId/rows',            protect, crmAccess, catCtrl.getRows);
+router.post('/:productId/categories/:categoryId/rows/upload',    protect, crmAccess, catCtrl.uploadRows);
+router.post('/:productId/categories/:categoryId/rows',           protect, crmAccess, catCtrl.addRow);
+router.put('/:productId/categories/:categoryId/rows/:rowId',     protect, crmAccess, catCtrl.updateRow);
+router.delete('/:productId/categories/:categoryId/rows/:rowId',  protect, crmAccess, catCtrl.deleteRow);
+router.post('/:productId/categories/:categoryId/fields',         protect, crmAccess, catCtrl.addField);
 
 // Prospects under a product
 router.get('/:productId/prospects',              protect, crmAccess, ctrl.getProspects);

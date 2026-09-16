@@ -84,13 +84,20 @@ export default function ProductDetailPage() {
   // Viewing customers at a specific node ('unspecified' or a location id).
   // null = showing the location cards, not a customer list.
   const [viewingLocation, setViewingLocation] = useState(null);
+  // Viewing a Category node's rows (schools-type products only).
+  const [viewingCategory, setViewingCategory] = useState(null); // the category node object, or null
 
   const [addingLocation, setAddingLocation] = useState(false);
   const [addLocationName, setAddLocationName] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
+  const [addingCategory, setAddingCategory] = useState(false);
+  const [addCategoryName, setAddCategoryName] = useState('');
+  const [savingCategory, setSavingCategory] = useState(false);
   const [renamingLocation, setRenamingLocation] = useState(null); // node being renamed
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
+
+  const isSchoolsProduct = product?.productType === 'schools';
 
   // ── Customers within the currently-viewed location ──────────────────────
   const [prospects, setProspects] = useState([]);
@@ -137,14 +144,14 @@ export default function ProductDetailPage() {
   }, [productId, viewingLocation]);
 
   useEffect(() => { fetchProduct(); }, [fetchProduct]);
-  useEffect(() => { if (!viewingLocation) fetchChildren(); }, [fetchChildren, viewingLocation]);
+  useEffect(() => { if (!viewingLocation && !viewingCategory) fetchChildren(); }, [fetchChildren, viewingLocation, viewingCategory]);
   useEffect(() => { fetchProspects(); }, [fetchProspects]);
 
-  const enterLocation = (node) => { setPath(p => [...p, node]); setViewingLocation(null); };
-  const goToBreadcrumb = (idx) => { setPath(p => p.slice(0, idx + 1)); setViewingLocation(null); };
-  const goToRoot = () => { setPath([]); setViewingLocation(null); };
-  const viewCustomersHere = (nodeIdOrUnspecified) => { setViewingLocation(nodeIdOrUnspecified); setStatusFilter(''); setSearch(''); };
-  const backToLocations = () => { setViewingLocation(null); setStatusFilter(''); setSearch(''); };
+  const enterLocation = (node) => { setPath(p => [...p, node]); setViewingLocation(null); setViewingCategory(null); };
+  const goToBreadcrumb = (idx) => { setPath(p => p.slice(0, idx + 1)); setViewingLocation(null); setViewingCategory(null); };
+  const goToRoot = () => { setPath([]); setViewingLocation(null); setViewingCategory(null); };
+  const viewCustomersHere = (nodeIdOrUnspecified) => { setViewingLocation(nodeIdOrUnspecified); setViewingCategory(null); setStatusFilter(''); setSearch(''); };
+  const backToLocations = () => { setViewingLocation(null); setViewingCategory(null); setStatusFilter(''); setSearch(''); };
 
   const openAdd = () => {
     setEditProspect(null);
@@ -217,6 +224,23 @@ export default function ProductDetailPage() {
       fetchChildren();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     finally { setSavingLocation(false); }
+  };
+
+  const handleAddCategory = async (e) => {
+    e.preventDefault();
+    const name = addCategoryName.trim();
+    if (!name) return toast.error('Enter a category name');
+    // Categories can only be created inside a location — enforced by the
+    // Add Category button only appearing once you've drilled into one.
+    setSavingCategory(true);
+    try {
+      await api.post(`/products/${productId}/locations`, { name, parent: currentParent?._id || null, kind: 'category' });
+      toast.success('Category added');
+      setAddingCategory(false);
+      setAddCategoryName('');
+      fetchChildren();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    finally { setSavingCategory(false); }
   };
 
   const handleRenameLocation = async (e) => {
@@ -418,22 +442,27 @@ export default function ProductDetailPage() {
                 + Add Location
               </button>
             )}
+            {!viewingLocation && isSchoolsProduct && currentParent && (
+              <button onClick={() => { setAddingCategory(true); setAddCategoryName(''); }} className="btn-secondary btn-sm">
+                + Add Category
+              </button>
+            )}
           </div>
         </div>
       </div>
 
       {/* Breadcrumb */}
-      {(path.length > 0 || viewingLocation) && (
+      {(path.length > 0 || viewingLocation || viewingCategory) && (
         <div className="flex items-center gap-1.5 flex-wrap text-sm">
-          <button onClick={viewingLocation ? backToLocations : goToRoot} className="text-violet-500 hover:text-violet-700 font-semibold">
+          <button onClick={(viewingLocation || viewingCategory) ? backToLocations : goToRoot} className="text-violet-500 hover:text-violet-700 font-semibold">
             All Locations
           </button>
           {path.map((node, i) => (
             <span key={node._id} className="flex items-center gap-1.5">
               <span className="text-gray-300">/</span>
               <button
-                onClick={() => (viewingLocation && i === path.length - 1) ? backToLocations() : goToBreadcrumb(i)}
-                className={`font-semibold ${i === path.length - 1 && !viewingLocation ? 'text-gray-900' : 'text-violet-500 hover:text-violet-700'}`}>
+                onClick={() => ((viewingLocation || viewingCategory) && i === path.length - 1) ? backToLocations() : goToBreadcrumb(i)}
+                className={`font-semibold ${i === path.length - 1 && !viewingLocation && !viewingCategory ? 'text-gray-900' : 'text-violet-500 hover:text-violet-700'}`}>
                 {node.name}
               </button>
             </span>
@@ -443,6 +472,9 @@ export default function ProductDetailPage() {
           )}
           {viewingLocation && viewingLocation !== UNSPECIFIED && viewingNode && !path.some(n => n._id === viewingLocation) && (
             <span className="flex items-center gap-1.5"><span className="text-gray-300">/</span><span className="font-semibold text-gray-900">{viewingNode.name}</span></span>
+          )}
+          {viewingCategory && (
+            <span className="flex items-center gap-1.5"><span className="text-gray-300">/</span><span className="font-semibold text-gray-900">{viewingCategory.name}</span></span>
           )}
         </div>
       )}
@@ -469,6 +501,26 @@ export default function ProductDetailPage() {
         )}
       </AnimatePresence>
 
+      {/* Add category form */}
+      <AnimatePresence>
+        {addingCategory && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-4">
+            <h3 className="font-bold text-gray-900 mb-3">Add Category inside "{currentParent?.name}"</h3>
+            <form onSubmit={handleAddCategory} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div className="flex-1">
+                <label className="label-text">Category name</label>
+                <input className="input-field" placeholder="e.g. CBSE Below 500" value={addCategoryName} autoFocus
+                  onChange={e => setAddCategoryName(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setAddingCategory(false); setAddCategoryName(''); }} className="btn-secondary btn-sm">Cancel</button>
+                <button type="submit" disabled={savingCategory} className="btn-primary btn-sm">{savingCategory ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Rename location form */}
       <AnimatePresence>
         {renamingLocation && (
@@ -489,17 +541,59 @@ export default function ProductDetailPage() {
       </AnimatePresence>
 
       {/* Location Cards */}
-      {!viewingLocation && (
+      {!viewingLocation && !viewingCategory && (
         locLoading ? (
           <p className="text-center py-10 text-violet-400 text-sm">Loading locations...</p>
         ) : children.length === 0 && unspecifiedCount === 0 ? (
           <div className="glass-card p-10 text-center">
             <p className="text-gray-500 font-semibold">No locations yet</p>
-            <p className="text-sm text-gray-400 mt-1">Add a location to get started, then add customers to it.</p>
+            <p className="text-sm text-gray-400 mt-1">
+              {isSchoolsProduct ? 'Add a location to get started, then add a category or customers to it.' : 'Add a location to get started, then add customers to it.'}
+            </p>
           </div>
         ) : (
           <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {children.map(node => (
+            {children.map(node => node.kind === 'category' ? (
+              <motion.div key={node._id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                onClick={() => setViewingCategory(node)}
+                className="glass-card p-4 cursor-pointer hover:shadow-md transition-all group bg-amber-50/40 border border-amber-100">
+                <div className="flex items-start justify-between mb-2">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <svg className="w-4 h-4 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    <h3 className="font-bold text-gray-900 truncate">{node.name}</h3>
+                  </div>
+                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setRenamingLocation(node); setRenameValue(node.name); }}
+                      title="Rename category"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                      </svg>
+                    </button>
+                    <button
+                      onClick={(e) => { e.stopPropagation(); handleDeleteLocation(node); }}
+                      title="Delete category"
+                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+
+                <div className="pt-3 border-t border-amber-100">
+                  <p className="text-2xl font-bold text-amber-600 leading-none">{node.rowCount}</p>
+                  <p className="text-[10px] text-gray-500 mt-1">row{node.rowCount !== 1 ? 's' : ''}{node.fields?.length ? ` · ${node.fields.length} field${node.fields.length !== 1 ? 's' : ''}` : ' · no fields yet'}</p>
+                </div>
+
+                <div className="mt-3 text-[10px] font-semibold text-amber-600 group-hover:underline">
+                  Open Category →
+                </div>
+              </motion.div>
+            ) : (
               <motion.div key={node._id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
                 className="glass-card p-4 hover:shadow-md transition-all group">
                 <div className="flex items-start justify-between mb-2">
@@ -816,6 +910,286 @@ export default function ProductDetailPage() {
           </p>
         </>
       )}
+
+      {viewingCategory && (
+        <CategoryView
+          productId={productId}
+          category={viewingCategory}
+          onCategoryUpdated={(updated) => setViewingCategory(v => v ? { ...v, ...updated } : v)}
+        />
+      )}
     </div>
+  );
+}
+
+/* ── Category rows: dynamic-field table for a Category node ────────────── */
+function CategoryView({ productId, category, onCategoryUpdated }) {
+  const fileRef = useRef(null);
+  const [fields, setFields] = useState(category.fields || []);
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
+  const [search, setSearch] = useState('');
+
+  const [showRowForm, setShowRowForm] = useState(false);
+  const [editRow, setEditRow] = useState(null); // row being edited, or null for add
+  const [rowForm, setRowForm] = useState({});
+  const [savingRow, setSavingRow] = useState(false);
+
+  const [addingField, setAddingField] = useState(false);
+  const [newFieldName, setNewFieldName] = useState('');
+  const [savingField, setSavingField] = useState(false);
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/products/${productId}/categories/${category._id}/rows`);
+      setFields(data.category.fields);
+      setRows(data.rows);
+      onCategoryUpdated?.({ fields: data.category.fields, rowCount: data.rows.length });
+    } catch { toast.error('Failed to load category data'); }
+    finally { setLoading(false); }
+  }, [productId, category._id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  const openAddRow = () => { setEditRow(null); setRowForm({}); setShowRowForm(true); };
+  const openEditRow = (row) => { setEditRow(row); setRowForm({ ...row.fields }); setShowRowForm(true); };
+
+  const handleSaveRow = async (e) => {
+    e.preventDefault();
+    setSavingRow(true);
+    try {
+      if (editRow) {
+        const { data } = await api.put(`/products/${productId}/categories/${category._id}/rows/${editRow._id}`, { fields: rowForm });
+        setRows(prev => prev.map(r => r._id === editRow._id ? data : r));
+        toast.success('Updated');
+      } else {
+        const { data } = await api.post(`/products/${productId}/categories/${category._id}/rows`, { fields: rowForm });
+        setRows(prev => [data, ...prev]);
+        toast.success('Row added');
+        onCategoryUpdated?.({ rowCount: rows.length + 1 });
+      }
+      setShowRowForm(false);
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    finally { setSavingRow(false); }
+  };
+
+  const handleDeleteRow = async (rowId) => {
+    if (!window.confirm('Delete this row?')) return;
+    try {
+      await api.delete(`/products/${productId}/categories/${category._id}/rows/${rowId}`);
+      setRows(prev => prev.filter(r => r._id !== rowId));
+      onCategoryUpdated?.({ rowCount: rows.length - 1 });
+      toast.success('Deleted');
+    } catch { toast.error('Failed'); }
+  };
+
+  const handleAddField = async (e) => {
+    e.preventDefault();
+    const name = newFieldName.trim();
+    if (!name) return toast.error('Enter a field name');
+    setSavingField(true);
+    try {
+      const { data } = await api.post(`/products/${productId}/categories/${category._id}/fields`, { name });
+      setFields(data.fields);
+      onCategoryUpdated?.({ fields: data.fields });
+      toast.success('Field added');
+      setAddingField(false);
+      setNewFieldName('');
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+    finally { setSavingField(false); }
+  };
+
+  const handleUpload = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf);
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      const sheetRows = XLSX.utils.sheet_to_json(ws, { header: 1 });
+      if (sheetRows.length < 2) { toast.error('File is empty'); setUploading(false); return; }
+
+      const columns = sheetRows[0].map(h => String(h || '').trim()).filter(Boolean);
+      const dataRows = sheetRows.slice(1)
+        .filter(r => r.some(cell => cell !== undefined && cell !== null && cell !== ''))
+        .map(r => columns.reduce((acc, col, i) => {
+          if (r[i] !== undefined && r[i] !== null && r[i] !== '') acc[col] = String(r[i]).trim();
+          return acc;
+        }, {}));
+
+      if (dataRows.length === 0) { toast.error('No valid rows found'); setUploading(false); return; }
+
+      const { data } = await api.post(`/products/${productId}/categories/${category._id}/rows/upload`, { columns, rows: dataRows });
+      toast.success(`${data.count} rows uploaded`);
+      fetchRows();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to parse or upload file'); }
+    finally { setUploading(false); }
+  };
+
+  const downloadTemplate = () => {
+    const cols = fields.length ? fields : ['Column 1', 'Column 2'];
+    const ws = XLSX.utils.aoa_to_sheet([cols]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, category.name.slice(0, 31));
+    XLSX.writeFile(wb, `${category.name}_template.xlsx`);
+  };
+
+  const downloadData = () => {
+    if (filteredRows.length === 0) { toast.error('No data to download'); return; }
+    const ws = XLSX.utils.aoa_to_sheet([fields, ...filteredRows.map(r => fields.map(f => r.fields[f] || ''))]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, category.name.slice(0, 31));
+    XLSX.writeFile(wb, `${category.name}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success(`Downloaded ${filteredRows.length} row${filteredRows.length !== 1 ? 's' : ''}`);
+  };
+
+  const filteredRows = rows.filter(r => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return Object.values(r.fields).some(v => String(v).toLowerCase().includes(q));
+  });
+
+  return (
+    <>
+      <div className="flex items-center gap-2 flex-wrap">
+        {fields.length > 0 && (
+          <button onClick={downloadTemplate} className="btn-secondary btn-sm" title="Download Excel template matching this category's columns">
+            Template
+          </button>
+        )}
+        <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleUpload} />
+        <button onClick={() => fileRef.current?.click()} disabled={uploading} className="btn-secondary btn-sm">
+          {uploading ? 'Uploading...' : 'Upload Excel'}
+        </button>
+        {rows.length > 0 && (
+          <button onClick={downloadData} className="btn-secondary btn-sm">Export Excel</button>
+        )}
+        <button onClick={() => { setAddingField(true); setNewFieldName(''); }} className="btn-secondary btn-sm">
+          + Add Field
+        </button>
+        {fields.length > 0 && (
+          <button onClick={openAddRow} className="btn-primary btn-sm">+ Add Row</button>
+        )}
+      </div>
+
+      {fields.length === 0 && (
+        <div className="glass-card p-4 text-sm text-gray-500">
+          This category has no fields yet. Upload an Excel sheet — its column headers become this category's fields — or use "+ Add Field" to define one manually.
+        </div>
+      )}
+
+      <AnimatePresence>
+        {addingField && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-4">
+            <h3 className="font-bold text-gray-900 mb-3">Add Field</h3>
+            <form onSubmit={handleAddField} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+              <div className="flex-1">
+                <label className="label-text">Field name</label>
+                <input className="input-field" placeholder="e.g. Notes" value={newFieldName} autoFocus
+                  onChange={e => setNewFieldName(e.target.value)} />
+              </div>
+              <div className="flex gap-2">
+                <button type="button" onClick={() => { setAddingField(false); setNewFieldName(''); }} className="btn-secondary btn-sm">Cancel</button>
+                <button type="submit" disabled={savingField} className="btn-primary btn-sm">{savingField ? 'Saving...' : 'Save'}</button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {showRowForm && (
+          <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-4">
+            <h3 className="font-bold text-gray-900 mb-3">{editRow ? 'Edit Row' : 'Add Row'}</h3>
+            <form onSubmit={handleSaveRow} className="space-y-3">
+              <div className="grid sm:grid-cols-3 gap-3">
+                {fields.map(f => (
+                  <div key={f}>
+                    <label className="label-text">{f}</label>
+                    <input className="input-field" value={rowForm[f] || ''}
+                      onChange={e => setRowForm(v => ({ ...v, [f]: e.target.value }))} />
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-2 justify-end">
+                <button type="button" onClick={() => setShowRowForm(false)} className="btn-secondary btn-sm">Cancel</button>
+                <button type="submit" disabled={savingRow} className="btn-primary btn-sm">{savingRow ? 'Saving...' : editRow ? 'Update' : 'Add Row'}</button>
+              </div>
+            </form>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {fields.length > 0 && (
+        <div className="glass-card overflow-hidden">
+          <div className="px-4 py-3 border-b border-gray-100 space-y-2">
+            <p className="text-sm font-semibold text-gray-900">{filteredRows.length} row{filteredRows.length !== 1 ? 's' : ''}</p>
+            <div className="relative">
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder="Search this category…"
+                className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-violet-400 focus:bg-white transition-colors"
+              />
+            </div>
+          </div>
+
+          {loading ? (
+            <p className="text-center py-10 text-violet-400 text-sm">Loading...</p>
+          ) : filteredRows.length === 0 ? (
+            <div className="p-10 text-center">
+              <p className="text-gray-500 font-semibold">No rows yet</p>
+              <p className="text-sm text-gray-400 mt-1">Upload an Excel sheet or add a row manually.</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    {fields.map(f => (
+                      <th key={f} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100">
+                        {f}
+                      </th>
+                    ))}
+                    <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredRows.map((r, i) => (
+                    <tr key={r._id} className={`border-b border-gray-100 hover:bg-amber-50/40 transition-colors ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                      {fields.map(f => (
+                        <td key={f} className="px-3 py-2 border-r border-gray-100 text-gray-700 max-w-[200px] truncate" title={r.fields[f]}>
+                          {r.fields[f] || '—'}
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 whitespace-nowrap">
+                        <div className="flex items-center gap-1">
+                          <button onClick={() => openEditRow(r)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                          <button onClick={() => handleDeleteRow(r._id)}
+                            className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+    </>
   );
 }

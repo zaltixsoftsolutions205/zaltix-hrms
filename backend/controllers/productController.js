@@ -1,6 +1,7 @@
 const Product        = require('../models/Product');
 const ProductProspect = require('../models/ProductProspect');
 const ProductLocation = require('../models/ProductLocation');
+const ProductCategoryRow = require('../models/ProductCategoryRow');
 const Lead           = require('../models/Lead');
 const { _ancestorsOf: ancestorsOf } = require('./productLocationController');
 
@@ -63,6 +64,7 @@ exports.deleteProduct = async (req, res) => {
     await Product.findByIdAndDelete(req.params.id);
     await ProductProspect.deleteMany({ product: req.params.id });
     await ProductLocation.deleteMany({ product: req.params.id });
+    await ProductCategoryRow.deleteMany({ product: req.params.id });
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });

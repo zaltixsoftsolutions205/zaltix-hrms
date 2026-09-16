@@ -13,7 +13,7 @@ export default function ProductsTab() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editProduct, setEditProduct] = useState(null);
-  const [form, setForm] = useState({ name: '', category: '' });
+  const [form, setForm] = useState({ name: '', category: '', productType: 'generic' });
   const [submitting, setSubmitting] = useState(false);
   const [isOtherCat, setIsOtherCat] = useState(false);
 
@@ -30,7 +30,7 @@ export default function ProductsTab() {
 
   const openAdd = () => {
     setEditProduct(null);
-    setForm({ name: '', category: '' });
+    setForm({ name: '', category: '', productType: 'generic' });
     setIsOtherCat(false);
     setShowForm(true);
   };
@@ -40,7 +40,7 @@ export default function ProductsTab() {
     setEditProduct(p);
     const isOther = !!p.category && !STANDARD_CATEGORIES.includes(p.category);
     setIsOtherCat(isOther);
-    setForm({ name: p.name, category: p.category });
+    setForm({ name: p.name, category: p.category, productType: p.productType || 'generic' });
     setShowForm(true);
   };
 
@@ -122,6 +122,17 @@ export default function ProductsTab() {
                       autoFocus
                     />
                   )}
+                </div>
+                <div>
+                  <label className="label-text">Product Type</label>
+                  <select className="input-field" value={form.productType}
+                    onChange={e => setForm(f => ({ ...f, productType: e.target.value }))}>
+                    <option value="generic">Generic (standard customer fields)</option>
+                    <option value="schools">Schools Data (custom category fields)</option>
+                  </select>
+                  <p className="text-[10px] text-gray-400 mt-1">
+                    Schools Data lets you add Categories inside locations, each with its own custom fields uploaded from a sheet.
+                  </p>
                 </div>
               </div>
               <div className="flex gap-2 justify-end">
