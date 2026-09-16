@@ -7,9 +7,6 @@ const productSchema = new mongoose.Schema({
   price:       { type: Number, default: 0 },
   unit:        { type: String, default: '' },
   status:      { type: String, enum: ['active', 'inactive'], default: 'active' },
-  // Known location names for this product's prospects, including ones with
-  // no prospects yet — lets a location be created before any customer exists.
-  locations:   { type: [String], default: [] },
   createdBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 
