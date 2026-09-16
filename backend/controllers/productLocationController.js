@@ -30,11 +30,15 @@ exports.getChildren = async (req, res) => {
         const rowCount = await ProductCategoryRow.countDocuments({ category: node._id });
         return { ...node.toObject(), rowCount, hasChildren: false };
       }
-      const [prospectCount, childCount] = await Promise.all([
+      const [prospectCount, subLocationCount, categoryCount] = await Promise.all([
         ProductProspect.countDocuments({ product: productId, location: node._id }),
-        ProductLocation.countDocuments({ product: productId, parent: node._id }),
+        ProductLocation.countDocuments({ product: productId, parent: node._id, kind: 'location' }),
+        ProductLocation.countDocuments({ product: productId, parent: node._id, kind: 'category' }),
       ]);
-      return { ...node.toObject(), prospectCount, hasChildren: childCount > 0 };
+      return {
+        ...node.toObject(), prospectCount, subLocationCount, categoryCount,
+        hasChildren: subLocationCount + categoryCount > 0,
+      };
     }));
 
     // Direct prospects with no location at all only make sense to surface

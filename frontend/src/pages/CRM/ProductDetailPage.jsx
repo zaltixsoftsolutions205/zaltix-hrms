@@ -623,16 +623,30 @@ export default function ProductDetailPage() {
                   </div>
                 </div>
 
-                <div className="pt-3 border-t border-gray-100">
-                  <p className="text-2xl font-bold text-violet-700 leading-none">{node.prospectCount}</p>
-                  <p className="text-[10px] text-gray-500 mt-1">customer{node.prospectCount !== 1 ? 's' : ''} here</p>
+                <div className={`pt-3 border-t border-gray-100 grid gap-2 ${isSchoolsProduct ? 'grid-cols-3' : 'grid-cols-2'}`}>
+                  <div>
+                    <p className="text-2xl font-bold text-violet-700 leading-none">{node.prospectCount}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">customer{node.prospectCount !== 1 ? 's' : ''}</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold text-gray-700 leading-none">{node.subLocationCount ?? 0}</p>
+                    <p className="text-[10px] text-gray-500 mt-1">sub-location{node.subLocationCount !== 1 ? 's' : ''}</p>
+                  </div>
+                  {isSchoolsProduct && (
+                    <div>
+                      <p className="text-2xl font-bold text-amber-600 leading-none">{node.categoryCount ?? 0}</p>
+                      <p className="text-[10px] text-gray-500 mt-1">categor{node.categoryCount !== 1 ? 'ies' : 'y'}</p>
+                    </div>
+                  )}
                 </div>
 
-                <div className="mt-3 flex items-center gap-3 text-[10px] font-semibold">
-                  <button onClick={() => enterLocation(node)} className="text-violet-500 hover:underline">
-                    {node.hasChildren ? 'Open →' : 'Open (add sub-location) →'}
+                <div className="mt-3 flex items-center gap-2">
+                  <button onClick={() => enterLocation(node)}
+                    className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
+                    Open →
                   </button>
-                  <button onClick={() => viewCustomersHere(node._id)} className="text-gray-500 hover:underline">
+                  <button onClick={() => viewCustomersHere(node._id)}
+                    className="text-[10px] font-semibold text-gray-500 hover:text-gray-700 hover:underline flex-shrink-0">
                     View Customers →
                   </button>
                 </div>
