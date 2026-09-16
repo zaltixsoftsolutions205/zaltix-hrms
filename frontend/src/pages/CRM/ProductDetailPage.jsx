@@ -925,7 +925,11 @@ export default function ProductDetailPage() {
         </>
       )}
 
-      {viewingCategory && (
+      {viewingCategory && viewingCategory.isAggregateView && (
+        <AllSchoolsView productId={productId} />
+      )}
+
+      {viewingCategory && !viewingCategory.isAggregateView && (
         <CategoryView
           productId={productId}
           category={viewingCategory}
@@ -1061,11 +1065,27 @@ function CategoryView({ productId, category, onCategoryUpdated }) {
     toast.success(`Downloaded ${filteredRows.length} row${filteredRows.length !== 1 ? 's' : ''}`);
   };
 
-  const filteredRows = rows.filter(r => {
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return Object.values(r.fields).some(v => String(v).toLowerCase().includes(q));
-  });
+  // Sort by the category's first field (e.g. Sl.No) rather than upload
+  // order, so a re-uploaded or edited sheet still reads top-to-bottom the
+  // way the source spreadsheet did. Numeric-looking values sort as numbers;
+  // rows missing the field sort last.
+  const sortField = fields[0];
+  const filteredRows = rows
+    .filter(r => {
+      if (!search.trim()) return true;
+      const q = search.toLowerCase();
+      return Object.values(r.fields).some(v => String(v).toLowerCase().includes(q));
+    })
+    .sort((a, b) => {
+      if (!sortField) return 0;
+      const av = a.fields[sortField], bv = b.fields[sortField];
+      if (av === undefined && bv === undefined) return 0;
+      if (av === undefined) return 1;
+      if (bv === undefined) return -1;
+      const an = Number(av), bn = Number(bv);
+      if (!Number.isNaN(an) && !Number.isNaN(bn)) return an - bn;
+      return String(av).localeCompare(String(bv), undefined, { numeric: true });
+    });
 
   return (
     <>
@@ -1204,6 +1224,132 @@ function CategoryView({ productId, category, onCategoryUpdated }) {
           )}
         </div>
       )}
+    </>
+  );
+}
+
+/* ── ALL SCHOOLS: read-only aggregate across every category, product-wide ── */
+function AllSchoolsView({ productId }) {
+  const [fields, setFields] = useState([]);
+  const [rows, setRows] = useState([]);
+  const [locations, setLocations] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [board, setBoard] = useState('');
+  const [locationFilter, setLocationFilter] = useState('');
+  const [search, setSearch] = useState('');
+
+  useEffect(() => {
+    api.get(`/products/${productId}/locations/all-flat`).then(({ data }) => setLocations(data)).catch(() => {});
+  }, [productId]);
+
+  const fetchRows = useCallback(async () => {
+    setLoading(true);
+    try {
+      const { data } = await api.get(`/products/${productId}/categories/all-rows`, {
+        params: { board: board || undefined, location: locationFilter || undefined },
+      });
+      setFields(data.fields);
+      setRows(data.rows);
+    } catch { toast.error('Failed to load'); }
+    finally { setLoading(false); }
+  }, [productId, board, locationFilter]);
+
+  useEffect(() => { fetchRows(); }, [fetchRows]);
+
+  const filteredRows = rows.filter(r => {
+    if (!search.trim()) return true;
+    const q = search.toLowerCase();
+    return Object.values(r.fields).some(v => String(v).toLowerCase().includes(q))
+      || r.category.toLowerCase().includes(q)
+      || r.locationPath.toLowerCase().includes(q);
+  });
+
+  const downloadData = () => {
+    if (filteredRows.length === 0) { toast.error('No data to download'); return; }
+    const headers = ['Location', 'Category', ...fields];
+    const data = filteredRows.map(r => [r.locationPath, r.category, ...fields.map(f => r.fields[f] || '')]);
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'All Schools');
+    XLSX.writeFile(wb, `all_schools_${new Date().toISOString().split('T')[0]}.xlsx`);
+    toast.success(`Downloaded ${filteredRows.length} row${filteredRows.length !== 1 ? 's' : ''}`);
+  };
+
+  return (
+    <>
+      <div className="flex items-center gap-2 flex-wrap">
+        <select value={board} onChange={e => setBoard(e.target.value)}
+          className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-violet-400">
+          <option value="">All Boards</option>
+          <option value="cbse">CBSE</option>
+          <option value="state">State</option>
+        </select>
+        <select value={locationFilter} onChange={e => setLocationFilter(e.target.value)}
+          className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-violet-400 max-w-[220px]">
+          <option value="">All Locations</option>
+          {locations.map(l => <option key={l._id} value={l._id}>{l.path}</option>)}
+        </select>
+        {(board || locationFilter) && (
+          <button onClick={() => { setBoard(''); setLocationFilter(''); }}
+            className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
+            Clear filters
+          </button>
+        )}
+        {rows.length > 0 && (
+          <button onClick={downloadData} className="btn-secondary btn-sm ml-auto">Export Excel</button>
+        )}
+      </div>
+
+      <div className="glass-card overflow-hidden">
+        <div className="px-4 py-3 border-b border-gray-100 space-y-2">
+          <p className="text-sm font-semibold text-gray-900">{filteredRows.length} school{filteredRows.length !== 1 ? 's' : ''}</p>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Search across all schools…"
+            className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-violet-400 focus:bg-white transition-colors"
+          />
+        </div>
+
+        {loading ? (
+          <p className="text-center py-10 text-violet-400 text-sm">Loading...</p>
+        ) : filteredRows.length === 0 ? (
+          <div className="p-10 text-center">
+            <p className="text-gray-500 font-semibold">No schools found</p>
+            <p className="text-sm text-gray-400 mt-1">Try different filters or add data to a category.</p>
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100">Location</th>
+                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100">Category</th>
+                  {fields.map(f => (
+                    <th key={f} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100">
+                      {f}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filteredRows.map((r, i) => (
+                  <tr key={r._id} className={`border-b border-gray-100 hover:bg-violet-50/40 transition-colors ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
+                    <td className="px-3 py-2 border-r border-gray-100 text-gray-600 whitespace-nowrap">{r.locationPath}</td>
+                    <td className="px-3 py-2 border-r border-gray-100 text-amber-700 font-medium whitespace-nowrap">{r.category}</td>
+                    {fields.map(f => (
+                      <td key={f} className="px-3 py-2 border-r border-gray-100 text-gray-700 max-w-[200px] truncate" title={r.fields[f]}>
+                        {r.fields[f] || '—'}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </>
   );
 }
