@@ -189,3 +189,26 @@ exports.addField = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
+
+// Remove a column from a category. Only allowed while it has no rows yet —
+// once data exists, removing a field would silently drop real values, so
+// that must go through editing/deleting rows instead.
+exports.deleteField = async (req, res) => {
+  try {
+    const { productId, categoryId, fieldName } = req.params;
+
+    const category = await getCategory(productId, categoryId);
+    if (!category) return res.status(404).json({ message: 'Category not found' });
+
+    const rowCount = await ProductCategoryRow.countDocuments({ category: categoryId });
+    if (rowCount > 0) {
+      return res.status(400).json({ message: 'This category already has rows — edit or delete them instead of removing the field.' });
+    }
+
+    category.fields = category.fields.filter(f => f !== fieldName);
+    await category.save();
+    res.json({ fields: category.fields });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};

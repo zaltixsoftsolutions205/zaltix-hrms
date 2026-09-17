@@ -34,6 +34,7 @@ router.post('/:productId/categories/:categoryId/rows',           crmEdit, catCtr
 router.put('/:productId/categories/:categoryId/rows/:rowId',     crmEdit, catCtrl.updateRow);
 router.delete('/:productId/categories/:categoryId/rows/:rowId',  crmEdit, catCtrl.deleteRow);
 router.post('/:productId/categories/:categoryId/fields',         crmEdit, catCtrl.addField);
+router.delete('/:productId/categories/:categoryId/fields/:fieldName', crmEdit, catCtrl.deleteField);
 
 // Prospects under a product
 router.get('/:productId/prospects',              ctrl.getProspects);

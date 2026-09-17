@@ -1021,6 +1021,15 @@ function CategoryView({ productId, category, onCategoryUpdated }) {
     finally { setSavingField(false); }
   };
 
+  const handleDeleteField = async (fieldName) => {
+    try {
+      const { data } = await api.delete(`/products/${productId}/categories/${category._id}/fields/${encodeURIComponent(fieldName)}`);
+      setFields(data.fields);
+      onCategoryUpdated?.({ fields: data.fields });
+      toast.success('Field removed');
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+  };
+
   const handleUpload = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1114,7 +1123,20 @@ function CategoryView({ productId, category, onCategoryUpdated }) {
 
       {fields.length === 0 && (
         <div className="glass-card p-4 text-sm text-gray-500">
-          This category has no fields yet. Upload an Excel sheet — its column headers become this category's fields — or use "+ Add Field" to define one manually.
+          This category has no fields yet. The easiest way to set them up is <strong>Upload Excel</strong> — the sheet's column headers (e.g. "School Name", "Address") automatically become this category's fields. Only use "+ Add Field" to add one column at a time by hand.
+        </div>
+      )}
+
+      {rows.length === 0 && fields.length > 0 && (
+        <div className="glass-card p-3 flex flex-wrap items-center gap-1.5">
+          <span className="text-xs text-gray-400 mr-1">Fields (no rows yet, so still editable):</span>
+          {fields.map(f => (
+            <span key={f} className="inline-flex items-center gap-1 text-[11px] font-medium bg-violet-50 text-violet-700 px-2 py-0.5 rounded-md">
+              {f}
+              <button type="button" onClick={() => handleDeleteField(f)} title={`Remove "${f}"`}
+                className="text-violet-400 hover:text-violet-700 leading-none ml-0.5">×</button>
+            </span>
+          ))}
         </div>
       )}
 
@@ -1122,9 +1144,12 @@ function CategoryView({ productId, category, onCategoryUpdated }) {
         {addingField && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-4">
             <h3 className="font-bold text-gray-900 mb-3">Add Field</h3>
+            <p className="text-xs text-gray-500 mb-3">
+              Adds one column name to this category (e.g. "Notes"). If you have a full sheet to bring in, use <strong>Upload Excel</strong> instead — it sets every column at once.
+            </p>
             <form onSubmit={handleAddField} className="flex flex-col sm:flex-row gap-3 sm:items-end">
               <div className="flex-1">
-                <label className="label-text">Field name</label>
+                <label className="label-text">Field (column) name</label>
                 <input className="input-field" placeholder="e.g. Notes" value={newFieldName} autoFocus
                   onChange={e => setNewFieldName(e.target.value)} />
               </div>
