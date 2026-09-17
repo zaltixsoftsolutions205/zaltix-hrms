@@ -6,21 +6,6 @@ async function getCategory(productId, categoryId) {
   return category;
 }
 
-// Every descendant (any depth) of `locationId` within `product`, including
-// itself — used to scope the aggregate view to a location subtree.
-async function subtreeIds(productId, locationId) {
-  const ids = [locationId];
-  let frontier = [locationId];
-  while (frontier.length) {
-    const children = await ProductLocation.find(
-      { product: productId, parent: { $in: frontier }, kind: 'location' }, '_id'
-    );
-    frontier = children.map(c => String(c._id));
-    ids.push(...frontier);
-  }
-  return ids;
-}
-
 // fields is stored as [{key, value}] (not a Mongoose Map — column headers
 // like "Sl.No" contain characters Mongo forbids in Map/document keys).
 // These convert to/from the plain object shape the frontend works with.
@@ -148,50 +133,31 @@ exports.deleteRow = async (req, res) => {
   }
 };
 
-// The read-only "ALL SCHOOLS" aggregate: every row from every category
-// product-wide, unioned onto one field list, each tagged with its category
-// name and full location path. Supports ?board=cbse|state (matched against
-// the category name) and ?location=<id> (scopes to that subtree).
+// The read-only "ALL SCHOOLS" view for one location: every row from that
+// location's own direct categories (not sub-locations), unioned onto one
+// field list, each tagged with its source category name. Optional
+// ?board=cbse|state filters to categories whose name contains that text.
 exports.getAllRows = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { board, location } = req.query;
-    const { _ancestorsOf: ancestorsOf } = require('./productLocationController');
+    const { location, board } = req.query;
+    if (!location) return res.status(400).json({ message: 'A location is required' });
 
-    const categories = await ProductLocation.find({ product: productId, kind: 'category', isAggregateView: { $ne: true } });
-
-    let scoped = categories;
+    let categories = await ProductLocation.find({ product: productId, parent: location, kind: 'category' });
     if (board) {
       const b = board.toLowerCase();
-      scoped = scoped.filter(c => c.name.toLowerCase().includes(b));
-    }
-    if (location) {
-      const allowed = new Set(await subtreeIds(productId, location));
-      const pathCache = new Map();
-      const inScope = [];
-      for (const c of scoped) {
-        if (!pathCache.has(String(c.parent))) {
-          const chain = await ancestorsOf(c.parent);
-          pathCache.set(String(c.parent), chain.map(n => String(n._id)));
-        }
-        const chainIds = pathCache.get(String(c.parent));
-        if (chainIds.some(id => allowed.has(id))) inScope.push(c);
-      }
-      scoped = inScope;
+      categories = categories.filter(c => c.name.toLowerCase().includes(b));
     }
 
     const fieldSet = new Set();
     const allRows = [];
-    for (const category of scoped) {
+    for (const category of categories) {
       category.fields.forEach(f => fieldSet.add(f));
-      const chain = await ancestorsOf(category.parent);
-      const locationPath = chain.map(n => n.name).join(' / ');
       const rows = await ProductCategoryRow.find({ category: category._id });
       rows.forEach(r => allRows.push({
         _id: r._id,
         fields: toObject(r.fields),
         category: category.name,
-        locationPath,
         createdAt: r.createdAt,
       }));
     }

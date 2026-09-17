@@ -15,10 +15,6 @@ const productLocationSchema = new mongoose.Schema({
   name:    { type: String, required: true, trim: true },
   kind:    { type: String, enum: ['location', 'category'], default: 'location' },
   fields:  { type: [String], default: [] }, // category-only: ordered column names
-  // category-only: marks this as the special read-only aggregate view
-  // (e.g. "ALL SCHOOLS") that unions every other category's rows
-  // product-wide, rather than holding rows of its own.
-  isAggregateView: { type: Boolean, default: false },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 

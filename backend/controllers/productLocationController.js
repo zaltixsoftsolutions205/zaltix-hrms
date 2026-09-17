@@ -27,17 +27,7 @@ exports.getChildren = async (req, res) => {
 
     const withCounts = await Promise.all(nodes.map(async (node) => {
       if (node.kind === 'category') {
-        let rowCount;
-        if (node.isAggregateView) {
-          // Total across every other category product-wide, not this
-          // node's own (always-empty) rows.
-          const otherCategoryIds = await ProductLocation.find(
-            { product: productId, kind: 'category', isAggregateView: { $ne: true } }, '_id'
-          );
-          rowCount = await ProductCategoryRow.countDocuments({ category: { $in: otherCategoryIds.map(c => c._id) } });
-        } else {
-          rowCount = await ProductCategoryRow.countDocuments({ category: node._id });
-        }
+        const rowCount = await ProductCategoryRow.countDocuments({ category: node._id });
         return { ...node.toObject(), rowCount, hasChildren: false };
       }
       const [prospectCount, subLocationCount, categoryCount] = await Promise.all([
@@ -61,25 +51,36 @@ exports.getChildren = async (req, res) => {
       });
     }
 
+    // Virtual "ALL SCHOOLS" card: for schools-type products, whenever we're
+    // inside a location (not the top level, which holds only locations) and
+    // it has at least one direct category, show a synthetic read-only node
+    // summing just that location's own categories. Never stored — id is a
+    // sentinel ("all-schools:<locationId>"), not a real ProductLocation.
+    let allNodes = withCounts;
+    if (parent) {
+      const product = await Product.findById(productId);
+      const directCategories = withCounts.filter(n => n.kind === 'category');
+      if (product?.productType === 'schools' && directCategories.length > 0) {
+        const rowCount = directCategories.reduce((sum, c) => sum + c.rowCount, 0);
+        const fields = Array.from(new Set(directCategories.flatMap(c => c.fields)));
+        allNodes = [
+          {
+            _id: `all-schools:${parent}`,
+            kind: 'category',
+            isAllSchools: true,
+            name: 'ALL SCHOOLS',
+            fields,
+            rowCount,
+            hasChildren: false,
+          },
+          ...withCounts,
+        ];
+      }
+    }
+
     const breadcrumb = parent ? await ancestorsOf(parent) : [];
 
-    res.json({ nodes: withCounts, unspecifiedCount, breadcrumb });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-// Every location node (not category) for a product, flattened with its
-// full path label — for a location filter dropdown, not tree navigation.
-exports.getAllLocationsFlat = async (req, res) => {
-  try {
-    const { productId } = req.params;
-    const nodes = await ProductLocation.find({ product: productId, kind: 'location' }).sort({ name: 1 });
-    const withPaths = await Promise.all(nodes.map(async (node) => {
-      const chain = await ancestorsOf(node._id);
-      return { _id: node._id, name: node.name, path: chain.map(n => n.name).join(' / ') };
-    }));
-    res.json(withPaths);
+    res.json({ nodes: allNodes, unspecifiedCount, breadcrumb });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

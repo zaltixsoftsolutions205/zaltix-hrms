@@ -564,24 +564,26 @@ export default function ProductDetailPage() {
                     </svg>
                     <h3 className="font-bold text-gray-900 truncate">{node.name}</h3>
                   </div>
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setRenamingLocation(node); setRenameValue(node.name); }}
-                      title="Rename category"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                    </button>
-                    <button
-                      onClick={(e) => { e.stopPropagation(); handleDeleteLocation(node); }}
-                      title="Delete category"
-                      className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  </div>
+                  {!node.isAllSchools && (
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setRenamingLocation(node); setRenameValue(node.name); }}
+                        title="Rename category"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-500 hover:text-amber-700 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                        </svg>
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); handleDeleteLocation(node); }}
+                        title="Delete category"
+                        className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors">
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 <div className="pt-3 border-t border-amber-100">
@@ -925,11 +927,11 @@ export default function ProductDetailPage() {
         </>
       )}
 
-      {viewingCategory && viewingCategory.isAggregateView && (
-        <AllSchoolsView productId={productId} />
+      {viewingCategory && viewingCategory.isAllSchools && (
+        <AllSchoolsView productId={productId} locationId={currentParent?._id} />
       )}
 
-      {viewingCategory && !viewingCategory.isAggregateView && (
+      {viewingCategory && !viewingCategory.isAllSchools && (
         <CategoryView
           productId={productId}
           category={viewingCategory}
@@ -1228,31 +1230,26 @@ function CategoryView({ productId, category, onCategoryUpdated }) {
   );
 }
 
-/* ── ALL SCHOOLS: read-only aggregate across every category, product-wide ── */
-function AllSchoolsView({ productId }) {
+/* ── ALL SCHOOLS: read-only aggregate of one location's own categories ── */
+function AllSchoolsView({ productId, locationId }) {
   const [fields, setFields] = useState([]);
   const [rows, setRows] = useState([]);
-  const [locations, setLocations] = useState([]);
   const [loading, setLoading] = useState(true);
   const [board, setBoard] = useState('');
-  const [locationFilter, setLocationFilter] = useState('');
   const [search, setSearch] = useState('');
 
-  useEffect(() => {
-    api.get(`/products/${productId}/locations/all-flat`).then(({ data }) => setLocations(data)).catch(() => {});
-  }, [productId]);
-
   const fetchRows = useCallback(async () => {
+    if (!locationId) return;
     setLoading(true);
     try {
       const { data } = await api.get(`/products/${productId}/categories/all-rows`, {
-        params: { board: board || undefined, location: locationFilter || undefined },
+        params: { location: locationId, board: board || undefined },
       });
       setFields(data.fields);
       setRows(data.rows);
     } catch { toast.error('Failed to load'); }
     finally { setLoading(false); }
-  }, [productId, board, locationFilter]);
+  }, [productId, locationId, board]);
 
   useEffect(() => { fetchRows(); }, [fetchRows]);
 
@@ -1260,14 +1257,13 @@ function AllSchoolsView({ productId }) {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return Object.values(r.fields).some(v => String(v).toLowerCase().includes(q))
-      || r.category.toLowerCase().includes(q)
-      || r.locationPath.toLowerCase().includes(q);
+      || r.category.toLowerCase().includes(q);
   });
 
   const downloadData = () => {
     if (filteredRows.length === 0) { toast.error('No data to download'); return; }
-    const headers = ['Location', 'Category', ...fields];
-    const data = filteredRows.map(r => [r.locationPath, r.category, ...fields.map(f => r.fields[f] || '')]);
+    const headers = ['Category', ...fields];
+    const data = filteredRows.map(r => [r.category, ...fields.map(f => r.fields[f] || '')]);
     const ws = XLSX.utils.aoa_to_sheet([headers, ...data]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'All Schools');
@@ -1284,16 +1280,11 @@ function AllSchoolsView({ productId }) {
           <option value="cbse">CBSE</option>
           <option value="state">State</option>
         </select>
-        <select value={locationFilter} onChange={e => setLocationFilter(e.target.value)}
-          className="text-xs border border-gray-200 rounded-lg px-3 py-2 bg-white focus:outline-none focus:border-violet-400 max-w-[220px]">
-          <option value="">All Locations</option>
-          {locations.map(l => <option key={l._id} value={l._id}>{l.path}</option>)}
-        </select>
-        {(board || locationFilter) && (
-          <button onClick={() => { setBoard(''); setLocationFilter(''); }}
+        {board && (
+          <button onClick={() => setBoard('')}
             className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1">
             <svg className="w-3 h-3" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-            Clear filters
+            Clear filter
           </button>
         )}
         {rows.length > 0 && (
@@ -1307,7 +1298,7 @@ function AllSchoolsView({ productId }) {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search across all schools…"
+            placeholder="Search across all schools here…"
             className="w-full px-3 py-2 text-xs border border-gray-200 rounded-xl bg-gray-50 focus:outline-none focus:border-violet-400 focus:bg-white transition-colors"
           />
         </div>
@@ -1317,14 +1308,13 @@ function AllSchoolsView({ productId }) {
         ) : filteredRows.length === 0 ? (
           <div className="p-10 text-center">
             <p className="text-gray-500 font-semibold">No schools found</p>
-            <p className="text-sm text-gray-400 mt-1">Try different filters or add data to a category.</p>
+            <p className="text-sm text-gray-400 mt-1">Try a different filter or add data to a category.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs border-collapse">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100">Location</th>
                   <th className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100">Category</th>
                   {fields.map(f => (
                     <th key={f} className="px-3 py-2 text-left font-semibold text-gray-500 uppercase tracking-wide text-[10px] whitespace-nowrap border-r border-gray-100">
@@ -1336,7 +1326,6 @@ function AllSchoolsView({ productId }) {
               <tbody>
                 {filteredRows.map((r, i) => (
                   <tr key={r._id} className={`border-b border-gray-100 hover:bg-violet-50/40 transition-colors ${i % 2 === 1 ? 'bg-gray-50/40' : ''}`}>
-                    <td className="px-3 py-2 border-r border-gray-100 text-gray-600 whitespace-nowrap">{r.locationPath}</td>
                     <td className="px-3 py-2 border-r border-gray-100 text-amber-700 font-medium whitespace-nowrap">{r.category}</td>
                     {fields.map(f => (
                       <td key={f} className="px-3 py-2 border-r border-gray-100 text-gray-700 max-w-[200px] truncate" title={r.fields[f]}>

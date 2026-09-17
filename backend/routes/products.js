@@ -20,7 +20,6 @@ router.put('/:id',       crmEdit, ctrl.updateProduct);
 router.delete('/:id',    crmEdit, ctrl.deleteProduct);
 
 // Locations under a product — a tree, nested to any depth via `parent`
-router.get('/:productId/locations/all-flat',          locCtrl.getAllLocationsFlat);
 router.get('/:productId/locations',                  locCtrl.getChildren);
 router.post('/:productId/locations',                 crmEdit, locCtrl.createLocation);
 router.post('/:productId/locations/bulk-move',        crmEdit, locCtrl.bulkSetLocation);
