@@ -662,7 +662,7 @@ const AttendancePage = ({ employeeId = null }) => {
                             <td>{record.workHours ? `${record.workHours}h` : '—'}</td>
                             <td><Badge status={record.status} /></td>
                             <td>
-                              {(record.isLate || record.isEarlyLeave) ? (
+                              {(record.isLate || record.isEarlyLeave || (record.checkIn && !record.checkOut)) ? (
                                 <RegularizeInline record={record} onDone={fetchAttendance} />
                               ) : (
                                 <span className="text-violet-300 text-xs">—</span>
