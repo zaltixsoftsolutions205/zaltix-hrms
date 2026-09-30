@@ -182,49 +182,51 @@ const RegularizationsPanel = () => {
                     )}
                   </div>
 
-                  {/* Right: action buttons — pending can be approved/rejected;
-                      an approved request can still be reversed to rejected
-                      later (restores the original punch times). */}
-                  {(r.regularizationStatus === 'pending' || r.regularizationStatus === 'approved') && (
-                    <div className="flex-shrink-0">
-                      {!isReviewing ? (
-                        <button onClick={() => initReview(r._id)}
-                          className="btn-secondary btn-sm text-xs">
-                          {r.regularizationStatus === 'approved' ? 'Reverse' : 'Review'}
-                        </button>
-                      ) : (
-                        <div className="flex flex-col gap-1.5 w-52">
-                          <input
-                            className="input-field text-xs py-1 px-2"
-                            placeholder="Comment (optional)…"
-                            value={rv.comment}
-                            onChange={e => setComment(r._id, e.target.value)}
-                          />
-                          <div className="flex gap-1.5">
-                            {r.regularizationStatus === 'pending' && (
-                              <button
-                                onClick={() => submit(r._id, 'approved')}
-                                disabled={rv.loading}
-                                className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors">
-                                {rv.loading ? '…' : 'Approve'}
-                              </button>
-                            )}
+                  {/* Right: action buttons — HR can change the decision
+                      either direction at any time (approved <-> rejected,
+                      or act on a still-pending request). Approving applies
+                      the regularized times; rejecting restores whatever the
+                      record looked like before it was ever approved. */}
+                  <div className="flex-shrink-0">
+                    {!isReviewing ? (
+                      <button onClick={() => initReview(r._id)}
+                        className="btn-secondary btn-sm text-xs">
+                        {r.regularizationStatus === 'pending' ? 'Review' : 'Change Decision'}
+                      </button>
+                    ) : (
+                      <div className="flex flex-col gap-1.5 w-52">
+                        <input
+                          className="input-field text-xs py-1 px-2"
+                          placeholder="Comment (optional)…"
+                          value={rv.comment}
+                          onChange={e => setComment(r._id, e.target.value)}
+                        />
+                        <div className="flex gap-1.5">
+                          {r.regularizationStatus !== 'approved' && (
+                            <button
+                              onClick={() => submit(r._id, 'approved')}
+                              disabled={rv.loading}
+                              className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                              {rv.loading ? '…' : 'Approve'}
+                            </button>
+                          )}
+                          {r.regularizationStatus !== 'rejected' && (
                             <button
                               onClick={() => submit(r._id, 'rejected')}
                               disabled={rv.loading}
                               className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-gray-200 text-white hover:bg-gray-200 disabled:opacity-50 transition-colors">
                               {rv.loading ? '…' : r.regularizationStatus === 'approved' ? 'Reject (undo approval)' : 'Reject'}
                             </button>
-                            <button
-                              onClick={() => setReviewing(prev => { const c = { ...prev }; delete c[r._id]; return c; })}
-                              className="text-xs px-2 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100">
-                              ✕
-                            </button>
-                          </div>
+                          )}
+                          <button
+                            onClick={() => setReviewing(prev => { const c = { ...prev }; delete c[r._id]; return c; })}
+                            className="text-xs px-2 py-1.5 rounded-lg bg-violet-50 text-violet-600 hover:bg-violet-100">
+                            ✕
+                          </button>
                         </div>
-                      )}
-                    </div>
-                  )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             );

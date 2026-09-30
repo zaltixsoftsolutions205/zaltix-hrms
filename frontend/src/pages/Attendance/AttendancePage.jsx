@@ -142,31 +142,34 @@ const RegularizeInline = ({ record, onDone }) => {
   const [regCheckIn, setRegCheckIn] = useState("");
   const [regCheckOut, setRegCheckOut] = useState("");
 
+  const openForm = () => {
+    // Seed with whatever's already on record — the previously-submitted
+    // correction if this is a reapply, otherwise the actual punch time —
+    // so the employee only has to change the field that's actually wrong.
+    setRegCheckIn(record.regularizedCheckIn || record.checkIn || "");
+    setRegCheckOut(record.regularizedCheckOut || record.checkOut || "");
+    setOpen(true);
+  };
+
   const submit = async () => {
     if (!reason.trim()) {
       return toast.error("Please enter a reason");
     }
 
-    if (record.isLate && !regCheckIn) {
+    if (!regCheckIn) {
       return toast.error("Please enter your check-in time");
     }
 
-    if ((record.isEarlyLeave || !record.checkOut) && !regCheckOut) {
+    if (!regCheckOut) {
       return toast.error("Please enter your check-out (leaving) time");
     }
 
     const payload = {
       attendanceId: record._id,
       reason,
+      checkIn: regCheckIn,
+      checkOut: regCheckOut,
     };
-
-    if (record.isLate) {
-      payload.checkIn = regCheckIn;
-    }
-
-    if (record.isEarlyLeave || !record.checkOut) {
-      payload.checkOut = regCheckOut;
-    }
 
     setLoading(true);
 
@@ -217,7 +220,7 @@ const RegularizeInline = ({ record, onDone }) => {
               <span className="text-[10px] text-gray-400">Max attempts reached — contact HR</span>
             ) : (
               <button
-                onClick={() => setOpen(true)}
+                onClick={openForm}
                 className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
               >
                 Reapply ({3 - (record.regularizationAttempts || 0)} left)
@@ -226,7 +229,7 @@ const RegularizeInline = ({ record, onDone }) => {
           </div>
         ) : (
           <button
-            onClick={() => setOpen(true)}
+            onClick={openForm}
             className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
           >
             Request
@@ -236,35 +239,26 @@ const RegularizeInline = ({ record, onDone }) => {
         <div className="flex flex-col gap-3 min-w-[250px]">
 
           {/* Check In */}
-          {record.isLate && (
-            <>
-              <label className="text-xs font-semibold text-violet-700">
-                Correct Check-In Time
-              </label>
+          <label className="text-xs font-semibold text-violet-700">
+            Check-In Time
+          </label>
 
-              <TimeInput12
-                value={regCheckIn}
-                onChange={setRegCheckIn}
-              />
-            </>
-          )}
+          <TimeInput12
+            required
+            value={regCheckIn}
+            onChange={setRegCheckIn}
+          />
 
           {/* Check Out */}
-          {(record.isEarlyLeave || !record.checkOut) && (
-            <>
-              <label className="text-xs font-semibold text-violet-700" >
-                {!record.checkOut
-                  ? "Check-Out (Leaving) Time — required"
-                  : "Correct Early Leave Time"}
-              </label>
+          <label className="text-xs font-semibold text-violet-700">
+            Check-Out (Leaving) Time
+          </label>
 
-              <TimeInput12
-                required
-                value={regCheckOut}
-                onChange={setRegCheckOut}
-              />
-            </>
-          )}
+          <TimeInput12
+            required
+            value={regCheckOut}
+            onChange={setRegCheckOut}
+          />
 
           {/* Reason */}
           <label className="text-xs font-semibold text-violet-700">
@@ -370,8 +364,8 @@ const AttendancePage = ({ employeeId = null }) => {
 
   const handleRegularizeToday = async () => {
     if (!regReason.trim()) return toast.error('Please enter a reason');
-    if (today?.isLate && !regCheckIn) return toast.error('Please enter your check-in time');
-    if ((today?.isEarlyLeave || todayMissingCheckout) && !regCheckOut) return toast.error('Please enter your check-out (leaving) time');
+    if (!regCheckIn) return toast.error('Please enter your check-in time');
+    if (!regCheckOut) return toast.error('Please enter your check-out (leaving) time');
     setRegLoading(true);
     try {
       await api.post('/attendance/regularize', { attendanceId: today?._id, reason: regReason, checkIn: regCheckIn, checkOut: regCheckOut });
@@ -468,7 +462,11 @@ const AttendancePage = ({ employeeId = null }) => {
                     Max attempts reached — contact HR
                   </span>
                 ) : (
-                  <button onClick={() => setShowRegForm(v => !v)}
+                  <button onClick={() => {
+                    setShowRegForm(v => !v);
+                    setRegCheckIn(today?.regularizedCheckIn || today?.checkIn || '');
+                    setRegCheckOut(today?.regularizedCheckOut || today?.checkOut || '');
+                  }}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
                     <SI d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={12} />
                     {today.regularizationStatus === 'rejected' ? 'Reapply for Regularization' : 'Request Regularization'}
@@ -492,29 +490,20 @@ const AttendancePage = ({ employeeId = null }) => {
               value={regReason}
               onChange={e => setRegReason(e.target.value)}
             />
-            {today?.isLate && (
-              <>
-                <p className="text-xs font-semibold text-violet-700 mb-2">Correct check-in time:</p>
-                <TimeInput12
-                  className="w-full text-sm mb-3"
-                  value={regCheckIn}
-                  onChange={setRegCheckIn}
-                />
-              </>
-            )}
-            {(today?.isEarlyLeave || todayMissingCheckout) && (
-              <>
-                <p className="text-xs font-semibold text-violet-700 mb-2">
-                  {todayMissingCheckout ? 'Check-out (leaving) time — required:' : 'Correct check-out time:'}
-                </p>
-                <TimeInput12
-                  required
-                  className="w-full text-sm mb-3"
-                  value={regCheckOut}
-                  onChange={setRegCheckOut}
-                />
-              </>
-            )}
+            <p className="text-xs font-semibold text-violet-700 mb-2">Check-in time:</p>
+            <TimeInput12
+              required
+              className="w-full text-sm mb-3"
+              value={regCheckIn}
+              onChange={setRegCheckIn}
+            />
+            <p className="text-xs font-semibold text-violet-700 mb-2">Check-out (leaving) time:</p>
+            <TimeInput12
+              required
+              className="w-full text-sm mb-3"
+              value={regCheckOut}
+              onChange={setRegCheckOut}
+            />
 
             <div className="flex gap-2 mt-2">
               <button onClick={handleRegularizeToday} disabled={regLoading}
@@ -667,7 +656,7 @@ const AttendancePage = ({ employeeId = null }) => {
                             <td>{record.workHours ? `${record.workHours}h` : '—'}</td>
                             <td><Badge status={record.status} /></td>
                             <td>
-                              {(record.isLate || record.isEarlyLeave || (record.checkIn && !record.checkOut)) ? (
+                              {(record.isLate || record.isEarlyLeave || (record.checkIn && !record.checkOut) || record.regularizationStatus) ? (
                                 <RegularizeInline record={record} onDone={fetchAttendance} />
                               ) : (
                                 <span className="text-violet-300 text-xs">—</span>
