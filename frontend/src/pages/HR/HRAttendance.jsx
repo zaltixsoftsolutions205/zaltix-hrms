@@ -228,6 +228,177 @@ const RegularizationsPanel = () => {
   );
 };
 
+// ── Working Hours: per-employee totals, hidden until requested ─────────────
+const WorkingHoursPanel = ({ employees, departments }) => {
+  const [loading, setLoading] = useState(true);
+  const [summary, setSummary] = useState([]);
+  const now = new Date();
+  const todayIST = now.toLocaleDateString('en-CA', { timeZone: 'Asia/Kolkata' });
+  const [filter, setFilter] = useState({ viewMode: 'range', fromDate: todayIST, toDate: todayIST, month: now.getMonth() + 1, year: now.getFullYear(), employeeId: '', departmentId: '' });
+
+  const fetchSummary = async () => {
+    setLoading(true);
+    try {
+      const params = new URLSearchParams();
+      if (filter.viewMode === 'range' && filter.fromDate && filter.toDate) {
+        params.append('fromDate', filter.fromDate);
+        params.append('toDate', filter.toDate);
+      } else {
+        params.append('month', filter.month);
+        params.append('year', filter.year);
+      }
+      if (filter.employeeId) params.append('employeeId', filter.employeeId);
+      if (filter.departmentId) params.append('departmentId', filter.departmentId);
+      const res = await api.get(`/attendance?${params}`);
+
+      const byEmployee = new Map();
+      for (const r of res.data) {
+        const id = r.employee?._id;
+        if (!id) continue;
+        if (!byEmployee.has(id)) {
+          byEmployee.set(id, {
+            employeeId: r.employee.employeeId, name: r.employee.name,
+            totalHours: 0, daysPresent: 0, daysHalf: 0, daysAbsent: 0,
+          });
+        }
+        const s = byEmployee.get(id);
+        s.totalHours += r.workHours || 0;
+        if (r.status === 'present') s.daysPresent += 1;
+        else if (r.status === 'half-day') s.daysHalf += 1;
+        else if (r.status === 'absent') s.daysAbsent += 1;
+      }
+      setSummary(
+        Array.from(byEmployee.values())
+          .map(s => ({ ...s, totalHours: Number(s.totalHours.toFixed(2)) }))
+          .sort((a, b) => b.totalHours - a.totalHours)
+      );
+    } catch { toast.error('Failed to load working hours'); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { fetchSummary(); }, [filter.viewMode, filter.fromDate, filter.toDate, filter.month, filter.year, filter.employeeId, filter.departmentId]);
+
+  return (
+    <Card>
+      <div className="mb-4">
+        <h3 className="font-bold text-violet-900 text-sm sm:text-base">Working Hours</h3>
+        <p className="text-xs text-violet-400 mt-0.5">Per-employee totals for the selected period</p>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-col gap-3 mb-5">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex rounded-lg overflow-hidden border border-violet-200 flex-shrink-0">
+            <button
+              className={`px-4 py-2 text-sm font-medium transition-colors ${filter.viewMode === 'range' ? 'bg-violet-700 text-white' : 'bg-white text-violet-600 hover:bg-violet-50'}`}
+              onClick={() => setFilter(f => ({ ...f, viewMode: 'range' }))}>Date Range</button>
+            <button
+              className={`px-4 py-2 text-sm font-medium transition-colors ${filter.viewMode === 'monthly' ? 'bg-violet-700 text-white' : 'bg-white text-violet-600 hover:bg-violet-50'}`}
+              onClick={() => setFilter(f => ({ ...f, viewMode: 'monthly' }))}>Monthly</button>
+          </div>
+
+          {filter.viewMode === 'range' ? (
+            <div className="flex items-center gap-2 flex-wrap">
+              <input type="date" className="input-field flex-1 sm:flex-none sm:w-auto min-w-[140px]"
+                value={filter.fromDate} onChange={e => setFilter(f => ({ ...f, fromDate: e.target.value, toDate: e.target.value > f.toDate ? e.target.value : f.toDate }))} />
+              <span className="text-xs text-violet-400 font-medium flex-shrink-0">to</span>
+              <input type="date" className="input-field flex-1 sm:flex-none sm:w-auto min-w-[140px]"
+                value={filter.toDate} min={filter.fromDate} onChange={e => setFilter(f => ({ ...f, toDate: e.target.value }))} />
+            </div>
+          ) : (
+            <>
+              <select className="input-field flex-1 sm:flex-none sm:w-auto" value={filter.month}
+                onChange={e => setFilter(f => ({ ...f, month: parseInt(e.target.value) }))}>
+                {Array.from({ length: 12 }, (_, i) => (
+                  <option key={i + 1} value={i + 1}>{new Date(0, i).toLocaleString('default', { month: 'long' })}</option>
+                ))}
+              </select>
+              <select className="input-field w-24 sm:w-auto" value={filter.year}
+                onChange={e => setFilter(f => ({ ...f, year: parseInt(e.target.value) }))}>
+                {[now.getFullYear(), now.getFullYear() - 1].map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+            </>
+          )}
+        </div>
+
+        <div className="flex flex-wrap gap-3">
+          <select className="input-field flex-1 sm:flex-none sm:w-auto min-w-[140px]" value={filter.departmentId}
+            onChange={e => setFilter(f => ({ ...f, departmentId: e.target.value, employeeId: '' }))}>
+            <option value="">All Departments</option>
+            {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
+          </select>
+          <select className="input-field flex-1 sm:flex-none sm:w-auto min-w-[140px]" value={filter.employeeId}
+            onChange={e => setFilter(f => ({ ...f, employeeId: e.target.value }))}>
+            <option value="">All Employees</option>
+            {employees.map(e => <option key={e._id} value={e._id}>{e.name}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="py-10 text-center text-violet-400 text-sm">Loading...</div>
+      ) : summary.length === 0 ? (
+        <EmptyState
+          icon={<SI d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" size={40} color="text-violet-400" />}
+          title="No records"
+          message="No attendance found for the selected filters."
+        />
+      ) : (
+        <>
+          {/* Mobile card list */}
+          <div className="sm:hidden space-y-2">
+            {summary.map(s => (
+              <div key={s.employeeId} className="p-3 border border-violet-100 rounded-xl">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <p className="font-semibold text-violet-900 text-sm truncate">{s.name}</p>
+                    <p className="text-[10px] text-violet-400">{s.employeeId}</p>
+                  </div>
+                  <p className="text-lg font-bold text-golden-600 flex-shrink-0">{s.totalHours}h</p>
+                </div>
+                <div className="flex items-center gap-3 text-xs mt-1 text-gray-500">
+                  <span>{s.daysPresent} present</span>
+                  {s.daysHalf > 0 && <span>{s.daysHalf} half-day</span>}
+                  {s.daysAbsent > 0 && <span>{s.daysAbsent} absent</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop table */}
+          <div className="hidden sm:block overflow-x-auto -mx-5 px-5">
+            <table className="data-table min-w-[520px]">
+              <thead>
+                <tr>
+                  <th>Employee</th>
+                  <th>Total Hours</th>
+                  <th>Days Present</th>
+                  <th>Half-Days</th>
+                  <th>Days Absent</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summary.map(s => (
+                  <tr key={s.employeeId}>
+                    <td>
+                      <p className="font-medium text-violet-900 whitespace-nowrap">{s.name}</p>
+                      <p className="text-xs text-violet-400">{s.employeeId}</p>
+                    </td>
+                    <td className="font-semibold text-golden-600">{s.totalHours}h</td>
+                    <td>{s.daysPresent}</td>
+                    <td>{s.daysHalf || '—'}</td>
+                    <td>{s.daysAbsent || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </Card>
+  );
+};
+
 // ── Main HR Attendance page ──────────────────────────────────────────────────
 const HRAttendance = () => {
   const { user } = useAuth();
@@ -313,7 +484,9 @@ const HRAttendance = () => {
       <div className="page-header">
         <div>
           <h2 className="page-title">Attendance Management</h2>
-          <p className="page-subtitle">{tab === 'records' ? `${records.length} records found` : 'Regularization requests'}</p>
+          <p className="page-subtitle">
+            {tab === 'records' ? `${records.length} records found` : tab === 'workingHours' ? 'Per-employee working hours' : 'Regularization requests'}
+          </p>
         </div>
         {tab === 'records' && (
           <button onClick={exportCSV} className="btn-secondary flex items-center gap-1.5 self-start sm:self-auto">
@@ -396,6 +569,11 @@ const HRAttendance = () => {
           Records
         </button>
         <button
+          className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'workingHours' ? 'bg-white text-violet-800 shadow-sm' : 'text-violet-500 hover:text-violet-700'}`}
+          onClick={() => setTab('workingHours')}>
+          Working Hours
+        </button>
+        <button
           className={`relative px-4 py-2 rounded-lg text-sm font-medium transition-colors ${tab === 'regularizations' ? 'bg-white text-violet-800 shadow-sm' : 'text-violet-500 hover:text-violet-700'}`}
           onClick={() => { setTab('regularizations'); setPendingRegCount(0); }}>
           Regularizations
@@ -409,6 +587,8 @@ const HRAttendance = () => {
 
       {tab === 'regularizations' ? (
         <RegularizationsPanel />
+      ) : tab === 'workingHours' ? (
+        <WorkingHoursPanel employees={employees} departments={departments} />
       ) : (
         <Card>
           {/* Filters */}
