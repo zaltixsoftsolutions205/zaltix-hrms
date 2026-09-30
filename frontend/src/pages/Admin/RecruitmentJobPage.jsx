@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import api from '../../utils/api';
 import { formatDate, getUploadUrl } from '../../utils/helpers';
 import Modal from '../../components/UI/Modal';
@@ -24,6 +25,31 @@ const JOB_STATUS = {
 };
 
 const statusOf = (key) => STATUSES.find(s => s.key === key) || STATUSES[0];
+
+const TEMPLATE_HEADERS = ['Name', 'Years of Experience', 'Status', 'Comment'];
+
+const downloadTemplate = (jobTitle) => {
+  const sampleRows = [
+    { 'Name': 'Jane Doe', 'Years of Experience': 3, 'Status': 'interested', 'Comment': 'Strong manual testing background' },
+    { 'Name': 'John Smith', 'Years of Experience': 5, 'Status': 'shortlisted', 'Comment': '' },
+  ];
+  const ws = XLSX.utils.json_to_sheet(sampleRows, { header: TEMPLATE_HEADERS });
+  ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 16 }, { wch: 40 }];
+
+  const notes = XLSX.utils.aoa_to_sheet([
+    ['Column', 'Notes'],
+    ['Name', 'Required.'],
+    ['Years of Experience', 'Optional. Number.'],
+    ['Status', `Optional. One of: ${STATUSES.map(s => s.key).join(', ')}. Defaults to "interested" if blank or invalid.`],
+    ['Comment', 'Optional. Why this resume is worth keeping.'],
+  ]);
+  notes['!cols'] = [{ wch: 22 }, { wch: 70 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Candidates');
+  XLSX.utils.book_append_sheet(wb, notes, 'Instructions');
+  XLSX.writeFile(wb, `Recruitment_Template_${(jobTitle || 'Job').replace(/[^a-z0-9]+/gi, '_')}.xlsx`);
+};
 
 const downloadFile = async (url, filename) => {
   try {
@@ -139,6 +165,10 @@ const RecruitmentJobPage = () => {
   /* detail modal */
   const [selected, setSelected] = useState(null);
 
+  /* bulk excel upload */
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
+
   /* ── fetch ── */
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -221,6 +251,43 @@ const RecruitmentJobPage = () => {
       setSelected(null);
       toast.success('Removed');
     } catch { toast.error('Failed'); }
+  };
+
+  /* ── bulk excel upload ── */
+  const handleFileChosen = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      if (raw.length === 0) { toast.error('No rows found in the file'); return; }
+
+      const rows = raw.map(r => ({
+        name: r['Name'] ?? r['name'] ?? '',
+        yearsOfExperience: r['Years of Experience'] ?? r['yearsOfExperience'] ?? '',
+        status: r['Status'] ?? r['status'] ?? '',
+        comment: r['Comment'] ?? r['comment'] ?? '',
+      }));
+
+      const res = await api.post('/recruitment/applicants/bulk', { jobPosting: jobId, rows });
+      const { created, skipped, errors } = res.data;
+
+      if (created > 0) toast.success(`Imported ${created} candidate${created !== 1 ? 's' : ''}`);
+      if (skipped > 0) toast.error(`Skipped ${skipped} row${skipped !== 1 ? 's' : ''} — missing name`);
+      if (errors?.length) errors.slice(0, 3).forEach(er => toast(`Row ${er.row}: ${er.message}`, { icon: '⚠️' }));
+
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed — check the file matches the template');
+    } finally {
+      setUploading(false);
+    }
   };
 
   /* filtered list */
@@ -315,12 +382,23 @@ const RecruitmentJobPage = () => {
             {statusFilter ? ` (filtered from ${resumes.length})` : ''}
           </span>
         </div>
-        <button onClick={() => setShowForm(v => !v)}
-          className={`btn-sm font-semibold text-sm px-4 py-2 rounded-lg transition-colors ${
-            showForm ? 'bg-gray-100 text-gray-600' : 'bg-violet-600 text-white hover:bg-violet-700'
-          }`}>
-          {showForm ? '✕ Cancel' : '+ Add Resume'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => downloadTemplate(job.title)}
+            className="btn-sm font-semibold text-sm px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+            ⬇ Download Template
+          </button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChosen} />
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            className="btn-sm font-semibold text-sm px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50">
+            {uploading ? 'Importing…' : '⬆ Upload Excel'}
+          </button>
+          <button onClick={() => setShowForm(v => !v)}
+            className={`btn-sm font-semibold text-sm px-4 py-2 rounded-lg transition-colors ${
+              showForm ? 'bg-gray-100 text-gray-600' : 'bg-violet-600 text-white hover:bg-violet-700'
+            }`}>
+            {showForm ? '✕ Cancel' : '+ Add Resume'}
+          </button>
+        </div>
       </div>
 
       {/* ── Add Resume Form ── */}
