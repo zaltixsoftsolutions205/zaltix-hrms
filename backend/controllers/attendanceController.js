@@ -344,6 +344,14 @@ exports.applyRegularization = async (req, res) => {
       });
     }
 
+    // Cap resubmissions at 3 attempts total for this record (initial
+    // request + up to 2 corrections after rejection).
+    if (record.regularizationAttempts >= 3) {
+      return res.status(400).json({
+        message: "You have reached the maximum of 3 regularization attempts for this day. Please contact HR directly.",
+      });
+    }
+
     // A missing or early checkout must be corrected with an actual leaving
     // time — otherwise approval later computes 0 work hours and the whole
     // day gets marked absent even though the employee was clearly present.
@@ -357,6 +365,7 @@ exports.applyRegularization = async (req, res) => {
     record.regularizationStatus = "pending";
     record.regularizationReason = reason.trim();
     record.regularizationComment = ""; // clear any prior rejection note
+    record.regularizationAttempts = (record.regularizationAttempts || 0) + 1;
 
     // Employee requested timings
     record.regularizedCheckIn = checkIn || null;
@@ -429,6 +438,31 @@ exports.reviewRegularization = async (req, res) => {
       });
     }
 
+    if (!["pending", "approved"].includes(record.regularizationStatus)) {
+      return res.status(400).json({
+        message: "Already reviewed",
+      });
+    }
+
+    // Reversing an approval back to rejected: restore the punch record to
+    // how it was right before approval overwrote it, rather than leaving
+    // the regularized times in effect under a "rejected" label.
+    if (record.regularizationStatus === "approved" && status === "rejected") {
+      if (record.preApprovalSnapshot?.status) {
+        const snap = record.preApprovalSnapshot;
+        record.checkIn = snap.checkIn;
+        record.checkOut = snap.checkOut;
+        record.status = snap.status;
+        record.isLate = snap.isLate;
+        record.isEarlyLeave = snap.isEarlyLeave;
+        record.workHours = snap.workHours;
+      }
+      record.regularizationStatus = status;
+      record.regularizationComment = comment?.trim() || "";
+      await record.save();
+      return res.json(record);
+    }
+
     if (record.regularizationStatus !== "pending") {
       return res.status(400).json({
         message: "Already reviewed",
@@ -439,6 +473,16 @@ exports.reviewRegularization = async (req, res) => {
     record.regularizationComment = comment?.trim() || "";
 
     if (status === "approved") {
+      // Snapshot the punch record as it stood before approval overwrites
+      // it, so a later reversal can restore it exactly.
+      record.preApprovalSnapshot = {
+        checkIn: record.checkIn,
+        checkOut: record.checkOut,
+        status: record.status,
+        isLate: record.isLate,
+        isEarlyLeave: record.isEarlyLeave,
+        workHours: record.workHours,
+      };
 
       // Apply corrected check-in
       if (record.regularizedCheckIn) {
@@ -456,17 +500,17 @@ exports.reviewRegularization = async (req, res) => {
         record.checkIn,
         record.checkOut
       );
-    }
 
-    // cal workhours
-    if (record.workHours >= 8) {
-      record.status = "present";
-    }
-    else if (record.workHours >= 4) {
-      record.status = "half-day";
-    }
-    else {
-      record.status = "absent";
+      // cal workhours
+      if (record.workHours >= 8) {
+        record.status = "present";
+      }
+      else if (record.workHours >= 4) {
+        record.status = "half-day";
+      }
+      else {
+        record.status = "absent";
+      }
     }
 
     await record.save();

@@ -117,6 +117,9 @@ const RegularizationsPanel = () => {
                       <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${REG_BADGE[r.regularizationStatus]}`}>
                         {r.regularizationStatus}
                       </span>
+                      {r.regularizationAttempts > 0 && (
+                        <span className="text-xs text-violet-400">Attempt {r.regularizationAttempts}/3</span>
+                      )}
                     </div>
                     <div className="mt-3 space-y-2">
 
@@ -179,13 +182,15 @@ const RegularizationsPanel = () => {
                     )}
                   </div>
 
-                  {/* Right: action buttons (only for pending) */}
-                  {r.regularizationStatus === 'pending' && (
+                  {/* Right: action buttons — pending can be approved/rejected;
+                      an approved request can still be reversed to rejected
+                      later (restores the original punch times). */}
+                  {(r.regularizationStatus === 'pending' || r.regularizationStatus === 'approved') && (
                     <div className="flex-shrink-0">
                       {!isReviewing ? (
                         <button onClick={() => initReview(r._id)}
                           className="btn-secondary btn-sm text-xs">
-                          Review
+                          {r.regularizationStatus === 'approved' ? 'Reverse' : 'Review'}
                         </button>
                       ) : (
                         <div className="flex flex-col gap-1.5 w-52">
@@ -196,17 +201,19 @@ const RegularizationsPanel = () => {
                             onChange={e => setComment(r._id, e.target.value)}
                           />
                           <div className="flex gap-1.5">
-                            <button
-                              onClick={() => submit(r._id, 'approved')}
-                              disabled={rv.loading}
-                              className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors">
-                              {rv.loading ? '…' : 'Approve'}
-                            </button>
+                            {r.regularizationStatus === 'pending' && (
+                              <button
+                                onClick={() => submit(r._id, 'approved')}
+                                disabled={rv.loading}
+                                className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-violet-600 text-white hover:bg-violet-700 disabled:opacity-50 transition-colors">
+                                {rv.loading ? '…' : 'Approve'}
+                              </button>
+                            )}
                             <button
                               onClick={() => submit(r._id, 'rejected')}
                               disabled={rv.loading}
                               className="flex-1 text-xs font-semibold px-2 py-1.5 rounded-lg bg-gray-200 text-white hover:bg-gray-200 disabled:opacity-50 transition-colors">
-                              {rv.loading ? '…' : 'Reject'}
+                              {rv.loading ? '…' : r.regularizationStatus === 'approved' ? 'Reject (undo approval)' : 'Reject'}
                             </button>
                             <button
                               onClick={() => setReviewing(prev => { const c = { ...prev }; delete c[r._id]; return c; })}

@@ -23,6 +23,20 @@ const attendanceSchema = new mongoose.Schema(
     regularizedCheckIn: { type: String, default: null },
     regularizedCheckOut: {type: String, default: null},
     regularizationComment: { type: String, default: '' },
+    // How many times regularization has been submitted for this record
+    // (initial request + each resubmit after a rejection). Capped at 3.
+    regularizationAttempts: { type: Number, default: 0 },
+    // Snapshot of checkIn/checkOut/status/isLate/isEarlyLeave/workHours taken
+    // right before an approval overwrites them — lets HR later reverse an
+    // approval back to rejected and restore the original punch record.
+    preApprovalSnapshot: {
+      checkIn: { type: String, default: null },
+      checkOut: { type: String, default: null },
+      status: { type: String, default: null },
+      isLate: { type: Boolean, default: null },
+      isEarlyLeave: { type: Boolean, default: null },
+      workHours: { type: Number, default: null },
+    },
   },
   { timestamps: true }
 );

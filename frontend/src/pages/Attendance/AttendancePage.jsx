@@ -10,6 +10,7 @@ import { useAttendance } from '../../hooks/useAttendance';
 import LocationCheckModal from '../../components/UI/LocationCheckModal';
 import { useAuth } from '../../contexts/AuthContext';
 import IntelligenceAlerts from '../../components/UI/IntelligenceAlerts';
+import TimeInput12 from '../../components/UI/TimeInput12';
 
 const SI = ({ d, d2, size = 16, color }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={color || ''}>
@@ -212,12 +213,16 @@ const RegularizeInline = ({ record, onDone }) => {
             >
               Rejected{record.regularizationComment ? ` — ${record.regularizationComment}` : ""}
             </span>
-            <button
-              onClick={() => setOpen(true)}
-              className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
-            >
-              Reapply
-            </button>
+            {(record.regularizationAttempts || 0) >= 3 ? (
+              <span className="text-[10px] text-gray-400">Max attempts reached — contact HR</span>
+            ) : (
+              <button
+                onClick={() => setOpen(true)}
+                className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
+              >
+                Reapply ({3 - (record.regularizationAttempts || 0)} left)
+              </button>
+            )}
           </div>
         ) : (
           <button
@@ -237,11 +242,9 @@ const RegularizeInline = ({ record, onDone }) => {
                 Correct Check-In Time
               </label>
 
-              <input
-                type="time"
-                className="input-field"
+              <TimeInput12
                 value={regCheckIn}
-                onChange={(e) => setRegCheckIn(e.target.value)}
+                onChange={setRegCheckIn}
               />
             </>
           )}
@@ -255,12 +258,10 @@ const RegularizeInline = ({ record, onDone }) => {
                   : "Correct Early Leave Time"}
               </label>
 
-              <input
-                type="time"
+              <TimeInput12
                 required
-                className="input-field"
                 value={regCheckOut}
-                onChange={(e) => setRegCheckOut(e.target.value)}
+                onChange={setRegCheckOut}
               />
             </>
           )}
@@ -462,11 +463,17 @@ const AttendancePage = ({ employeeId = null }) => {
                     Regularization Rejected{today.regularizationComment ? ` — ${today.regularizationComment}` : ''}
                   </span>
                 )}
-                <button onClick={() => setShowRegForm(v => !v)}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
-                  <SI d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={12} />
-                  {today.regularizationStatus === 'rejected' ? 'Reapply for Regularization' : 'Request Regularization'}
-                </button>
+                {today.regularizationStatus === 'rejected' && (today.regularizationAttempts || 0) >= 3 ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-400">
+                    Max attempts reached — contact HR
+                  </span>
+                ) : (
+                  <button onClick={() => setShowRegForm(v => !v)}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
+                    <SI d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={12} />
+                    {today.regularizationStatus === 'rejected' ? 'Reapply for Regularization' : 'Request Regularization'}
+                  </button>
+                )}
               </>
             )}
           </div>
@@ -488,11 +495,10 @@ const AttendancePage = ({ employeeId = null }) => {
             {today?.isLate && (
               <>
                 <p className="text-xs font-semibold text-violet-700 mb-2">Correct check-in time:</p>
-                <input
-                  type="time"
-                  className="input-field w-full text-sm mb-3"
+                <TimeInput12
+                  className="w-full text-sm mb-3"
                   value={regCheckIn}
-                  onChange={(e) => setRegCheckIn(e.target.value)}
+                  onChange={setRegCheckIn}
                 />
               </>
             )}
@@ -501,12 +507,11 @@ const AttendancePage = ({ employeeId = null }) => {
                 <p className="text-xs font-semibold text-violet-700 mb-2">
                   {todayMissingCheckout ? 'Check-out (leaving) time — required:' : 'Correct check-out time:'}
                 </p>
-                <input
-                  type="time"
+                <TimeInput12
                   required
-                  className="input-field w-full text-sm mb-3"
+                  className="w-full text-sm mb-3"
                   value={regCheckOut}
-                  onChange={(e) => setRegCheckOut(e.target.value)}
+                  onChange={setRegCheckOut}
                 />
               </>
             )}
