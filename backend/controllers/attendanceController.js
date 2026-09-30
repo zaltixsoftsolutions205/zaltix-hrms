@@ -326,9 +326,16 @@ exports.applyRegularization = async (req, res) => {
       });
     }
 
+    // A checkout more than an hour past office end (e.g. genuinely
+    // forgetting to check out until late at night, or inflating hours) is
+    // just as worth flagging/correcting as arriving late or leaving early.
+    const LATE_CHECKOUT_THRESHOLD = "19:00"; // 1hr past OFFICE_END (18:00)
+    const isLateCheckout = record.checkOut && record.checkOut > LATE_CHECKOUT_THRESHOLD;
+
     if (
       !record.isLate &&
       !record.isEarlyLeave &&
+      !isLateCheckout &&
       record.checkOut
     ) {
       return res.status(400).json({
