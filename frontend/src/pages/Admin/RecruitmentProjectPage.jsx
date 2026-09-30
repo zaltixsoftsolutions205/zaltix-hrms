@@ -1,9 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import api from '../../utils/api';
 import { formatDate } from '../../utils/helpers';
+
+const JOB_TYPE_KEYS = ['full-time', 'part-time', 'contract', 'internship'];
+const TEMPLATE_HEADERS = ['Title', 'Department', 'Location', 'Type', 'Openings', 'Description', 'Requirements'];
+
+const downloadJobTemplate = (projectName) => {
+  const sampleRows = [
+    { 'Title': 'React Developer', 'Department': 'Engineering', 'Location': 'Remote', 'Type': 'full-time', 'Openings': 2, 'Description': 'Build and maintain UI features', 'Requirements': '2+ yrs React experience' },
+    { 'Title': 'QA Engineer', 'Department': 'Engineering', 'Location': 'Delhi', 'Type': 'contract', 'Openings': 1, 'Description': '', 'Requirements': '' },
+  ];
+  const ws = XLSX.utils.json_to_sheet(sampleRows, { header: TEMPLATE_HEADERS });
+  ws['!cols'] = [{ wch: 22 }, { wch: 16 }, { wch: 16 }, { wch: 12 }, { wch: 10 }, { wch: 30 }, { wch: 30 }];
+
+  const notes = XLSX.utils.aoa_to_sheet([
+    ['Column', 'Notes'],
+    ['Title', 'Required.'],
+    ['Department', 'Optional.'],
+    ['Location', 'Optional.'],
+    ['Type', `Optional. One of: ${JOB_TYPE_KEYS.join(', ')}. Defaults to "full-time" if blank or invalid.`],
+    ['Openings', 'Optional. Number. Defaults to 1.'],
+    ['Description', 'Optional.'],
+    ['Requirements', 'Optional.'],
+  ]);
+  notes['!cols'] = [{ wch: 16 }, { wch: 70 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Job Postings');
+  XLSX.utils.book_append_sheet(wb, notes, 'Instructions');
+  XLSX.writeFile(wb, `Job_Postings_Template_${(projectName || 'Project').replace(/[^a-z0-9]+/gi, '_')}.xlsx`);
+};
 
 export default function RecruitmentProjectPage() {
   const { projectId } = useParams();
@@ -16,6 +46,8 @@ export default function RecruitmentProjectPage() {
   const [showForm, setShowForm] = useState(false);
   const [form, setForm] = useState({ title: '', department: '', location: '', type: 'full-time', openings: 1, description: '', requirements: '' });
   const [submitting, setSubmitting] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   const fetchAll = async () => {
     setLoading(true);
@@ -75,6 +107,45 @@ export default function RecruitmentProjectPage() {
     }
   };
 
+  const handleFileChosen = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      if (raw.length === 0) { toast.error('No rows found in the file'); return; }
+
+      const rows = raw.map(r => ({
+        title: r['Title'] ?? r['title'] ?? '',
+        department: r['Department'] ?? r['department'] ?? '',
+        location: r['Location'] ?? r['location'] ?? '',
+        type: r['Type'] ?? r['type'] ?? '',
+        openings: r['Openings'] ?? r['openings'] ?? '',
+        description: r['Description'] ?? r['description'] ?? '',
+        requirements: r['Requirements'] ?? r['requirements'] ?? '',
+      }));
+
+      const res = await api.post('/recruitment/jobs/bulk', { project: projectId, rows });
+      const { created, skipped, errors } = res.data;
+
+      if (created > 0) toast.success(`Created ${created} job posting${created !== 1 ? 's' : ''}`);
+      if (skipped > 0) toast.error(`Skipped ${skipped} row${skipped !== 1 ? 's' : ''} — missing title`);
+      if (errors?.length) errors.slice(0, 3).forEach(er => toast(`Row ${er.row}: ${er.message}`, { icon: '⚠️' }));
+
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed — check the file matches the template');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const filtered = jobs.filter(j => tab === 'all' ? true : j.status === tab);
 
   if (loading) return <p className="text-center text-sm text-violet-400 py-16">Loading...</p>;
@@ -92,6 +163,15 @@ export default function RecruitmentProjectPage() {
           <h2 className="page-title">{project?.name || 'Project'}</h2>
           <p className="page-subtitle">{project?.description || 'Job postings and candidate pipeline'}</p>
         </div>
+        <button onClick={() => downloadJobTemplate(project?.name)}
+          className="text-xs font-semibold px-3 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+          ⬇ Template
+        </button>
+        <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChosen} />
+        <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+          className="text-xs font-semibold px-3 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50">
+          {uploading ? 'Importing…' : '⬆ Upload Excel'}
+        </button>
         <button onClick={() => setShowForm(v => !v)} className="btn-primary btn-sm">
           {showForm ? 'Cancel' : '+ Post Job'}
         </button>

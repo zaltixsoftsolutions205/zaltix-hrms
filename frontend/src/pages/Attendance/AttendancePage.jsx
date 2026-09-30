@@ -382,7 +382,10 @@ const AttendancePage = ({ employeeId = null }) => {
 
   const today = data?.todayRecord;
   const todayMissingCheckout = !!today?.checkIn && !today?.checkOut;
-  const todayHasIssue = today?.isLate || today?.isEarlyLeave || todayMissingCheckout;
+  // Checked out more than an hour past office end (7 PM) — worth flagging
+  // just like arriving late or leaving early.
+  const todayLateCheckout = !!today?.checkOut && today.checkOut > '19:00';
+  const todayHasIssue = today?.isLate || today?.isEarlyLeave || todayMissingCheckout || todayLateCheckout;
 
   // Derive attendance intelligence from existing records — no extra API call
   const attendanceAlerts = (() => {
@@ -444,6 +447,12 @@ const AttendancePage = ({ employeeId = null }) => {
                 Missing Check-Out
               </span>
             )}
+            {todayLateCheckout && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-900">
+                <SI d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={13} color="text-gray-900" />
+                Late Checkout ({formatTime12(today.checkOut)})
+              </span>
+            )}
             {/* Regularization status / action */}
             {today.regularizationStatus && today.regularizationStatus !== 'rejected' ? (
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${REG_BADGE[today.regularizationStatus]}`}>
@@ -481,7 +490,7 @@ const AttendancePage = ({ employeeId = null }) => {
         {showRegForm && (!today?.regularizationStatus || today.regularizationStatus === 'rejected') && todayHasIssue && (
           <div className="mt-3 p-3 bg-violet-50 rounded-xl border border-violet-100">
             <p className="text-xs font-semibold text-violet-700 mb-2">
-              Reason for {[today?.isLate && 'late arrival', today?.isEarlyLeave && 'early leave', todayMissingCheckout && 'missing check-out'].filter(Boolean).join(' & ')}:
+              Reason for {[today?.isLate && 'late arrival', today?.isEarlyLeave && 'early leave', todayMissingCheckout && 'missing check-out', todayLateCheckout && 'late checkout'].filter(Boolean).join(' & ')}:
             </p>
             <textarea
               className="input-field w-full text-sm resize-none"
@@ -656,7 +665,7 @@ const AttendancePage = ({ employeeId = null }) => {
                             <td>{record.workHours ? `${record.workHours}h` : '—'}</td>
                             <td><Badge status={record.status} /></td>
                             <td>
-                              {(record.isLate || record.isEarlyLeave || (record.checkIn && !record.checkOut) || record.regularizationStatus) ? (
+                              {(record.isLate || record.isEarlyLeave || (record.checkIn && !record.checkOut) || (record.checkOut && record.checkOut > '19:00') || record.regularizationStatus) ? (
                                 <RegularizeInline record={record} onDone={fetchAttendance} />
                               ) : (
                                 <span className="text-violet-300 text-xs">—</span>
