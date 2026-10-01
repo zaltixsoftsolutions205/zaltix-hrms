@@ -31,7 +31,7 @@ const generatePayslipPDF = (payslipData) => {
         basicSalary, allowances, deductions,
         grossSalary, netSalary,
         workingDays, presentDays, lwpDays,
-        accountNumber, ifscCode, uanNumber,
+        accountNumber, ifscCode, uanNumber, panNumber,
       } = payslipData;
 
       const uploadsDir = path.join(__dirname, '../uploads/payslips');
@@ -109,11 +109,12 @@ const generatePayslipPDF = (payslipData) => {
       doc.fillColor('#000000').fontSize(14).font('Helvetica-Bold')
          .text('Zaltix Soft Solutions Private Limited', infoX, y + 2, { width: infoW, align: 'center' });
       doc.fillColor('#333333').fontSize(7.5).font('Helvetica')
-         .text('Swarnakanchi Road, Green Hills Colony Rd No.3, above Vajra Food Court,', infoX, y + 20, { width: infoW, align: 'center' });
-      doc.text('Green Hills Colony, Kothapet, Hyderabad, Telangana - 500102', infoX, y + 30, { width: infoW, align: 'center' });
-      doc.text('Email : hr@zaltixsoftsolutions.com   |   Phone : 9966653131', infoX, y + 40, { width: infoW, align: 'center' });
+         .text('Plot No : 63,64, Tvasta One, Opp Police Station, Near TCS Adibatla,', infoX, y + 20, { width: infoW, align: 'center' });
+      doc.text('K.V. Rangareddy Dist, Telangana - 501510', infoX, y + 30, { width: infoW, align: 'center' });
+      doc.text('Email : hr@zaltixsoftsolutions.com   |   Phone : +91 9966653131', infoX, y + 40, { width: infoW, align: 'center' });
+      doc.text('Visit us at : www.zaltixsoftsolutions.com', infoX, y + 50, { width: infoW, align: 'center' });
 
-      y += 62;
+      y += 72;
       doc.moveTo(ML, y).lineTo(MR, y).strokeColor('#000000').lineWidth(1.2).stroke();
       y += 10;
 
@@ -139,11 +140,20 @@ const generatePayslipPDF = (payslipData) => {
       // column widths: label=120, value=137, label=118, value=140 → 515
       const EC1 = 120, EC2 = 137, EC3 = 118, EC4 = CW - EC1 - EC2 - EC3;
 
+      // Date of joining, from the employee record, as DD MMM YYYY.
+      const fmtDate = (d) => {
+        if (!d) return '—';
+        const dt = new Date(d);
+        if (isNaN(dt)) return '—';
+        const mon = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][dt.getUTCMonth()];
+        return `${String(dt.getUTCDate()).padStart(2, '0')} ${mon} ${dt.getUTCFullYear()}`;
+      };
+
       const empRows = [
         ['Employee Code', employee.employeeId,          'Employee Name', employee.name],
         ['Designation',   employee.designation || '—',  'Department',    employee.department?.name || '—'],
         ['Working Days',  String(wdDays),               'Present Days',  String(prsDays)],
-        ['Loss of Pay',   String(lopDays),              '',              ''],
+        ['LWP Days',   String(lopDays),              'Date of Joining', fmtDate(employee.joiningDate)],
       ];
 
       empRows.forEach(([l1, v1, l2, v2]) => {
@@ -173,7 +183,9 @@ const generatePayslipPDF = (payslipData) => {
       y += RH;
       cell('UAN Number',     ML,             y, AD1, RH, { fsize: 8, color: '#555555', bg: SUB_BG });
       cell(uanNumber || '—',                 ML + AD1,             y, AD2, RH, { fsize: 8.5, bold: true });
-      cell('',               ML + AD1 + AD2, y, AD3 + AD4, RH, { bg: null });
+      // PAN sits below IFSC, in the right column of the UAN row.
+      cell('PAN Number',     ML + AD1 + AD2, y, AD3, RH, { fsize: 8, color: '#555555', bg: SUB_BG });
+      cell(panNumber || '—',                 ML + AD1 + AD2 + AD3, y, AD4, RH, { fsize: 8.5, bold: true });
       y += RH + 12;
 
       /* ════════════════════════════════════════

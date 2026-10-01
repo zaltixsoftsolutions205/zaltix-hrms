@@ -40,6 +40,11 @@ const STATUS_OPACITY = {
   rejected: 'opacity-30 line-through',
 };
 
+// Local YYYY-MM-DD — avoids the UTC-conversion day-shift of toISOString()
+// for timezones ahead of UTC (e.g. IST).
+const localDateKey = (d) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
 const LeaveCalendar = ({ leaves, calMonth, calYear, onPrev, onNext }) => {
   // Expand each leave into individual days for the calendar
   const dayMap = {};
@@ -49,7 +54,7 @@ const LeaveCalendar = ({ leaves, calMonth, calYear, onPrev, onNext }) => {
     d.setHours(0, 0, 0, 0);
     end.setHours(0, 0, 0, 0);
     while (d <= end) {
-      const key = d.toISOString().split('T')[0];
+      const key = localDateKey(d);
       if (!dayMap[key] || dayMap[key].status === 'pending') {
         dayMap[key] = { status: leave.status, type: leave.type };
       }
@@ -59,7 +64,7 @@ const LeaveCalendar = ({ leaves, calMonth, calYear, onPrev, onNext }) => {
 
   const firstDayOfWeek = new Date(calYear, calMonth - 1, 1).getDay();
   const daysInMonth = new Date(calYear, calMonth, 0).getDate();
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = localDateKey(new Date());
 
   return (
     <div>

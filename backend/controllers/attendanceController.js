@@ -11,8 +11,8 @@ const istDate = () => istNow().toISOString().slice(0, 10);   // YYYY-MM-DD
 const istTime = () => istNow().toISOString().slice(11, 16);  // HH:mm
 
 // Office hours (IST)
-const OFFICE_START = '09:30'; // late if check-in after this
-const OFFICE_END = '18:30'; // early leave if check-out before this
+const OFFICE_START = '09:00'; // late if check-in after this
+const OFFICE_END = '18:00'; // early leave if check-out before this
 
 // Find a holiday falling on the given IST calendar date (YYYY-MM-DD).
 // Holiday.date is stored as a Date (often midnight UTC), so we match by a
@@ -195,13 +195,13 @@ exports.getMyAttendance = async (req, res) => {
         ? moment(today).subtract(1, "day").format("YYYY-MM-DD")
         : end;
 
-    // Count Mon–Fri working days
+    // Count working days — Sunday is the only weekly off; Saturday is worked
     let workingDays = 0;
     const cur = moment(start);
     const endM = moment(absentCalcEnd);
 
     while (cur.isSameOrBefore(endM)) {
-      if (cur.day() !== 0 && cur.day() !== 6) {
+      if (cur.day() !== 0) {
         workingDays++;
       }
       cur.add(1, "day");
@@ -325,9 +325,16 @@ exports.applyRegularization = async (req, res) => {
       });
     }
 
+    // A checkout more than an hour past office end (e.g. genuinely
+    // forgetting to check out until late at night, or inflating hours) is
+    // just as worth flagging/correcting as arriving late or leaving early.
+    const LATE_CHECKOUT_THRESHOLD = "19:00"; // 1hr past OFFICE_END (18:00)
+    const isLateCheckout = record.checkOut && record.checkOut > LATE_CHECKOUT_THRESHOLD;
+
     if (
       !record.isLate &&
       !record.isEarlyLeave &&
+      !isLateCheckout &&
       record.checkOut
     ) {
       return res.status(400).json({
@@ -335,14 +342,37 @@ exports.applyRegularization = async (req, res) => {
       });
     }
 
-    if (record.regularizationStatus) {
+    // Block only while a request is pending or already approved. A rejected
+    // request can be corrected and resubmitted.
+    if (record.regularizationStatus === "pending" || record.regularizationStatus === "approved") {
       return res.status(400).json({
         message: "Regularization already submitted",
       });
     }
 
+    // Cap resubmissions at 3 attempts total for this record (initial
+    // request + up to 2 corrections after rejection).
+    if (record.regularizationAttempts >= 3) {
+      return res.status(400).json({
+        message: "You have reached the maximum of 3 regularization attempts for this day. Please contact HR directly.",
+      });
+    }
+
+    // Always require both times on every request, regardless of which one
+    // originally triggered it — otherwise a corrected checkout submitted
+    // without a checkIn (or vice versa) leaves the other half unset, and
+    // approval later computes work hours off a partially-corrected record.
+    if (!checkIn) {
+      return res.status(400).json({ message: "Please provide your check-in time" });
+    }
+    if (!checkOut) {
+      return res.status(400).json({ message: "Please provide your check-out (leaving) time" });
+    }
+
     record.regularizationStatus = "pending";
     record.regularizationReason = reason.trim();
+    record.regularizationComment = ""; // clear any prior rejection note
+    record.regularizationAttempts = (record.regularizationAttempts || 0) + 1;
 
     // Employee requested timings
     record.regularizedCheckIn = checkIn || null;
@@ -397,7 +427,7 @@ function calculateWorkHours(checkIn, checkOut) {
 exports.reviewRegularization = async (req, res) => {
   const { status, comment } = req.body;
   const OFFICE_START = process.env.OFFICE_START || "09:00";
-  const OFFICE_END = process.env.OFFICE_END || "18:30";
+  const OFFICE_END = process.env.OFFICE_END || "18:00";
 
   try {
     if (!["approved", "rejected"].includes(status)) {
@@ -415,45 +445,69 @@ exports.reviewRegularization = async (req, res) => {
       });
     }
 
-    if (record.regularizationStatus !== "pending") {
+    if (!["pending", "approved", "rejected"].includes(record.regularizationStatus)) {
       return res.status(400).json({
-        message: "Already reviewed",
+        message: "No regularization request on this record",
       });
     }
 
-    record.regularizationStatus = status;
-    record.regularizationComment = comment?.trim() || "";
+    if (record.regularizationStatus === status) {
+      return res.status(400).json({
+        message: `Already ${status}`,
+      });
+    }
 
-    if (status === "approved") {
+    const wasApproved = record.regularizationStatus === "approved";
 
-      // Apply corrected check-in
+    if (status === "rejected") {
+      // Moving to rejected from approved: restore the punch record to how
+      // it was right before approval overwrote it, rather than leaving the
+      // regularized times in effect under a "rejected" label. Moving from
+      // pending, there's nothing to restore — the record was never touched.
+      if (wasApproved && record.preApprovalSnapshot?.status) {
+        const snap = record.preApprovalSnapshot;
+        record.checkIn = snap.checkIn;
+        record.checkOut = snap.checkOut;
+        record.status = snap.status;
+        record.isLate = snap.isLate;
+        record.isEarlyLeave = snap.isEarlyLeave;
+        record.workHours = snap.workHours;
+      }
+    } else if (status === "approved") {
+      // Moving to approved from pending or rejected: apply the regularized
+      // times. Snapshot first so a later reversal can restore this exact
+      // state — but only if we don't already have one from an earlier
+      // approval (re-approving after a reject-then-reapprove shouldn't
+      // overwrite the original pre-regularization snapshot).
+      if (!wasApproved && !record.preApprovalSnapshot?.status) {
+        record.preApprovalSnapshot = {
+          checkIn: record.checkIn,
+          checkOut: record.checkOut,
+          status: record.status,
+          isLate: record.isLate,
+          isEarlyLeave: record.isEarlyLeave,
+          workHours: record.workHours,
+        };
+      }
+
       if (record.regularizedCheckIn) {
         record.checkIn = record.regularizedCheckIn;
         record.isLate = record.checkIn > OFFICE_START;
       }
-
-      // Apply corrected check-out
       if (record.regularizedCheckOut) {
         record.checkOut = record.regularizedCheckOut;
         record.isEarlyLeave = record.checkOut < OFFICE_END;
       }
 
-      record.workHours = calculateWorkHours(
-        record.checkIn,
-        record.checkOut
-      );
+      record.workHours = calculateWorkHours(record.checkIn, record.checkOut);
+
+      if (record.workHours >= 8) record.status = "present";
+      else if (record.workHours >= 4) record.status = "half-day";
+      else record.status = "absent";
     }
 
-    // cal workhours
-    if (record.workHours >= 8) {
-      record.status = "present";
-    }
-    else if (record.workHours >= 4) {
-      record.status = "half-day";
-    }
-    else {
-      record.status = "absent";
-    }
+    record.regularizationStatus = status;
+    record.regularizationComment = comment?.trim() || "";
 
     await record.save();
 

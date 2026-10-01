@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 import api from '../../utils/api';
 import { formatDate, getUploadUrl } from '../../utils/helpers';
 import Modal from '../../components/UI/Modal';
@@ -25,6 +26,31 @@ const JOB_STATUS = {
 
 const statusOf = (key) => STATUSES.find(s => s.key === key) || STATUSES[0];
 
+const TEMPLATE_HEADERS = ['Name', 'Years of Experience', 'Status', 'Comment'];
+
+const downloadTemplate = (jobTitle) => {
+  const sampleRows = [
+    { 'Name': 'Jane Doe', 'Years of Experience': 3, 'Status': 'interested', 'Comment': 'Strong manual testing background' },
+    { 'Name': 'John Smith', 'Years of Experience': 5, 'Status': 'shortlisted', 'Comment': '' },
+  ];
+  const ws = XLSX.utils.json_to_sheet(sampleRows, { header: TEMPLATE_HEADERS });
+  ws['!cols'] = [{ wch: 22 }, { wch: 18 }, { wch: 16 }, { wch: 40 }];
+
+  const notes = XLSX.utils.aoa_to_sheet([
+    ['Column', 'Notes'],
+    ['Name', 'Required.'],
+    ['Years of Experience', 'Optional. Number.'],
+    ['Status', `Optional. One of: ${STATUSES.map(s => s.key).join(', ')}. Defaults to "interested" if blank or invalid.`],
+    ['Comment', 'Optional. Why this resume is worth keeping.'],
+  ]);
+  notes['!cols'] = [{ wch: 22 }, { wch: 70 }];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Candidates');
+  XLSX.utils.book_append_sheet(wb, notes, 'Instructions');
+  XLSX.writeFile(wb, `Recruitment_Template_${(jobTitle || 'Job').replace(/[^a-z0-9]+/gi, '_')}.xlsx`);
+};
+
 const downloadFile = async (url, filename) => {
   try {
     const res  = await fetch(url);
@@ -47,8 +73,9 @@ const ResumeCard = ({ app, onClick }) => {
   return (
     <motion.div initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }}
       onClick={onClick}
-      className="flex flex-wrap items-center justify-between gap-3 p-4 rounded-xl bg-white border border-gray-100 hover:shadow-md hover:border-violet-200 transition-all cursor-pointer group"
+      className="p-4 rounded-xl bg-white border border-gray-100 hover:shadow-md hover:border-violet-200 transition-all cursor-pointer group"
     >
+     <div className="flex flex-wrap items-center justify-between gap-3">
       <div className="flex items-center gap-3 min-w-0">
         <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${st.bg} group-hover:scale-105 transition-transform`}>
           <span className={`text-sm font-bold ${st.text}`}>{app.name.charAt(0).toUpperCase()}</span>
@@ -92,6 +119,19 @@ const ResumeCard = ({ app, onClick }) => {
           {st.label}
         </span>
       </div>
+     </div>
+
+      {/* Why we're keeping this resume */}
+      {app.comment ? (
+        <div className="mt-3 flex items-start gap-2 bg-violet-50/60 border border-violet-100 rounded-lg px-3 py-2">
+          <svg className="w-3.5 h-3.5 text-violet-400 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M7 8h10M7 12h6m-6 8l-3-3V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H10l-3 3z" />
+          </svg>
+          <p className="text-xs text-violet-800 whitespace-pre-wrap break-words">{app.comment}</p>
+        </div>
+      ) : (
+        <p className="mt-3 text-xs text-gray-300 italic">No comment — click to add why this resume is worth keeping</p>
+      )}
     </motion.div>
   );
 };
@@ -112,13 +152,22 @@ const RecruitmentJobPage = () => {
   const [resumeFile, setResumeFile]           = useState(null);
   const [resumeStatus, setResumeStatus]       = useState('interested');
   const [resumeExpYears, setResumeExpYears]   = useState('');
+  const [resumeComment, setResumeComment]     = useState('');
   const [submitting, setSubmitting]           = useState(false);
+
+  /* comment editing inside the detail modal */
+  const [commentDraft, setCommentDraft]   = useState('');
+  const [savingComment, setSavingComment] = useState(false);
 
   /* status filter */
   const [statusFilter, setStatusFilter] = useState('');
 
   /* detail modal */
   const [selected, setSelected] = useState(null);
+
+  /* bulk excel upload */
+  const fileInputRef = useRef(null);
+  const [uploading, setUploading] = useState(false);
 
   /* ── fetch ── */
   const fetchData = useCallback(async () => {
@@ -158,13 +207,14 @@ const RecruitmentJobPage = () => {
       fd.append('name', resumeName.trim());
       fd.append('status', resumeStatus);
       if (resumeExpYears !== '') fd.append('yearsOfExperience', resumeExpYears);
+      if (resumeComment.trim()) fd.append('comment', resumeComment.trim());
       if (resumeFile) fd.append('resume', resumeFile);
       const r = await api.post('/recruitment/applicants', fd, {
         headers: { 'Content-Type': 'multipart/form-data' },
       });
       toast.success('Resume added');
       setResumes(prev => [r.data, ...prev]);
-      setResumeName(''); setResumeFile(null); setResumeStatus('interested'); setResumeExpYears('');
+      setResumeName(''); setResumeFile(null); setResumeStatus('interested'); setResumeExpYears(''); setResumeComment('');
       setShowForm(false);
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     finally { setSubmitting(false); }
@@ -180,6 +230,18 @@ const RecruitmentJobPage = () => {
     } catch { toast.error('Failed'); }
   };
 
+  /* ── save comment ── */
+  const handleSaveComment = async (id) => {
+    setSavingComment(true);
+    try {
+      const r = await api.put(`/recruitment/applicants/${id}/comment`, { comment: commentDraft.trim() });
+      setResumes(prev => prev.map(a => a._id === id ? r.data : a));
+      setSelected(r.data);
+      toast.success('Comment saved');
+    } catch { toast.error('Failed to save comment'); }
+    finally { setSavingComment(false); }
+  };
+
   /* ── delete resume ── */
   const handleDelete = async (id) => {
     if (!window.confirm('Remove this resume?')) return;
@@ -189,6 +251,43 @@ const RecruitmentJobPage = () => {
       setSelected(null);
       toast.success('Removed');
     } catch { toast.error('Failed'); }
+  };
+
+  /* ── bulk excel upload ── */
+  const handleFileChosen = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: 'array' });
+      const sheet = wb.Sheets[wb.SheetNames[0]];
+      const raw = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+
+      if (raw.length === 0) { toast.error('No rows found in the file'); return; }
+
+      const rows = raw.map(r => ({
+        name: r['Name'] ?? r['name'] ?? '',
+        yearsOfExperience: r['Years of Experience'] ?? r['yearsOfExperience'] ?? '',
+        status: r['Status'] ?? r['status'] ?? '',
+        comment: r['Comment'] ?? r['comment'] ?? '',
+      }));
+
+      const res = await api.post('/recruitment/applicants/bulk', { jobPosting: jobId, rows });
+      const { created, skipped, errors } = res.data;
+
+      if (created > 0) toast.success(`Imported ${created} candidate${created !== 1 ? 's' : ''}`);
+      if (skipped > 0) toast.error(`Skipped ${skipped} row${skipped !== 1 ? 's' : ''} — missing name`);
+      if (errors?.length) errors.slice(0, 3).forEach(er => toast(`Row ${er.row}: ${er.message}`, { icon: '⚠️' }));
+
+      fetchData();
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Import failed — check the file matches the template');
+    } finally {
+      setUploading(false);
+    }
   };
 
   /* filtered list */
@@ -283,12 +382,23 @@ const RecruitmentJobPage = () => {
             {statusFilter ? ` (filtered from ${resumes.length})` : ''}
           </span>
         </div>
-        <button onClick={() => setShowForm(v => !v)}
-          className={`btn-sm font-semibold text-sm px-4 py-2 rounded-lg transition-colors ${
-            showForm ? 'bg-gray-100 text-gray-600' : 'bg-violet-600 text-white hover:bg-violet-700'
-          }`}>
-          {showForm ? '✕ Cancel' : '+ Add Resume'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => downloadTemplate(job.title)}
+            className="btn-sm font-semibold text-sm px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors">
+            ⬇ Download Template
+          </button>
+          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleFileChosen} />
+          <button onClick={() => fileInputRef.current?.click()} disabled={uploading}
+            className="btn-sm font-semibold text-sm px-4 py-2 rounded-lg bg-gray-100 text-gray-600 hover:bg-gray-200 transition-colors disabled:opacity-50">
+            {uploading ? 'Importing…' : '⬆ Upload Excel'}
+          </button>
+          <button onClick={() => setShowForm(v => !v)}
+            className={`btn-sm font-semibold text-sm px-4 py-2 rounded-lg transition-colors ${
+              showForm ? 'bg-gray-100 text-gray-600' : 'bg-violet-600 text-white hover:bg-violet-700'
+            }`}>
+            {showForm ? '✕ Cancel' : '+ Add Resume'}
+          </button>
+        </div>
       </div>
 
       {/* ── Add Resume Form ── */}
@@ -325,6 +435,14 @@ const RecruitmentJobPage = () => {
                   </select>
                 </div>
               </div>
+              <div>
+                <label className="input-label">Comment — why keep this resume?</label>
+                <textarea className="input-field" rows={2} maxLength={1000}
+                  placeholder="e.g. Strong manual testing background, good communication — worth calling for the next QA opening"
+                  value={resumeComment}
+                  onChange={e => setResumeComment(e.target.value)} />
+                <p className="text-[11px] text-gray-400 mt-0.5">Shown with the resume so anyone reviewing later knows why it was shortlisted or kept.</p>
+              </div>
               <div className="flex gap-3 justify-end">
                 <button type="button" onClick={() => setShowForm(false)} className="btn-secondary btn-sm">Cancel</button>
                 <button type="submit" disabled={submitting} className="btn-primary btn-sm">
@@ -354,7 +472,8 @@ const RecruitmentJobPage = () => {
       ) : (
         <div className="space-y-3">
           {filtered.map(app => (
-            <ResumeCard key={app._id} app={app} onClick={() => setSelected(app)} />
+            <ResumeCard key={app._id} app={app}
+              onClick={() => { setSelected(app); setCommentDraft(app.comment || ''); }} />
           ))}
         </div>
       )}
@@ -418,6 +537,24 @@ const RecruitmentJobPage = () => {
               ) : (
                 <p className="text-sm text-gray-400 italic">No resume file uploaded.</p>
               )}
+
+              {/* Comment — why this resume is worth keeping */}
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase mb-2">Comment — why keep this resume?</p>
+                <textarea className="input-field" rows={3} maxLength={1000}
+                  placeholder="e.g. Strong manual testing background — call back for the next QA opening"
+                  value={commentDraft}
+                  onChange={e => setCommentDraft(e.target.value)} />
+                <div className="flex items-center justify-between mt-1.5">
+                  <span className="text-[11px] text-gray-400">{commentDraft.length}/1000</span>
+                  <button
+                    onClick={() => handleSaveComment(selected._id)}
+                    disabled={savingComment || commentDraft.trim() === (selected.comment || '')}
+                    className="btn-primary btn-sm disabled:opacity-40 disabled:cursor-not-allowed">
+                    {savingComment ? 'Saving...' : 'Save Comment'}
+                  </button>
+                </div>
+              </div>
 
               {/* Status update */}
               <div>

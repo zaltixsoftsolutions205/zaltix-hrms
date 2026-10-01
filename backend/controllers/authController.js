@@ -10,9 +10,21 @@ const generateToken = (id) => jwt.sign({ id }, process.env.JWT_SECRET, { expires
 exports.login = async (req, res) => {
   const { login, password  } = req.body;
   try {
+    if (!login || !password) {
+      return res.status(400).json({ message: 'Please provide your email or employee ID and password' });
+    }
+
+    // Accept either an email address or an employee ID. Emails are stored
+    // lowercased, but employee IDs are entered by hand and vary in case
+    // (ADMIN001, ZSSE0007, emp1), so match those case-insensitively.
+    const identifier = String(login).trim();
+    const employeeIdPattern = new RegExp(
+      `^${identifier.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`,
+      'i'
+    );
     const user = await User.findOne({  $or: [
-        { email: login },
-        { employeeId: login }
+        { email: identifier.toLowerCase() },
+        { employeeId: employeeIdPattern }
       ]}).populate('department');
     if (!user) return res.status(401).json({ message: 'Invalid credentials' });
 

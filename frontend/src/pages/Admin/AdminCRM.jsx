@@ -49,31 +49,63 @@ const getMonthStart = () => {
   return d;
 };
 
+/* ── Sparkline — plain SVG polyline, no chart library overhead ── */
+const Sparkline = ({ points = [], stroke = '#8B5CF6' }) => {
+  if (!points.length || points.every(p => p === 0)) return null;
+  const w = 120, h = 34;
+  const max = Math.max(...points, 1);
+  const min = Math.min(...points, 0);
+  const span = max - min || 1;
+  const step = points.length > 1 ? w / (points.length - 1) : w;
+  const coords = points.map((p, i) => [i * step, h - ((p - min) / span) * (h - 4) - 2]);
+  const line = coords.map(([x, y]) => `${x.toFixed(1)},${y.toFixed(1)}`).join(' ');
+  const area = `${coords[0][0]},${h} ${line} ${coords[coords.length - 1][0]},${h}`;
+  const gid = `sg-${stroke.replace('#', '')}`;
+  return (
+    <svg width="100%" height={h} viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" className="mt-2 block">
+      <defs>
+        <linearGradient id={gid} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity="0.22" />
+          <stop offset="100%" stopColor={stroke} stopOpacity="0" />
+        </linearGradient>
+      </defs>
+      <polygon points={area} fill={`url(#${gid})`} />
+      <polyline points={line} fill="none" stroke={stroke} strokeWidth="2"
+        strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />
+    </svg>
+  );
+};
+
 /* ── KPI card ── */
-const KPI = ({ label, value, sub, icon, color = 'violet', trend }) => {
+const KPI = ({ label, value, sub, icon, color = 'violet', trend, spark }) => {
   const c = {
-    violet: { wrap: 'bg-violet-50 border-violet-100', icon: 'text-violet-600', val: 'text-violet-700', sub: 'text-violet-400' },
-    amber:  { wrap: 'bg-amber-50  border-amber-100',  icon: 'text-amber-600',  val: 'text-amber-700',  sub: 'text-amber-400'  },
-    green:  { wrap: 'bg-emerald-50 border-emerald-100',icon: 'text-emerald-600',val: 'text-emerald-700',sub: 'text-emerald-400'},
-    blue:   { wrap: 'bg-blue-50   border-blue-100',   icon: 'text-blue-600',   val: 'text-blue-700',   sub: 'text-blue-400'   },
-  }[color] || { wrap: 'bg-violet-50 border-violet-100', icon: 'text-violet-600', val: 'text-violet-700', sub: 'text-violet-400' };
+    violet: { card: 'bg-violet-50/70 border-violet-200/70 hover:border-violet-300', chip: 'bg-violet-100 text-violet-600', label: 'text-violet-900/60', sub: 'text-violet-500', line: '#8B5CF6' },
+    amber:  { card: 'bg-amber-50/70 border-amber-200/70 hover:border-amber-300',    chip: 'bg-amber-100 text-amber-600',  label: 'text-amber-900/60',  sub: 'text-amber-500',  line: '#F59E0B' },
+    green:  { card: 'bg-emerald-50/70 border-emerald-200/70 hover:border-emerald-300', chip: 'bg-emerald-100 text-emerald-600', label: 'text-emerald-900/60', sub: 'text-emerald-500', line: '#10B981' },
+    blue:   { card: 'bg-blue-50/70 border-blue-200/70 hover:border-blue-300',       chip: 'bg-blue-100 text-blue-600',    label: 'text-blue-900/60',   sub: 'text-blue-500',   line: '#3B82F6' },
+    rose:   { card: 'bg-rose-50/70 border-rose-200/70 hover:border-rose-300',       chip: 'bg-rose-100 text-rose-500',    label: 'text-rose-900/60',   sub: 'text-rose-500',   line: '#F43F5E' },
+    indigo: { card: 'bg-indigo-50/70 border-indigo-200/70 hover:border-indigo-300', chip: 'bg-indigo-100 text-indigo-600',label: 'text-indigo-900/60', sub: 'text-indigo-500', line: '#6366F1' },
+  }[color] || { card: 'bg-violet-50/70 border-violet-200/70', chip: 'bg-violet-100 text-violet-600', label: 'text-violet-900/60', sub: 'text-violet-500', line: '#8B5CF6' };
 
   return (
-    <div className={`bg-white border border-gray-100 rounded-2xl p-4 flex flex-col gap-3`}>
-      <div className={`w-9 h-9 rounded-xl border flex items-center justify-center ${c.wrap} ${c.icon}`}>
-        {icon}
+    <div className={`border rounded-2xl p-4 shadow-sm hover:shadow-md hover:-translate-y-0.5 transition-all duration-200 flex flex-col ${c.card}`}>
+      <div className="flex items-center gap-2.5 mb-3">
+        <span className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${c.chip}`}>
+          {icon}
+        </span>
+        <p className={`text-xs font-bold leading-tight ${c.label}`}>{label}</p>
       </div>
-      <div>
-        <p className="text-2xl font-extrabold text-gray-900 leading-none">{value ?? '—'}</p>
-        <p className="text-xs text-gray-400 font-medium mt-1">{label}</p>
-        {sub && <p className={`text-[10px] mt-0.5 font-semibold ${c.sub}`}>{sub}</p>}
-        {trend != null && (
-          <div className={`inline-flex items-center gap-0.5 text-[10px] font-bold mt-1 ${trend >= 0 ? 'text-emerald-500' : 'text-red-400'}`}>
-            <span>{trend >= 0 ? '▲' : '▼'}</span>
-            <span>{Math.abs(trend).toFixed(1)}% vs prior</span>
-          </div>
-        )}
-      </div>
+      <p className="text-[26px] font-extrabold text-gray-900 leading-none tabular-nums">{value ?? '—'}</p>
+      {trend != null ? (
+        <div className={`inline-flex items-center gap-1 text-[11px] font-bold mt-2 ${trend >= 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+          <span>{trend >= 0 ? '↑' : '↓'}</span>
+          <span>{Math.abs(trend).toFixed(1)}%</span>
+          <span className={`font-medium ${c.label}`}>vs last period</span>
+        </div>
+      ) : sub ? (
+        <p className={`text-[11px] mt-2 font-semibold ${c.sub}`}>{sub}</p>
+      ) : <div className="mt-2 h-[17px]" />}
+      <div className="mt-auto"><Sparkline points={spark} stroke={c.line} /></div>
     </div>
   );
 };
@@ -118,6 +150,44 @@ const AdminCRM = () => {
   const periodConverted = periodLeads.filter(l => l.status === 'converted').length;
   const convRate       = periodLeads.length > 0 ? ((periodConverted / periodLeads.length) * 100).toFixed(1) : '0.0';
   const activeClients  = clients.filter(c => c.status === 'active').length || clients.length;
+
+  /* ── Previous comparable period, for the KPI trend badges ── */
+  const periodMs = { today: 86400000, weekly: 7 * 86400000, monthly: 30 * 86400000, yearly: 365 * 86400000 }[period];
+  const prevCutoff = new Date(cutoff.getTime() - periodMs);
+  const inPrev = (d) => { const t = new Date(d); return t >= prevCutoff && t < cutoff; };
+  const prevActs = allLeads.flatMap(l => (l.activities || []).filter(a => inPrev(a.date || a.createdAt)));
+  const prevStats = {
+    leads: allLeads.filter(l => inPrev(l.createdAt)).length,
+    calls: prevActs.filter(a => a.type === 'call').length,
+    meetings: prevActs.filter(a => a.type === 'meeting').length,
+    deals: deals.filter(d => d.status === 'won' && inPrev(d.updatedAt || d.createdAt)).length,
+  };
+  // Percentage change, or null when there is no prior figure to divide by —
+  // showing a trend against zero would be meaningless (or Infinity).
+  const pct = (now, before) => (before > 0 ? ((now - before) / before) * 100 : null);
+
+  /* ── Sparkline series: last 8 buckets sized to the selected period ── */
+  const sparkSeries = (() => {
+    const buckets = 8;
+    const size = period === 'today' ? 3600000 * 3 : period === 'weekly' ? 86400000 : period === 'monthly' ? 4 * 86400000 : 30 * 86400000;
+    const end = Date.now();
+    const mk = (match) => Array.from({ length: buckets }, (_, i) => {
+      const from = end - (buckets - i) * size;
+      const to = from + size;
+      return match(from, to);
+    });
+    const actsIn = (type) => mk((from, to) => allLeads.flatMap(l => l.activities || [])
+      .filter(a => a.type === type)
+      .filter(a => { const t = new Date(a.date || a.createdAt).getTime(); return t >= from && t < to; }).length);
+    return {
+      leads: mk((from, to) => allLeads.filter(l => { const t = new Date(l.createdAt).getTime(); return t >= from && t < to; }).length),
+      calls: actsIn('call'),
+      meetings: actsIn('meeting'),
+      deals: mk((from, to) => deals.filter(d => d.status === 'won')
+        .filter(d => { const t = new Date(d.updatedAt || d.createdAt).getTime(); return t >= from && t < to; }).length),
+      clients: mk((from, to) => clients.filter(c => { const t = new Date(c.createdAt).getTime(); return t >= from && t < to; }).length),
+    };
+  })();
 
   /* ── Monthly trend data ── */
   const monthlyTrend = (() => {
@@ -182,12 +252,12 @@ const AdminCRM = () => {
 
       {/* ── KPI cards ── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <KPI label="Leads Generated"  value={periodLeads.length}    icon={<Icon d={IC.lead}  size={16} />} color="violet" />
-        <KPI label="Calls Made"       value={periodCalls}           icon={<Icon d={IC.users} size={16} />} color="blue" />
-        <KPI label="Meetings Booked"  value={periodMeetings}        icon={<Icon d={IC.spark} size={16} />} color="amber" />
-        <KPI label="Deals Closed"     value={periodDeals}           icon={<Icon d={IC.bag}   size={16} />} color="green" />
-        <KPI label="Conv. Rate"       value={`${convRate}%`}        icon={<Icon d={IC.trend} size={16} />} color="violet" sub={`${periodConverted} of ${periodLeads.length} converted`} />
-        <KPI label="Active Clients"   value={activeClients}         icon={<Icon d={IC.box}   size={16} />} color="green" />
+        <KPI label="Leads Generated"  value={periodLeads.length}    icon={<Icon d={IC.lead}  size={16} />} color="violet" trend={pct(periodLeads.length, prevStats.leads)} spark={sparkSeries.leads} />
+        <KPI label="Calls Made"       value={periodCalls}           icon={<Icon d={IC.users} size={16} />} color="blue"   trend={pct(periodCalls, prevStats.calls)} spark={sparkSeries.calls} />
+        <KPI label="Meetings Booked"  value={periodMeetings}        icon={<Icon d={IC.spark} size={16} />} color="amber"  trend={pct(periodMeetings, prevStats.meetings)} spark={sparkSeries.meetings} />
+        <KPI label="Deals Closed"     value={periodDeals}           icon={<Icon d={IC.bag}   size={16} />} color="green"  trend={pct(periodDeals, prevStats.deals)} spark={sparkSeries.deals} />
+        <KPI label="Conv. Rate"       value={`${convRate}%`}        icon={<Icon d={IC.trend} size={16} />} color="indigo" sub={`${periodConverted} of ${periodLeads.length} converted`} />
+        <KPI label="Active Clients"   value={activeClients}         icon={<Icon d={IC.box}   size={16} />} color="rose"   spark={sparkSeries.clients} />
       </div>
 
       {/* ── Tabs ── */}
@@ -208,21 +278,70 @@ const AdminCRM = () => {
           <motion.div key="overview" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}
             className="space-y-4">
 
-            {/* ── Leads list for selected period ── */}
-            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50">
+            {/* ── Trend chart + period leads, side by side (2:1) ── */}
+            <div className="grid lg:grid-cols-3 gap-4 items-stretch">
+
+            {/* 6-month trend */}
+            <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl p-5 shadow-sm flex flex-col">
+              <div className="flex items-start justify-between mb-4 gap-3">
                 <div>
-                  <p className="font-bold text-gray-900 text-sm">
+                  <p className="font-bold text-gray-900 text-sm">Lead &amp; Deal Trend</p>
+                  <p className="text-[11px] text-gray-400 mt-0.5">Last 6 months</p>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] text-gray-400 flex-wrap justify-end">
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-violet-200 inline-block" />Leads</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-violet-600 inline-block" />Converted</span>
+                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" />Deals Won</span>
+                </div>
+              </div>
+              {monthlyTrend.some(m => m.leads || m.converted || m.deals) ? (
+                <ResponsiveContainer width="100%" height={250}>
+                  <BarChart data={monthlyTrend} barGap={3} barSize={14}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
+                    <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
+                    <YAxis tick={{ fontSize: 9, fill: '#D1D5DB' }} axisLine={false} tickLine={false} />
+                    <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #F3F4F6', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} cursor={{ fill: '#F5F3FF' }} />
+                    <Bar dataKey="leads"     name="Leads"     fill="#DDD6FE" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="converted" name="Converted" fill="#7C3AED" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="deals"     name="Deals Won" fill="#F59E0B" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              ) : (
+                <div className="flex flex-col items-center justify-center flex-1 min-h-[250px] text-center">
+                  <span className="w-11 h-11 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                    <Icon d={IC.trend} size={20} className="text-violet-300" />
+                  </span>
+                  <p className="text-sm font-semibold text-gray-500">No trend data</p>
+                  <p className="text-[11px] text-gray-400 mt-1">Leads and deals appear here as they are created.</p>
+                </div>
+              )}
+            </div>
+
+            {/* ── Leads list for selected period ── */}
+            <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden flex flex-col">
+              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-50 gap-2">
+                <div className="min-w-0">
+                  <p className="font-bold text-gray-900 text-sm truncate">
                     {PERIODS.find(p => p.key === period)?.label} Leads
                   </p>
                   <p className="text-[11px] text-gray-400 mt-0.5">{periodLeads.length} lead{periodLeads.length !== 1 ? 's' : ''} found</p>
                 </div>
-                <span className="text-[11px] font-bold text-violet-600 bg-violet-50 px-3 py-1 rounded-full">
+                <span className="text-[11px] font-bold text-violet-600 bg-violet-50 px-3 py-1 rounded-full flex-shrink-0">
                   {periodConverted} converted
                 </span>
               </div>
               {periodLeads.length === 0 ? (
-                <div className="py-10 text-center text-gray-300 text-sm">No leads for this period</div>
+                <div className="flex flex-col items-center justify-center flex-1 min-h-[250px] text-center px-5">
+                  <span className="w-12 h-12 rounded-2xl bg-violet-50 flex items-center justify-center mb-3">
+                    <Icon d={IC.lead} size={22} className="text-violet-300" />
+                  </span>
+                  <p className="text-sm font-semibold text-gray-500">No leads for this period</p>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    {allLeads.length > 0
+                      ? `You have ${allLeads.length} leads overall — try a wider period.`
+                      : 'New leads will show up here.'}
+                  </p>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-xs">
@@ -265,31 +384,7 @@ const AdminCRM = () => {
               )}
             </div>
 
-            {/* 6-month trend */}
-            <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <p className="font-bold text-gray-900 text-sm">Lead & Deal Trend</p>
-                  <p className="text-[11px] text-gray-400">Last 6 months</p>
-                </div>
-                <div className="flex items-center gap-3 text-[10px] text-gray-400">
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-violet-200 inline-block" />Leads</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-violet-600 inline-block" />Converted</span>
-                  <span className="flex items-center gap-1"><span className="w-2.5 h-2.5 rounded-sm bg-amber-400 inline-block" />Deals Won</span>
-                </div>
-              </div>
-              <ResponsiveContainer width="100%" height={220}>
-                <BarChart data={monthlyTrend} barGap={3} barSize={14}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F3F4F6" vertical={false} />
-                  <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 9, fill: '#D1D5DB' }} axisLine={false} tickLine={false} />
-                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #F3F4F6', fontSize: 11, boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }} cursor={{ fill: '#F5F3FF' }} />
-                  <Bar dataKey="leads"     name="Leads"     fill="#DDD6FE" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="converted" name="Converted" fill="#7C3AED" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="deals"     name="Deals Won" fill="#F59E0B" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+            </div>{/* end trend + leads grid */}
 
             {/* Sales summary cards */}
             <div className="grid sm:grid-cols-3 gap-4">
@@ -297,37 +392,72 @@ const AdminCRM = () => {
                 { label: 'Weekly Sales', value: deals.filter(d => d.status === 'won' && new Date(d.updatedAt || d.createdAt) >= getWeekStart()).reduce((s, d) => s + (d.value || d.dealValue || 0), 0), sub: 'Revenue this week' },
                 { label: 'Monthly Sales', value: deals.filter(d => d.status === 'won' && new Date(d.updatedAt || d.createdAt) >= getMonthStart()).reduce((s, d) => s + (d.value || d.dealValue || 0), 0), sub: 'Revenue this month' },
                 { label: 'Yearly Sales', value: deals.filter(d => d.status === 'won' && new Date(d.updatedAt || d.createdAt) >= yearStart).reduce((s, d) => s + (d.value || d.dealValue || 0), 0), sub: 'Revenue this year' },
-              ].map((s, i) => (
-                <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-                  <p className="text-xs text-gray-400 font-medium mb-1">{s.label}</p>
-                  <p className="text-2xl font-extrabold text-gray-900">{formatCurrency(s.value)}</p>
-                  <p className="text-[10px] text-gray-300 mt-1">{s.sub}</p>
-                  <div className="mt-3 h-1 bg-gray-100 rounded-full">
-                    <div className="h-full bg-violet-500 rounded-full" style={{ width: `${Math.min(100, s.value > 0 ? 65 : 0)}%` }} />
+              ].map((s, i) => {
+                // Bar is each period's share of the yearly total — a real
+                // proportion rather than a fixed placeholder width.
+                const yearTotal = deals.filter(d => d.status === 'won' && new Date(d.updatedAt || d.createdAt) >= yearStart)
+                  .reduce((a, d) => a + (d.value || d.dealValue || 0), 0);
+                const share = yearTotal > 0 ? Math.min(100, (s.value / yearTotal) * 100) : 0;
+                const tone = ['bg-violet-50 text-violet-600', 'bg-emerald-50 text-emerald-600', 'bg-amber-50 text-amber-600'][i];
+                const bar = ['bg-violet-500', 'bg-emerald-500', 'bg-amber-500'][i];
+                return (
+                  <div key={i} className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow duration-200">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs text-gray-400 font-medium mb-1">{s.label}</p>
+                        <p className="text-2xl font-extrabold text-gray-900 tabular-nums">{formatCurrency(s.value)}</p>
+                        <p className="text-[10px] text-gray-300 mt-1">{s.sub}</p>
+                      </div>
+                      <span className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${tone}`}>
+                        <Icon d={IC.bag} size={18} />
+                      </span>
+                    </div>
+                    <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${bar} transition-all`} style={{ width: `${share}%` }} />
+                    </div>
+                    {yearTotal > 0 && (
+                      <p className="text-[10px] text-gray-400 mt-1.5">{share.toFixed(0)}% of yearly revenue</p>
+                    )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
 
             {/* Pipeline status breakdown */}
             <div className="bg-white border border-gray-100 rounded-2xl p-5 shadow-sm">
-              <p className="font-bold text-gray-900 text-sm mb-4">Lead Pipeline Status</p>
+              <div className="flex items-baseline justify-between gap-3 mb-4">
+                <p className="font-bold text-gray-900 text-sm">Lead Pipeline Status</p>
+                <p className="text-[11px] text-gray-400">All time · {allLeads.length} leads</p>
+              </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 {[
-                  { label: 'New',           value: allLeads.filter(l => l.status === 'new').length,           bg: 'bg-blue-50 border-blue-100',     text: 'text-blue-700' },
-                  { label: 'Interested',    value: allLeads.filter(l => l.status === 'interested').length,    bg: 'bg-amber-50 border-amber-100',   text: 'text-amber-700' },
-                  { label: 'Converted',     value: allLeads.filter(l => l.status === 'converted').length,     bg: 'bg-violet-50 border-violet-100', text: 'text-violet-700' },
-                  { label: 'Not Interested',value: allLeads.filter(l => l.status === 'not-interested').length, bg: 'bg-gray-50 border-gray-100',    text: 'text-gray-500' },
-                ].map(s => (
-                  <div key={s.label} className={`rounded-xl border px-4 py-3 ${s.bg}`}>
-                    <p className={`text-2xl font-extrabold leading-none ${s.text}`}>{s.value}</p>
-                    <p className={`text-[11px] font-semibold mt-1 ${s.text} opacity-70`}>{s.label}</p>
-                    <div className="mt-2 h-0.5 bg-white/60 rounded-full">
-                      <div className={`h-full rounded-full ${s.text.replace('text', 'bg')}`}
-                        style={{ width: `${allLeads.length > 0 ? (s.value / allLeads.length * 100) : 0}%` }} />
+                  { label: 'New',           status: 'new',            bg: 'bg-blue-50 border-blue-100',     text: 'text-blue-700',   bar: 'bg-blue-500',   icon: IC.users },
+                  { label: 'Interested',    status: 'interested',     bg: 'bg-amber-50 border-amber-100',   text: 'text-amber-700',  bar: 'bg-amber-500',  icon: IC.spark },
+                  { label: 'Converted',     status: 'converted',      bg: 'bg-violet-50 border-violet-100', text: 'text-violet-700', bar: 'bg-violet-500', icon: IC.trend },
+                  { label: 'Not Interested',status: 'not-interested', bg: 'bg-gray-50 border-gray-100',     text: 'text-gray-500',   bar: 'bg-gray-400',   icon: IC.box },
+                ].map(s => {
+                  const value = allLeads.filter(l => l.status === s.status).length;
+                  const share = allLeads.length > 0 ? (value / allLeads.length) * 100 : 0;
+                  return (
+                    <div key={s.label} className={`rounded-xl border px-4 py-3.5 ${s.bg} hover:shadow-sm transition-shadow duration-200`}>
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className={`text-2xl font-extrabold leading-none tabular-nums ${s.text}`}>{value}</p>
+                          <p className={`text-[11px] font-semibold mt-1 ${s.text} opacity-70`}>{s.label}</p>
+                        </div>
+                        <span className={`w-8 h-8 rounded-lg bg-white/70 flex items-center justify-center flex-shrink-0 ${s.text}`}>
+                          <Icon d={s.icon} size={15} />
+                        </span>
+                      </div>
+                      <div className="mt-2.5 h-1 bg-white/70 rounded-full overflow-hidden">
+                        <div className={`h-full rounded-full ${s.bar}`} style={{ width: `${share}%` }} />
+                      </div>
+                      <p className={`text-[10px] mt-1.5 font-medium ${s.text} opacity-60`}>
+                        {share.toFixed(1)}% of all leads
+                      </p>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </motion.div>

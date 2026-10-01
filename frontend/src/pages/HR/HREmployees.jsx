@@ -83,6 +83,11 @@ const INTERN_FORM = {
   moduleAccess: [],
 };
 
+<<<<<<< HEAD
+=======
+const PRESET_ROLES = ['employee', 'sales', 'field_sales', 'hr', 'technical_associate', 'bda'];
+const EMPTY_FORM = { employeeId: '', name: '', email: '', role: 'employee', customRole: '', departmentId: '', designation: '', phone: '', joiningDate: '', exitDate: '', basicSalary: '', employeeType: '', moduleAccess: [] };
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
 export default function HREmployees() {
 
@@ -855,6 +860,99 @@ export default function HREmployees() {
           AttachDocsPanel={AttachDocsPanel}
         />
 
+<<<<<<< HEAD
+=======
+                    <tr key={emp._id} className="cursor-pointer hover:bg-violet-50/40 transition-colors" onClick={() => {
+                      // console.log("Clicked:", emp._id);
+                      navigate(`/hr/employees/${emp._id}`);
+                    }}>
+                      {/* Employee */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-violet-200 text-violet-800 font-bold text-sm flex items-center justify-center flex-shrink-0">
+                            {getInitials(emp.name)}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="font-semibold text-violet-900 truncate max-w-[160px]">{emp.name}</p>
+                            <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                              <Chip label={roleLabel(emp.role)} colorCls={ROLE_COLORS[emp.role] || 'bg-gray-100 text-gray-600'} />
+                              {emp.department?.name && (
+                                <span className="text-[11px] text-violet-500 font-medium truncate max-w-[100px]">{emp.department.name}</span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-violet-400 truncate max-w-[160px] mt-0.5">{emp.employeeId} · {emp.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      {/* Department */}
+                      <td className="px-4 py-3 text-sm text-violet-700 whitespace-nowrap">
+                        {emp.department?.name || <span className="text-violet-300">—</span>}
+                      </td>
+                      {/* Role / Type */}
+                      <td className="px-4 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          <Chip label={roleLabel(emp.role)} colorCls={ROLE_COLORS[emp.role] || 'bg-gray-100 text-gray-600'} />
+                          {emp.employeeType && <Chip label={emp.employeeType} colorCls={TYPE_COLORS[emp.employeeType] || 'bg-gray-100 text-gray-600'} />}
+                        </div>
+                      </td>
+                      {/* Status */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <div onClick={(e) => e.stopPropagation()}>
+                          <StatusDropdown emp={emp} onChange={handleStatusChange} />
+                        </div>
+                      </td>
+                      {/* Joining (+ exit date if the employee has left) */}
+                      <td className="px-4 py-3 text-sm text-violet-600 whitespace-nowrap">
+                        {formatDate(emp.joiningDate)}
+                        {emp.exitDate && (
+                          <span className="block text-[11px] font-semibold text-rose-500 mt-0.5">
+                            Exited: {formatDate(emp.exitDate)}
+                          </span>
+                        )}
+                      </td>
+                      {/* Salary */}
+                      <td className="px-4 py-3 text-sm font-semibold text-violet-800 whitespace-nowrap">
+                        {emp.basicSalary > 0 ? formatCurrency(emp.basicSalary) : <span className="text-violet-300 font-normal">—</span>}
+                      </td>
+                      {/* Actions */}
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <button onClick={(e) => { e.stopPropagation(); sendOffer(emp); }} title="Send offer letter"
+                            className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-100 transition-colors">
+                            <Ico d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); sendCreds(emp); }} title="Send credentials"
+                            className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-100 transition-colors">
+                            <Ico d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </button>
+                          {emp.employeeType && (
+                            <button onClick={(e) => { e.stopPropagation(); openDocs(emp); }} title="Review documents"
+                              className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-colors">
+                              <Ico d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                            </button>
+                          )}
+                          <button onClick={(e) => { e.stopPropagation(); openAttach(emp); }} title="Attach joining letter / ID card"
+                            className="p-1.5 rounded-lg text-violet-600 hover:bg-violet-50 transition-colors">
+                            <Ico d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); openEdit(emp); }} title="Edit employee"
+                            className="p-1.5 rounded-lg text-amber-600 hover:bg-amber-50 transition-colors">
+                            <Ico d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </button>
+                          <button onClick={(e) => { e.stopPropagation(); handleDelete(emp); }} title="Delete employee"
+                            className="p-1.5 rounded-lg text-red-600 hover:bg-red-50 transition-colors">
+                            <Ico d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </>
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
       )}
 
 
@@ -992,9 +1090,33 @@ export default function HREmployees() {
 }
 
 
+<<<<<<< HEAD
 /* ============================================================
    ATTACH DOCUMENT PANEL
 ============================================================ */
+=======
+/* ── Edit form ── */
+function EditForm({ emp, departments, onDone }) {
+  const isPreset = PRESET_ROLES.includes(emp.role);
+  const [form, setForm] = useState({
+    name: emp.name,
+    email: emp.email || '',
+    designation: emp.designation || '',
+    phone: emp.phone || '',
+    department: emp.department?._id || '',
+    joiningDate: emp.joiningDate ? new Date(emp.joiningDate).toISOString().split('T')[0] : '',
+    exitDate: emp.exitDate ? new Date(emp.exitDate).toISOString().split('T')[0] : '',
+    basicSalary: emp.basicSalary || 0,
+    role: isPreset ? emp.role : 'custom',
+    customRole: isPreset ? '' : emp.role,
+    moduleAccess: Array.isArray(emp.moduleAccess)
+      ? emp.moduleAccess.map(a => ({ module: a.module, permission: a.permission }))
+      : [],
+  });
+  const [sendNewCredentials, setSendNewCredentials] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const f = key => e => setForm(p => ({ ...p, [key]: e.target.value }));
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
 function AttachDocsPanel({
   emp,
@@ -1018,6 +1140,100 @@ function AttachDocsPanel({
       useRef(null)
   };
 
+<<<<<<< HEAD
+=======
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Name" value={form.name} onChange={f('name')} />
+        <Field label="Email *" type="email" required value={form.email} onChange={f('email')} placeholder="Login email" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Designation" value={form.designation} onChange={f('designation')} placeholder="Job title" />
+        <Field label="Phone" value={form.phone} onChange={f('phone')} placeholder="Phone number" />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <SelectField label="Department" value={form.department} onChange={f('department')}>
+          <option value="">None</option>
+          {departments.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
+        </SelectField>
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <Field label="Joining Date" type="date" value={form.joiningDate} onChange={f('joiningDate')} />
+        <Field label="Basic Salary (₹)" type="number" value={form.basicSalary} onChange={e => setForm(p => ({ ...p, basicSalary: parseFloat(e.target.value) || 0 }))} />
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div>
+          <Field label="Exit Date" type="date" value={form.exitDate} min={form.joiningDate || undefined} onChange={f('exitDate')} />
+          <p className="text-[11px] text-gray-400 mt-1">Last working day. Leave blank if still employed.</p>
+        </div>
+        {form.exitDate && (
+          <button type="button" onClick={() => setForm(p => ({ ...p, exitDate: '' }))}
+            className="self-end mb-6 text-xs font-semibold text-rose-500 hover:text-rose-600 text-left">
+            Clear exit date
+          </button>
+        )}
+      </div>
+      <div>
+        <SelectField label="Role" value={form.role} onChange={e => setForm(p => ({ ...p, role: e.target.value, customRole: '' }))}>
+          <option value="employee">Employee</option>
+          <option value="sales">Sales</option>
+          <option value="field_sales">Field Sales Executive</option>
+          <option value="hr">HR</option>
+          <option value="technical_associate">Technical Associate</option>
+          <option value="bda">BDA</option>
+          <option value="custom">Custom…</option>
+        </SelectField>
+        {form.role === 'custom' && (
+          <input
+            className="mt-2 w-full border border-violet-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-violet-400"
+            placeholder="Enter custom role"
+            value={form.customRole}
+            onChange={e => setForm(p => ({ ...p, customRole: e.target.value }))}
+          />
+        )}
+      </div>
+      <div className="border-t border-violet-100 pt-3">
+        <ModuleAccessPicker value={form.moduleAccess} onChange={ma => setForm(p => ({ ...p, moduleAccess: ma }))} />
+      </div>
+      <div className="border border-violet-100 rounded-xl p-3 bg-violet-50/40">
+        <label className="flex items-start gap-2 cursor-pointer">
+          <input type="checkbox" className="mt-0.5 accent-violet-600" checked={sendNewCredentials}
+            onChange={e => setSendNewCredentials(e.target.checked)} />
+          <span className="text-xs text-violet-700">
+            <span className="font-semibold">Generate a new password &amp; email login credentials</span>
+            <br />
+            {emailChanged
+              ? `A new password will be sent to ${form.email.trim() || 'the new email'}. The employee must use the new email + new password to log in.`
+              : 'A new password will be generated and emailed to the employee. Leave unchecked to keep their current password.'}
+          </span>
+        </label>
+        {emailChanged && !sendNewCredentials && (
+          <p className="text-xs text-amber-700 mt-2 flex items-start gap-1">
+            <span>ℹ</span> Email is changing — the employee will log in with the new email and their existing password.
+          </p>
+        )}
+      </div>
+      <div className="flex flex-col sm:flex-row gap-2 pt-2">
+        <button onClick={handleSave} disabled={loading}
+          className="flex-1 py-2.5 bg-violet-600 hover:bg-violet-700 disabled:opacity-50 text-white rounded-xl text-sm font-bold transition-colors">
+          {loading ? 'Saving…' : 'Save Changes'}
+        </button>
+        <button onClick={onDone}
+          className="flex-1 py-2.5 border border-violet-200 text-violet-700 hover:bg-violet-50 rounded-xl text-sm font-semibold transition-colors">
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Attach joining letter / ID card panel ── */
+function AttachDocsPanel({ emp, onDone }) {
+  const [files, setFiles] = useState({ joiningLetter: null, idCard: null });
+  const [loading, setLoading] = useState(false);
+  const refs = { joiningLetter: useRef(null), idCard: useRef(null) };
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
   const handleSubmit = async () => {
 

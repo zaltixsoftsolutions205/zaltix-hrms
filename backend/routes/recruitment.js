@@ -73,14 +73,23 @@ router.get('/stats', recruitAccess, ctrl.getStats);
 
 // ==========================
 // Job Postings
+<<<<<<< HEAD
 // ==========================
 router.get('/jobs', recruitAccess, ctrl.getJobPostings);
 router.post('/jobs', recruitEdit, ctrl.createJobPosting);
 router.put('/jobs/:id', recruitEdit, ctrl.updateJobPosting);
 router.delete('/jobs/:id', recruitEdit, ctrl.deleteJobPosting);
+=======
+router.get('/jobs',        recruitAccess, ctrl.getJobPostings);
+router.post('/jobs',       recruitEdit,   ctrl.createJobPosting);
+router.post('/jobs/bulk',  recruitEdit,   ctrl.bulkCreateJobPostings);
+router.put('/jobs/:id',    recruitEdit,   ctrl.updateJobPosting);
+router.delete('/jobs/:id', recruitEdit,   ctrl.deleteJobPosting);
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
 // ==========================
 // Applicants
+<<<<<<< HEAD
 // ==========================
 router.get('/applicants', recruitAccess, ctrl.getApplicants);
 router.post(
@@ -91,5 +100,13 @@ router.post(
 );
 router.put('/applicants/:id/status', recruitEdit, ctrl.updateStatus);
 router.delete('/applicants/:id', recruitEdit, ctrl.deleteApplicant);
+=======
+router.get('/applicants',              recruitAccess, ctrl.getApplicants);
+router.post('/applicants',             recruitEdit,   upload.single('resume'), ctrl.createApplicant);
+router.post('/applicants/bulk',        recruitEdit,   ctrl.bulkCreateApplicants);
+router.put('/applicants/:id/status',   recruitEdit,   ctrl.updateStatus);
+router.put('/applicants/:id/comment',  recruitEdit,   ctrl.updateComment);
+router.delete('/applicants/:id',       recruitEdit,   ctrl.deleteApplicant);
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
 module.exports = router;

@@ -10,6 +10,7 @@ import { useAttendance } from '../../hooks/useAttendance';
 import LocationCheckModal from '../../components/UI/LocationCheckModal';
 import { useAuth } from '../../contexts/AuthContext';
 import IntelligenceAlerts from '../../components/UI/IntelligenceAlerts';
+import TimeInput12 from '../../components/UI/TimeInput12';
 
 const SI = ({ d, d2, size = 16, color }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={color || ''}>
@@ -31,11 +32,18 @@ const REG_BADGE = {
   rejected: 'bg-red-100 text-red-700',
 };
 
-const MonthCalendar = ({ year, month, records }) => {
+const MonthCalendar = ({ year, month, records, holidays = [] }) => {
   const dayMap = {};
   records?.forEach(r => {
     const key = r.date?.split('T')[0];
     if (key) dayMap[key] = { status: r.status, isLate: r.isLate, isEarlyLeave: r.isEarlyLeave };
+  });
+
+  // Map of YYYY-MM-DD → holiday name, for coloring holiday cells.
+  const holidayMap = {};
+  holidays?.forEach(h => {
+    const key = h.date?.split('T')[0];
+    if (key) holidayMap[key] = h.name || 'Holiday';
   });
 
   const firstDayOfWeek = new Date(year, month - 1, 1).getDay();
@@ -55,6 +63,9 @@ const MonthCalendar = ({ year, month, records }) => {
             <span className="w-1.5 h-1.5 rounded-full bg-current" />{l.label}
           </span>
         ))}
+        <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-700">
+          <span className="w-1.5 h-1.5 rounded-full bg-current" />Holiday
+        </span>
         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-600">
           <span className="w-1.5 h-1.5 rounded-full border-2 border-violet-500" />Today
         </span>
@@ -86,20 +97,24 @@ const MonthCalendar = ({ year, month, records }) => {
           const isPast = dateStr < todayStr;
           const dayOfWeek = new Date(year, month - 1, day).getDay();
           const isWeekend = dayOfWeek === 0; // Only Sunday is off; Saturday is a working day
+          const holidayName = holidayMap[dateStr];
 
-          // Past weekday with no record → treat as absent
-          const effectiveStatus = status || (isPast && !isWeekend ? 'absent' : null);
+          // A holiday is a day off, so it never counts as absent even if past.
+          const effectiveStatus = status || (isPast && !isWeekend && !holidayName ? 'absent' : null);
 
           return (
             <div key={day}
               title={
-                isWeekend ? 'Weekend' :
-                  effectiveStatus ? `${effectiveStatus.replace('-', ' ')}${hasIssue ? ' · Late/Early' : ''}` :
-                    dateStr
+                holidayName ? `Holiday: ${holidayName}` :
+                  isWeekend ? 'Weekend' :
+                    effectiveStatus ? `${effectiveStatus.replace('-', ' ')}${hasIssue ? ' · Late/Early' : ''}` :
+                      dateStr
               }
               className="aspect-square flex items-center justify-center relative">
               <span className={`w-7 h-7 flex items-center justify-center rounded-full text-[11px] sm:text-xs transition-all
-                ${isWeekend ? 'text-gray-300' : effectiveStatus ? STATUS_STYLE[effectiveStatus] : 'text-violet-300'}
+                ${holidayName ? 'bg-indigo-100 text-indigo-700 font-semibold'
+                  : isWeekend ? 'text-gray-300'
+                    : effectiveStatus ? STATUS_STYLE[effectiveStatus] : 'text-violet-300'}
                 ${isToday ? 'ring-2 ring-violet-500 ring-offset-1' : ''}
               `}>
                 {day}
@@ -127,23 +142,34 @@ const RegularizeInline = ({ record, onDone }) => {
   const [regCheckIn, setRegCheckIn] = useState("");
   const [regCheckOut, setRegCheckOut] = useState("");
 
+  const openForm = () => {
+    // Seed with whatever's already on record — the previously-submitted
+    // correction if this is a reapply, otherwise the actual punch time —
+    // so the employee only has to change the field that's actually wrong.
+    setRegCheckIn(record.regularizedCheckIn || record.checkIn || "");
+    setRegCheckOut(record.regularizedCheckOut || record.checkOut || "");
+    setOpen(true);
+  };
+
   const submit = async () => {
     if (!reason.trim()) {
       return toast.error("Please enter a reason");
     }
 
+    if (!regCheckIn) {
+      return toast.error("Please enter your check-in time");
+    }
+
+    if (!regCheckOut) {
+      return toast.error("Please enter your check-out (leaving) time");
+    }
+
     const payload = {
       attendanceId: record._id,
       reason,
+      checkIn: regCheckIn,
+      checkOut: regCheckOut,
     };
-
-    if (record.isLate) {
-      payload.checkIn = regCheckIn;
-    }
-
-    if (record.isEarlyLeave || !record.checkOut) {
-      payload.checkOut = regCheckOut;
-    }
 
     setLoading(true);
 
@@ -167,7 +193,7 @@ const RegularizeInline = ({ record, onDone }) => {
     }
   };
 
-  if (record.regularizationStatus) {
+  if (record.regularizationStatus && record.regularizationStatus !== "rejected") {
     return (
       <span
         className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${REG_BADGE[record.regularizationStatus]
@@ -175,7 +201,6 @@ const RegularizeInline = ({ record, onDone }) => {
       >
         {record.regularizationStatus === "pending" && "Pending HR"}
         {record.regularizationStatus === "approved" && "Regularized"}
-        {record.regularizationStatus === "rejected" && "Rejected"}
       </span>
     );
   }
@@ -183,48 +208,57 @@ const RegularizeInline = ({ record, onDone }) => {
   return (
     <div>
       {!open ? (
-        <button
-          onClick={() => setOpen(true)}
-          className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
-        >
-          Request
-        </button>
+        record.regularizationStatus === "rejected" ? (
+          <div className="flex flex-col gap-1 items-start">
+            <span
+              className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full ${REG_BADGE.rejected}`}
+              title={record.regularizationComment || undefined}
+            >
+              Rejected{record.regularizationComment ? ` — ${record.regularizationComment}` : ""}
+            </span>
+            {(record.regularizationAttempts || 0) >= 3 ? (
+              <span className="text-[10px] text-gray-400">Max attempts reached — contact HR</span>
+            ) : (
+              <button
+                onClick={openForm}
+                className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
+              >
+                Reapply ({3 - (record.regularizationAttempts || 0)} left)
+              </button>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={openForm}
+            className="text-xs font-semibold text-violet-700 hover:text-violet-900 underline underline-offset-2"
+          >
+            Request
+          </button>
+        )
       ) : (
         <div className="flex flex-col gap-3 min-w-[250px]">
 
           {/* Check In */}
-          {record.isLate && (
-            <>
-              <label className="text-xs font-semibold text-violet-700">
-                Correct Check-In Time
-              </label>
+          <label className="text-xs font-semibold text-violet-700">
+            Check-In Time
+          </label>
 
-              <input
-                type="time"
-                className="input-field"
-                value={regCheckIn}
-                onChange={(e) => setRegCheckIn(e.target.value)}
-              />
-            </>
-          )}
+          <TimeInput12
+            required
+            value={regCheckIn}
+            onChange={setRegCheckIn}
+          />
 
           {/* Check Out */}
-          {(record.isEarlyLeave || !record.checkOut) && (
-            <>
-              <label className="text-xs font-semibold text-violet-700" >
-                {!record.checkOut
-                  ? "Correct Check-Out Time"
-                  : "Correct Early Leave Time"}
-              </label>
+          <label className="text-xs font-semibold text-violet-700">
+            Check-Out (Leaving) Time
+          </label>
 
-              <input
-                type="time"
-                className="input-field"
-                value={regCheckOut}
-                onChange={(e) => setRegCheckOut(e.target.value)}
-              />
-            </>
-          )}
+          <TimeInput12
+            required
+            value={regCheckOut}
+            onChange={setRegCheckOut}
+          />
 
           {/* Reason */}
           <label className="text-xs font-semibold text-violet-700">
@@ -278,21 +312,24 @@ const AttendancePage = ({ employeeId = null }) => {
   const [regLoading, setRegLoading] = useState(false);
   const [showRegForm, setShowRegForm] = useState(false);
   const [todayHoliday, setTodayHoliday] = useState(null);
+  const [holidays, setHolidays] = useState([]); // full list, reused by banner + calendar
   const now = new Date();
   const [filter, setFilter] = useState({ month: now.getMonth() + 1, year: now.getFullYear() });
 
+  // Fetch holidays for the year currently shown in the calendar.
   useEffect(() => {
     // IST calendar date (matches the backend's istDate()), so the holiday banner
     // shows on the correct local day regardless of the user's browser timezone.
     const todayStr = new Date(Date.now() + 5.5 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    api.get('/holidays', { params: { year: new Date().getFullYear() } })
+    api.get('/holidays', { params: { year: filter.year } })
       .then(({ data }) => {
-        const holidays = Array.isArray(data) ? data : (data.holidays || []);
-        const found = holidays.find(h => h.date && h.date.slice(0, 10) === todayStr);
+        const list = Array.isArray(data) ? data : (data.holidays || []);
+        setHolidays(list);
+        const found = list.find(h => h.date && h.date.slice(0, 10) === todayStr);
         setTodayHoliday(found || null);
       })
       .catch(() => { });
-  }, []);
+  }, [filter.year]);
 
   useEffect(() => {
     const timer = setInterval(() => setClock(getISTClock()), 1000);
@@ -327,6 +364,8 @@ const AttendancePage = ({ employeeId = null }) => {
 
   const handleRegularizeToday = async () => {
     if (!regReason.trim()) return toast.error('Please enter a reason');
+    if (!regCheckIn) return toast.error('Please enter your check-in time');
+    if (!regCheckOut) return toast.error('Please enter your check-out (leaving) time');
     setRegLoading(true);
     try {
       await api.post('/attendance/regularize', { attendanceId: today?._id, reason: regReason, checkIn: regCheckIn, checkOut: regCheckOut });
@@ -342,7 +381,11 @@ const AttendancePage = ({ employeeId = null }) => {
   };
 
   const today = data?.todayRecord;
-  const todayHasIssue = today?.isLate || today?.isEarlyLeave;
+  const todayMissingCheckout = !!today?.checkIn && !today?.checkOut;
+  // Checked out more than an hour past office end (7 PM) — worth flagging
+  // just like arriving late or leaving early.
+  const todayLateCheckout = !!today?.checkOut && today.checkOut > '19:00';
+  const todayHasIssue = today?.isLate || today?.isEarlyLeave || todayMissingCheckout || todayLateCheckout;
 
   // Derive attendance intelligence from existing records — no extra API call
   const attendanceAlerts = (() => {
@@ -353,7 +396,7 @@ const AttendancePage = ({ employeeId = null }) => {
     const missingCheckout = records.filter(r => r.checkIn && !r.checkOut && r.status === 'present').length;
     const alerts = [];
     if (lateDays >= 5)
-      alerts.push({ level: 'error', message: `You have been late ${lateDays} times this month. This is affecting your attendance score. Please maintain office hours (9:30 AM).` });
+      alerts.push({ level: 'error', message: `You have been late ${lateDays} times this month. This is affecting your attendance score. Please maintain office hours (9:00 AM).` });
     else if (lateDays >= 3)
       alerts.push({ level: 'warning', message: `You have ${lateDays} late check-ins this month. 5 or more will impact your performance score.` });
     if (earlyDays >= 3)
@@ -398,27 +441,57 @@ const AttendancePage = ({ employeeId = null }) => {
                 Early Leave ({formatTime12(today.checkOut)})
               </span>
             )}
+            {todayMissingCheckout && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-900">
+                <SI d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={13} color="text-gray-900" />
+                Missing Check-Out
+              </span>
+            )}
+            {todayLateCheckout && (
+              <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-900">
+                <SI d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" size={13} color="text-gray-900" />
+                Late Checkout ({formatTime12(today.checkOut)})
+              </span>
+            )}
             {/* Regularization status / action */}
-            {today.regularizationStatus ? (
+            {today.regularizationStatus && today.regularizationStatus !== 'rejected' ? (
               <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${REG_BADGE[today.regularizationStatus]}`}>
                 {today.regularizationStatus === 'pending' && 'Regularization Pending HR'}
                 {today.regularizationStatus === 'approved' && 'Regularization Approved'}
-                {today.regularizationStatus === 'rejected' && `Regularization Rejected${today.regularizationComment ? ` — ${today.regularizationComment}` : ''}`}
               </span>
             ) : (
-              <button onClick={() => setShowRegForm(v => !v)}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
-                <SI d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={12} />
-                Request Regularization
-              </button>
+              <>
+                {today.regularizationStatus === 'rejected' && (
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${REG_BADGE.rejected}`}>
+                    Regularization Rejected{today.regularizationComment ? ` — ${today.regularizationComment}` : ''}
+                  </span>
+                )}
+                {today.regularizationStatus === 'rejected' && (today.regularizationAttempts || 0) >= 3 ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-gray-100 text-gray-400">
+                    Max attempts reached — contact HR
+                  </span>
+                ) : (
+                  <button onClick={() => {
+                    setShowRegForm(v => !v);
+                    setRegCheckIn(today?.regularizedCheckIn || today?.checkIn || '');
+                    setRegCheckOut(today?.regularizedCheckOut || today?.checkOut || '');
+                  }}
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
+                    <SI d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" size={12} />
+                    {today.regularizationStatus === 'rejected' ? 'Reapply for Regularization' : 'Request Regularization'}
+                  </button>
+                )}
+              </>
             )}
           </div>
         )}
 
         {/* Regularization form */}
-        {showRegForm && !today?.regularizationStatus && todayHasIssue && (
+        {showRegForm && (!today?.regularizationStatus || today.regularizationStatus === 'rejected') && todayHasIssue && (
           <div className="mt-3 p-3 bg-violet-50 rounded-xl border border-violet-100">
-            <p className="text-xs font-semibold text-violet-700 mb-2">Reason for {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
+            <p className="text-xs font-semibold text-violet-700 mb-2">
+              Reason for {[today?.isLate && 'late arrival', today?.isEarlyLeave && 'early leave', todayMissingCheckout && 'missing check-out', todayLateCheckout && 'late checkout'].filter(Boolean).join(' & ')}:
+            </p>
             <textarea
               className="input-field w-full text-sm resize-none"
               rows={2}
@@ -426,28 +499,20 @@ const AttendancePage = ({ employeeId = null }) => {
               value={regReason}
               onChange={e => setRegReason(e.target.value)}
             />
-            {today?.isLate && (
-              <>
-                <p className="text-xs font-semibold text-violet-700 mb-2">check-in {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
-                <input
-                  type="time"
-                  className="input-field w-full text-sm mb-3"
-                  value={regCheckIn}
-                  onChange={(e) => setRegCheckIn(e.target.value)}
-                />
-              </>
-            )}
-            {(today?.isEarlyLeave || !today?.checkOut) && (
-              <>
-                <p className="text-xs font-semibold text-violet-700 mb-2">check-out {today?.isLate && today?.isEarlyLeave ? 'late arrival & early leave' : today?.isLate ? 'late arrival' : 'early leave'}:</p>
-                <input
-                  type="time"
-                  className="input-field w-full text-sm mb-3"
-                  value={regCheckOut}
-                  onChange={(e) => setRegCheckOut(e.target.value)}
-                />
-              </>
-            )}
+            <p className="text-xs font-semibold text-violet-700 mb-2">Check-in time:</p>
+            <TimeInput12
+              required
+              className="w-full text-sm mb-3"
+              value={regCheckIn}
+              onChange={setRegCheckIn}
+            />
+            <p className="text-xs font-semibold text-violet-700 mb-2">Check-out (leaving) time:</p>
+            <TimeInput12
+              required
+              className="w-full text-sm mb-3"
+              value={regCheckOut}
+              onChange={setRegCheckOut}
+            />
 
             <div className="flex gap-2 mt-2">
               <button onClick={handleRegularizeToday} disabled={regLoading}
@@ -554,7 +619,7 @@ const AttendancePage = ({ employeeId = null }) => {
             <div className="lg:flex lg:gap-6">
               {/* ── Calendar (compact on desktop) ── */}
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="lg:w-64 lg:flex-shrink-0">
-                <MonthCalendar year={filter.year} month={filter.month} records={data?.records} />
+                <MonthCalendar year={filter.year} month={filter.month} records={data?.records} holidays={holidays} />
               </motion.div>
 
               {/* Divider */}
@@ -600,7 +665,7 @@ const AttendancePage = ({ employeeId = null }) => {
                             <td>{record.workHours ? `${record.workHours}h` : '—'}</td>
                             <td><Badge status={record.status} /></td>
                             <td>
-                              {(record.isLate || record.isEarlyLeave) ? (
+                              {(record.isLate || record.isEarlyLeave || (record.checkIn && !record.checkOut) || (record.checkOut && record.checkOut > '19:00') || record.regularizationStatus) ? (
                                 <RegularizeInline record={record} onDone={fetchAttendance} />
                               ) : (
                                 <span className="text-violet-300 text-xs">—</span>

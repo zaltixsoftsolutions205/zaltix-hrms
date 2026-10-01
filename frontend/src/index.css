@@ -11,6 +11,35 @@
     font-size: 14px;
   }
 
+  /* Manrope for headings and figures, Inter for body copy — matches the
+     design reference. Declared as a plain custom property rather than
+     `@apply font-display` so it does not depend on the Tailwind config being
+     re-read (a running dev server keeps its startup copy and would error). */
+  :root {
+    --font-display: 'Manrope', 'Inter', system-ui, sans-serif;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-display);
+    letter-spacing: -0.018em;
+  }
+
+  /* `.tabular-nums` is how KPI values are marked across the app, so it
+     doubles as the hook for large numerals. */
+  .tabular-nums {
+    font-family: var(--font-display);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
+
+  /* Card titles are <p class="font-extrabold|font-bold"> throughout this
+     codebase rather than real headings, so give those the display face too. */
+  p.font-extrabold,
+  p.font-bold {
+    font-family: var(--font-display);
+    letter-spacing: -0.012em;
+  }
+
   button {
     display: inline-flex;
     align-items: center;

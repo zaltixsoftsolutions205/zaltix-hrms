@@ -11,7 +11,11 @@ const path = require('path');
 const fs = require('fs');
 
 exports.createEmployee = async (req, res) => {
+<<<<<<< HEAD
   const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess, internship } = req.body;
+=======
+  const { name, email, role, departmentId, designation, phone, joiningDate, exitDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess } = req.body;
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
   try {
     if (!employeeId || !employeeId.trim()) return res.status(400).json({ message: 'Employee ID is required' });
 
@@ -27,6 +31,7 @@ exports.createEmployee = async (req, res) => {
       name, email, password: tempPassword, role: role || 'employee',
       department: departmentId || null, designation, phone,
       joiningDate: joiningDate ? new Date(joiningDate) : null,
+      exitDate: exitDate ? new Date(exitDate) : null,
       basicSalary: basicSalary || 0,
       allowances: allowances || [],
       deductions: deductions || [],
@@ -199,6 +204,24 @@ exports.getAllEmployees = async (req, res) => {
   }
 };
 
+// Lean employee list for the payslip generator. Returns only the fields the
+// payslip form needs to prefill, so this can be gated by hr_payslips instead
+// of the broader hr_employees module (viewing/generating payslips must not
+// require employee-management access).
+exports.getEmployeesForPayslips = async (req, res) => {
+  try {
+    const employees = await User.find(
+      { role: { $ne: 'admin' } },
+      'name employeeId role designation location panNumber basicSalary da hra otherAllowance'
+    )
+      .populate('department', 'name')
+      .sort({ employeeId: 1 });
+    res.json(employees);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // Get single employee
 exports.getEmployee = async (req, res) => {
   try {
@@ -212,7 +235,11 @@ exports.getEmployee = async (req, res) => {
 
 // HR / Admin: Update employee
 exports.updateEmployee = async (req, res) => {
+<<<<<<< HEAD
   const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role' ,'employeeType'];
+=======
+  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'exitDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role'];
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
   const { email, sendNewCredentials } = req.body;
   try {
     const employee = await User.findById(req.params.id);
@@ -220,7 +247,14 @@ exports.updateEmployee = async (req, res) => {
 
     allowed.forEach(field => {
       if (req.body[field] !== undefined) {
-        employee[field] = field === 'department' ? req.body[field] || null : req.body[field];
+        if (field === 'department') {
+          employee.department = req.body[field] || null;
+        } else if (field === 'joiningDate' || field === 'exitDate') {
+          // Empty string clears the date (e.g. un-exiting a rejoined employee).
+          employee[field] = req.body[field] ? new Date(req.body[field]) : null;
+        } else {
+          employee[field] = req.body[field];
+        }
       }
     });
 
@@ -339,7 +373,7 @@ exports.deleteEmployee = async (req, res) => {
 
 // Employee: Update own profile (limited fields)
 exports.updateOwnProfile = async (req, res) => {
-  const allowed = ['phone', 'address', 'emergencyContact', 'accountNumber', 'ifscCode', 'uanNumber'];
+  const allowed = ['phone', 'address', 'emergencyContact', 'accountNumber', 'ifscCode', 'uanNumber', 'panNumber'];
   try {
     const employee = await User.findById(req.user._id);
     allowed.forEach(field => { if (req.body[field] !== undefined) employee[field] = req.body[field]; });

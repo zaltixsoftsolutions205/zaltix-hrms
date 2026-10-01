@@ -349,7 +349,8 @@ const HRPayslips = () => {
   };
 
   useEffect(() => {
-    api.get('/employees').then(r => setEmployees(r.data)).catch(() => {});
+    // Lean list gated by hr_payslips, so this page doesn't require hr_employees.
+    api.get('/payslips/employees').then(r => setEmployees(r.data)).catch(() => {});
     fetch();
   }, [filterMonth, filterYear]);
 
@@ -365,7 +366,7 @@ const HRPayslips = () => {
         location: emp.location || 'Hyderabad - SEZ',
         department: emp.department?.name || emp.department || 'US Staffing - Healthcare',
         designation: emp.designation || 'Management Trainee',
-        panNo: emp.panNo || '',
+        panNo: emp.panNumber || '',
         earnings: {
           basic: emp.basicSalary ? String(emp.basicSalary) : '',
           da: emp.da ? String(emp.da) : '',
@@ -450,7 +451,8 @@ const HRPayslips = () => {
   const handleViewPdf = async (id) => {
     setDownloading(id);
     try {
-      const response = await api.get(`/payslips/${id}/download`, { responseType: 'blob' });
+      // HR preview: gated by hr_payslips, streams any employee's payslip inline.
+      const response = await api.get(`/payslips/${id}/preview`, { responseType: 'blob' });
       const blobUrl = window.URL.createObjectURL(new Blob([response.data], { type: 'application/pdf' }));
       window.open(blobUrl, '_blank', 'noopener,noreferrer');
       setTimeout(() => window.URL.revokeObjectURL(blobUrl), 10000);

@@ -1,6 +1,7 @@
 const PERMISSIONS = { VIEW: 'view', EDIT: 'edit' };
 
 const MODULE_KEYS = [
+<<<<<<< HEAD
   'dashboard',
   'profile',
   'attendance',
@@ -39,6 +40,12 @@ const MODULE_KEYS = [
   'department',
   'project',
   'task',
+=======
+  'dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks',
+  'timesheets', 'knowledge_center', 'team', 'crm', 'field_sales', 'query_management',
+  'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips',
+  'recruitment', 'finance', 'reports', 'announcements', 'holidays',
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 ];
 
 const BASELINE_MODULES = [
@@ -61,6 +68,7 @@ const BASELINE_EDITABLE = [
 ];
 
 const ROLE_DEFAULT_MODULES = {
+<<<<<<< HEAD
   employee: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',],
   manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback',],
   'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task',],
@@ -129,6 +137,12 @@ const ROLE_DEFAULT_ACCESS = {
     { module: 'hr_tasks', permission: 'edit' },
     { module: 'hr_payslips', permission: 'edit' },
   ],
+=======
+  employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
+  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
+  field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
+  hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm'],
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 };
 
 

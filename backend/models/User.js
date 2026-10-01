@@ -13,6 +13,7 @@ const userSchema = new mongoose.Schema(
     phone: { type: String, default: '' },
     address: { type: String, default: '' },
     joiningDate: { type: Date, default: null },
+    exitDate: { type: Date, default: null }, // last working day; null = still employed
     basicSalary: { type: Number, default: 0 },
     allowances: [{ name: String, amount: Number }],
     deductions: [{ name: String, amount: Number }],
@@ -35,6 +36,7 @@ const userSchema = new mongoose.Schema(
     accountNumber: { type: String, default: '' },
     ifscCode: { type: String, default: '' },
     uanNumber: { type: String, default: '' },
+    panNumber: { type: String, default: '' },
     resetPasswordToken: { type: String, default: null },
     resetPasswordExpires: { type: Date, default: null },
     pushTokens: [{ type: String }],

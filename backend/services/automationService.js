@@ -7,7 +7,8 @@
  * Schedule summary:
  *  - Every hour        : Task deadline & overdue checks
  *  - Mon–Sat 08:30     : Morning work summary per employee
- *  - Mon–Sat 18:30     : Evening summary + missing checkout detection
+ *  - Mon–Sat 09:00–10:00: Check-in reminders every 15 min until checked in
+ *  - Mon–Sat 18:00     : Evening summary + missing checkout detection
  *  - Mon–Sat 09:30     : CRM + document compliance checks
  *  - Every Monday 09:00: Weekly performance report + productivity score
  */
@@ -19,6 +20,8 @@ const User            = require('../models/User');
 const Task            = require('../models/Task');
 const Attendance      = require('../models/Attendance');
 const Lead            = require('../models/Lead');
+const Leave           = require('../models/Leave');
+const Holiday         = require('../models/Holiday');
 const Document        = require('../models/Document');
 const ProductivityScore = require('../models/ProductivityScore');
 const { notify, notifyMany } = require('./notificationService');
@@ -31,6 +34,15 @@ const todayStr = () => {
   const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
   return ist.toISOString().slice(0, 10);
 };
+
+/** Returns the current IST time as HH:mm */
+const istHM = () => {
+  const ist = new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+  return ist.toISOString().slice(11, 16);
+};
+
+/** Office start time (IST) — matches attendanceController's late detection */
+const OFFICE_START = '09:00';
 
 /** Returns { start, end } of a given ISO week label e.g. "2026-W10" */
 const weekBounds = (weekLabel) => {
@@ -157,7 +169,7 @@ async function checkTasks() {
 }
 
 // ─── 2. ATTENDANCE MONITORING ─────────────────────────────────────────────────
-// Runs Mon–Sat at 18:30. Detects missing checkouts.
+// Runs Mon–Sat at 18:00. Detects missing checkouts.
 // Attendance pattern analysis runs on Mon at 09:00 (weekly).
 
 async function checkMissingCheckout() {
@@ -185,6 +197,172 @@ async function checkMissingCheckout() {
     console.log(`[Automation] Missing checkout: ${records.length} employees`);
   } catch (err) {
     console.error('[Automation] checkMissingCheckout error:', err.message);
+  }
+}
+
+/** IST-adjusted Date for "now". */
+const istNow = () => new Date(Date.now() + 5.5 * 60 * 60 * 1000);
+
+/** YYYY-MM-DD for an IST Date. */
+const ymdOf = (d) => d.toISOString().slice(0, 10);
+
+/** Whole-day UTC bounds for a YYYY-MM-DD, for matching Holiday.date. */
+const dayBounds = (ymd) => ({
+  $gte: new Date(`${ymd}T00:00:00.000Z`),
+  $lte: new Date(`${ymd}T23:59:59.999Z`),
+});
+
+/**
+ * The next working day strictly after `fromIst` (Mon–Sat; Sunday is skipped as
+ * the weekly off). Returns an IST Date at that day.
+ */
+const nextWorkingDay = (fromIst) => {
+  const d = new Date(fromIst);
+  do {
+    d.setUTCDate(d.getUTCDate() + 1);
+  } while (d.getUTCDay() === 0); // 0 = Sunday
+  return d;
+};
+
+/**
+ * Runs each evening. Reminds employees the evening of the LAST WORKING DAY
+ * before a holiday — not literally the calendar day before. So a Monday
+ * holiday reminds on Saturday evening (Sunday is the weekly off and people
+ * aren't working), while Tue–Sat holidays still remind the day before.
+ *
+ * Mechanism: look at the next working day after today; if that day is a
+ * holiday, tonight is the right time to remind. The job does not fire its
+ * notice on Sundays. Only actual Holiday records count, so a plain Sunday is
+ * never treated as a holiday.
+ */
+async function remindUpcomingHoliday() {
+  try {
+    const today = istNow();
+    // Don't run the reminder on a Sunday — nobody's at work to see it, and the
+    // Saturday run already covered a Monday holiday.
+    if (today.getUTCDay() === 0) {
+      console.log('[Automation] Holiday reminder skipped — Sunday (off day)');
+      return;
+    }
+
+    const target = nextWorkingDay(today);
+    const targetYmd = ymdOf(target);
+    const holiday = await Holiday.findOne({ date: dayBounds(targetYmd) });
+    if (!holiday) {
+      console.log('[Automation] Holiday reminder: next working day is not a holiday');
+      return;
+    }
+
+    const employees = await User.find({ isActive: true }, '_id');
+    if (employees.length === 0) return;
+
+    // "tomorrow" vs "on Monday" — word it by how far off the holiday is.
+    const todayYmd = ymdOf(today);
+    const dayGap = Math.round(
+      (new Date(`${targetYmd}T00:00:00Z`) - new Date(`${todayYmd}T00:00:00Z`)) / 86400000
+    );
+    const weekday = new Date(`${targetYmd}T00:00:00.000Z`)
+      .toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long' });
+    const whenWord = dayGap === 1 ? 'Tomorrow' : `On ${weekday.split(',')[0]}`;
+
+    await notifyMany(employees.map((e) => e._id), {
+      title: '🎉 Holiday Coming Up',
+      message: `${whenWord} (${weekday}) is a holiday: ${holiday.name}. Enjoy your day off!`,
+      type: 'general',
+      // Everyone can see upcoming holidays on the dashboard widget; there is
+      // no employee-facing /holidays route (only the admin one).
+      link: '/dashboard',
+      // One notice per holiday per employee, even if the job runs twice.
+      dedupKey: `holiday-${targetYmd}`,
+      dedupWindowMs: 30 * 60 * 60 * 1000,
+    });
+
+    console.log(`[Automation] Holiday reminder sent to ${employees.length} employees for "${holiday.name}" (${targetYmd}, ${dayGap}d ahead)`);
+  } catch (err) {
+    console.error('[Automation] remindUpcomingHoliday error:', err.message);
+  }
+}
+
+/**
+ * Runs every 15 minutes between 09:00 and 10:00 IST (Mon–Sat), i.e. at
+ * 09:00, 09:15, 09:30, 09:45 and 10:00. Reminds employees who have not
+ * checked in yet; the reminders stop as soon as they check in, and never
+ * run past 10:00.
+ *
+ * Skipped: public holidays, employees on approved leave, and admins.
+ */
+async function remindPendingCheckIn() {
+  try {
+    const today = todayStr();
+
+    // Nothing to chase on a public holiday.
+    const holiday = await Holiday.findOne({
+      date: { $gte: new Date(`${today}T00:00:00.000Z`), $lte: new Date(`${today}T23:59:59.999Z`) },
+    });
+    if (holiday) {
+      console.log(`[Automation] Check-in reminder skipped — holiday: ${holiday.name}`);
+      return;
+    }
+
+    const employees = await User.find({ isActive: true, role: { $ne: 'admin' } }, '_id name');
+    if (employees.length === 0) return;
+
+    const employeeIds = employees.map((e) => e._id);
+
+    // Anyone who already has a check-in time, or whom HR has already marked
+    // absent/half-day, should not be chased.
+    const records = await Attendance.find(
+      { employee: { $in: employeeIds }, date: today },
+      'employee checkIn status'
+    ).lean();
+    const settled = new Set(
+      records
+        .filter((r) => r.checkIn || r.status === 'absent' || r.status === 'half-day')
+        .map((r) => String(r.employee))
+    );
+
+    // Approved leave covering today. fromDate/toDate are Dates, so compare
+    // against the day's bounds rather than the YYYY-MM-DD string.
+    const dayStart = new Date(`${today}T00:00:00.000Z`);
+    const dayEnd = new Date(`${today}T23:59:59.999Z`);
+    const onLeave = await Leave.find(
+      {
+        employee: { $in: employeeIds },
+        status: 'approved',
+        fromDate: { $lte: dayEnd },
+        toDate: { $gte: dayStart },
+      },
+      'employee'
+    ).lean();
+    const onLeaveIds = new Set(onLeave.map((l) => String(l.employee)));
+
+    const pending = employees.filter(
+      (e) => !settled.has(String(e._id)) && !onLeaveIds.has(String(e._id))
+    );
+
+    // Past 09:00 the check-in would be recorded as late, so say so rather
+    // than repeating the same nudge. Strictly greater-than, matching
+    // attendanceController's own late detection — 09:00 exactly is on time.
+    const isLate = istHM() > OFFICE_START;
+
+    for (const emp of pending) {
+      await notify(emp._id, {
+        title: isLate ? '⏰ You are marked late' : '🕘 Check-In Reminder',
+        message: isLate
+          ? `You still haven't checked in. Office hours start at ${OFFICE_START} AM — please check in now.`
+          : `Good morning, ${emp.name.split(' ')[0]}! Please remember to check in for today.`,
+        type: 'general',
+        link: '/attendance',
+        // One reminder per 15-minute slot; the dedupKey keeps a restarted or
+        // double-scheduled job from sending the same slot twice.
+        dedupKey: `checkin-${emp._id}-${today}-${istHM()}`,
+        dedupWindowMs: 14 * 60 * 1000,
+      });
+    }
+
+    console.log(`[Automation] Check-in reminder (${istHM()}): ${pending.length} pending of ${employees.length}`);
+  } catch (err) {
+    console.error('[Automation] remindPendingCheckIn error:', err.message);
   }
 }
 
@@ -443,7 +621,7 @@ async function sendMorningSummary() {
 }
 
 // ─── 6. EVENING SUMMARY ───────────────────────────────────────────────────────
-// Runs Mon–Sat at 18:30. Shows today's completed vs pending.
+// Runs Mon–Sat at 18:00. Shows today's completed vs pending.
 
 async function sendEveningSummary() {
   try {
@@ -725,8 +903,12 @@ function startAutomation() {
   // Morning summary — Mon–Sat at 08:30
   cron.schedule('30 8 * * 1-6', sendMorningSummary, { timezone: 'Asia/Kolkata' });
 
-  // Evening summary + missing checkout — Mon–Sat at 18:30
-  cron.schedule('30 18 * * 1-6', sendEveningSummary, { timezone: 'Asia/Kolkata' });
+  // Evening summary + missing checkout — Mon–Sat at 18:00
+  cron.schedule('0 18 * * 1-6', sendEveningSummary, { timezone: 'Asia/Kolkata' });
+
+  // Check-in reminders — Mon–Sat at 09:00, 09:15, 09:30, 09:45, 10:00.
+  cron.schedule('0,15,30,45 9 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
+  cron.schedule('0 10 * * 1-6', remindPendingCheckIn, { timezone: 'Asia/Kolkata' });
 
   // CRM alerts + document compliance — Mon–Sat at 09:30
   cron.schedule('30 9 * * 1-6', async () => {
@@ -737,12 +919,18 @@ function startAutomation() {
   // Weekly report + productivity scores — every Monday at 09:00
   cron.schedule('0 9 * * 1', sendWeeklyReport, { timezone: 'Asia/Kolkata' });
 
-  console.log('[Automation] Scheduler started. 6 jobs active.');
+  // Holiday reminder — every evening at 18:00: if tomorrow is a holiday,
+  // tell everyone. Runs all 7 days so a holiday before a Sunday is covered.
+  cron.schedule('0 18 * * *', remindUpcomingHoliday, { timezone: 'Asia/Kolkata' });
+
+  console.log('[Automation] Scheduler started. 9 jobs active.');
 }
 
 module.exports = {
   startAutomation,
   checkTasks,
+  remindPendingCheckIn,
+  remindUpcomingHoliday,
   checkMissingCheckout,
   checkAttendancePatterns,
   checkCRMAlerts,

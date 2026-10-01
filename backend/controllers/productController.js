@@ -1,6 +1,16 @@
 const Product        = require('../models/Product');
 const ProductProspect = require('../models/ProductProspect');
+const ProductLocation = require('../models/ProductLocation');
+const ProductCategoryRow = require('../models/ProductCategoryRow');
 const Lead           = require('../models/Lead');
+const { _ancestorsOf: ancestorsOf } = require('./productLocationController');
+
+// "Telangana / Hyderabad / Adibatla" for a location id, or '' if unset.
+async function pathLabel(locationId) {
+  if (!locationId) return '';
+  const chain = await ancestorsOf(locationId);
+  return chain.map(n => n.name).join(' / ');
+}
 
 /* ── Products ─────────────────────────────────────────────────────────── */
 
@@ -53,6 +63,8 @@ exports.deleteProduct = async (req, res) => {
   try {
     await Product.findByIdAndDelete(req.params.id);
     await ProductProspect.deleteMany({ product: req.params.id });
+    await ProductLocation.deleteMany({ product: req.params.id });
+    await ProductCategoryRow.deleteMany({ product: req.params.id });
     res.json({ message: 'Deleted' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -66,13 +78,24 @@ exports.getProspects = async (req, res) => {
     const { productId } = req.params;
     const filter = { product: productId };
     if (req.query.status) filter.status = req.query.status;
+    // 'unspecified' means "no location set"; any other value filters to
+    // prospects on that exact location node (not its descendants).
+    if (req.query.location === 'unspecified') {
+      filter.$or = [{ location: null }, { location: { $exists: false } }];
+    } else if (req.query.location) {
+      filter.location = req.query.location;
+    }
 
     const prospects = await ProductProspect.find(filter)
       .populate('addedBy', 'name employeeId')
       .populate('convertedToLead', 'companyName status')
       .sort({ createdAt: -1 });
 
-    res.json(prospects);
+    const withPaths = await Promise.all(prospects.map(async (p) => ({
+      ...p.toObject(), locationPath: await pathLabel(p.location),
+    })));
+
+    res.json(withPaths);
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -81,10 +104,10 @@ exports.getProspects = async (req, res) => {
 exports.createProspect = async (req, res) => {
   try {
     const { productId } = req.params;
-    const { companyName, address, website, contactNumber, emailId, companyType, companySize, remarks, status } = req.body;
+    const { companyName, location, address, website, contactNumber, emailId, companyType, companySize, remarks, status } = req.body;
     if (!companyName?.trim()) return res.status(400).json({ message: 'Company name is required' });
     const prospect = await ProductProspect.create({
-      product: productId, companyName, address, website, contactNumber, emailId, companyType, companySize, remarks,
+      product: productId, companyName, location: location || null, address, website, contactNumber, emailId, companyType, companySize, remarks,
       status: status || 'new',
       addedBy: req.user._id,
     });
@@ -103,7 +126,7 @@ exports.bulkCreateProspects = async (req, res) => {
 
     const docs = prospects
       .filter(p => p.companyName?.trim())
-      .map(p => ({ ...p, product: productId, addedBy: req.user._id, status: p.status || 'new' }));
+      .map(p => ({ ...p, location: p.location || null, product: productId, addedBy: req.user._id, status: p.status || 'new' }));
 
     const created = await ProductProspect.insertMany(docs);
     res.status(201).json({ count: created.length });
@@ -114,9 +137,11 @@ exports.bulkCreateProspects = async (req, res) => {
 
 exports.updateProspect = async (req, res) => {
   try {
-    const prospect = await ProductProspect.findByIdAndUpdate(req.params.prospectId, req.body, { new: true });
+    const updates = { ...req.body };
+    if ('location' in updates) updates.location = updates.location || null;
+    const prospect = await ProductProspect.findByIdAndUpdate(req.params.prospectId, updates, { new: true });
     if (!prospect) return res.status(404).json({ message: 'Not found' });
-    res.json(prospect);
+    res.json({ ...prospect.toObject(), locationPath: await pathLabel(prospect.location) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

@@ -30,6 +30,8 @@ export default {
       },
       fontFamily: {
         sans: ['Inter', 'system-ui', 'sans-serif'],
+        // Headings, card titles and figures — Inter stays the body face.
+        display: ['Manrope', 'Inter', 'system-ui', 'sans-serif'],
       },
       backdropBlur: { xs: '2px' },
       animation: {

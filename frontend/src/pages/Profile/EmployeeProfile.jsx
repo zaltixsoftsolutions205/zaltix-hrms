@@ -31,6 +31,7 @@ const EmployeeProfile = () => {
     accountNumber: user?.accountNumber || '',
     ifscCode: user?.ifscCode || '',
     uanNumber: user?.uanNumber || '',
+    panNumber: user?.panNumber || '',
   });
   const [loading, setLoading] = useState(false);
   const [profileCompletion, setProfileCompletion] = useState(null);
@@ -418,6 +419,10 @@ const EmployeeProfile = () => {
               <p className="text-[10px] sm:text-xs text-violet-500 font-medium uppercase tracking-wide">UAN Number</p>
               <p className="text-xs sm:text-sm font-semibold text-violet-900 mt-0.5">{user?.uanNumber || '—'}</p>
             </div>
+            <div className="p-2.5 sm:p-3 bg-violet-50/60 rounded-xl">
+              <p className="text-[10px] sm:text-xs text-violet-500 font-medium uppercase tracking-wide">PAN Number</p>
+              <p className="text-xs sm:text-sm font-semibold text-violet-900 mt-0.5">{user?.panNumber || '—'}</p>
+            </div>
           </div>
         ) : (
           <div className="space-y-3">
@@ -447,6 +452,16 @@ const EmployeeProfile = () => {
                   value={form.uanNumber}
                   onChange={e => setForm(f => ({ ...f, uanNumber: e.target.value }))}
                   placeholder="Universal Account Number"
+                />
+              </div>
+              <div>
+                <label className="input-label text-xs sm:text-sm">PAN Number</label>
+                <input
+                  className="input-field text-sm"
+                  value={form.panNumber}
+                  onChange={e => setForm(f => ({ ...f, panNumber: e.target.value.toUpperCase() }))}
+                  placeholder="e.g. ABCDE1234F"
+                  maxLength={10}
                 />
               </div>
             </div>

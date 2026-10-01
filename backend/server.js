@@ -33,6 +33,8 @@ const allowedOrigins = [
   'https://hrms.zaltixsoftsolutions.com',
   'http://localhost:5173',
   'http://localhost:5174',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:5174',
 ].filter(Boolean);
 
 app.use(
@@ -182,12 +184,14 @@ app.use('/api/payslips', require('./routes/payslips'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/timesheets', require('./routes/timesheets'));
 app.use('/api/leads', require('./routes/leads'));
+app.use('/api/queries', require('./routes/queries'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/notifications', require('./routes/notifications'));
 app.use('/api/documents', require('./routes/documents'));
 app.use('/api/deals', require('./routes/deals'));
 app.use('/api/clients', require('./routes/clients'));
 app.use('/api/finance', require('./routes/finance'));
+app.use('/api/expense-claims', require('./routes/expenseClaims'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/holidays', require('./routes/holidays'));
 app.use('/api/quotations', require('./routes/quotations'));

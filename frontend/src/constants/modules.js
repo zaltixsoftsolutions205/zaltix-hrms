@@ -57,6 +57,7 @@ export const MODULES = [
   { key: 'team', label: 'My Team', path: '/team', icon: ICON.people, editable: false, group: 'Self-service' },
 
   // Sales / CRM
+<<<<<<< HEAD
   // Sales
   { key: 'crm', label: 'CRM', path: '/crm', icon: ICON.crm, editable: true, group: 'Sales' },
   // { key: 'field_sales', label: 'Field Sales', path: '/field-sales/leads', icon: ICON.field, editable: true, group: 'Sales' },
@@ -67,6 +68,11 @@ export const MODULES = [
   { key: 'demos', label: 'Demos', path: '/sale/demos', icon: ICON.book, editable: true, group: 'Sales' },
   { key: 'data_updation', label: 'Data Updation', path: '/sale/dataupdation', icon: ICON.book, editable: true, group: 'Sales' },
   { key: 'feedback', label: 'Feedback', path: '/sale/feedback', icon: ICON.book, editable: true, group: 'Sales' },
+=======
+  { key: 'crm',              label: 'CRM',                path: '/crm',                  icon: ICON.crm,       editable: true,  group: 'Sales' },
+  { key: 'field_sales',      label: 'Field Sales',        path: '/field-sales/leads',    icon: ICON.field,     editable: true,  group: 'Sales' },
+  { key: 'query_management', label: 'Query Management',   path: '/queries',              icon: ICON.approvals, editable: true,  group: 'Sales' },
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
   // HR-management modules
   { key: 'hr_employees', label: 'Employees (HR)', path: '/hr/employees', icon: ICON.people, editable: true, group: 'HR Management' },
@@ -110,6 +116,7 @@ export const BASELINE_MODULES = ['dashboard', 'profile', 'attendance', 'leaves',
 export const BASELINE_EDITABLE = ['profile', 'attendance', 'leaves', 'tasks', 'timesheets'];
 
 export const ROLE_DEFAULT_MODULES = {
+<<<<<<< HEAD
   employee: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
   manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback',],
   'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task'],
@@ -129,6 +136,12 @@ export const ROLE_DEFAULT_MODULES = {
     'feedback',
     'registration',
   ],
+=======
+  employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
+  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
+  field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
+  hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm'],
+>>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 };
 
 export const ROLE_DEFAULT_ACCESS = {
