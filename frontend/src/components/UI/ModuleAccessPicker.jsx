@@ -29,6 +29,7 @@ export default function ModuleAccessPicker({ value = [], onChange }) {
   const hasExplicit = access.length > 0;
 
   return (
+
     <div>
       <div className="flex items-center justify-between mb-2">
         <label className="block text-xs font-semibold text-violet-700">Module Access</label>
@@ -76,9 +77,8 @@ export default function ModuleAccessPicker({ value = [], onChange }) {
                         {[PERMISSIONS.VIEW, PERMISSIONS.EDIT].map(p => (
                           <button key={p} type="button"
                             onClick={() => setGrant(m.key, true, p)}
-                            className={`text-[10px] px-2 py-0.5 font-semibold capitalize transition-colors ${
-                              permOf(m.key) === p ? 'bg-violet-600 text-white' : 'bg-white text-violet-500 hover:bg-violet-50'
-                            }`}>
+                            className={`text-[10px] px-2 py-0.5 font-semibold capitalize transition-colors ${permOf(m.key) === p ? 'bg-violet-600 text-white' : 'bg-white text-violet-500 hover:bg-violet-50'
+                              }`}>
                             {p}
                           </button>
                         ))}

@@ -43,8 +43,6 @@ const TabContent = ({ activeTab, employeeId }) => {
   const [DocEmployee, setDocEmployee] = useState(null);
   const [performance, setPerformance] = useState(null);
 
-
-
   useEffect(() => {
     if (!employeeId) return;
 
@@ -362,79 +360,34 @@ const TabContent = ({ activeTab, employeeId }) => {
                     key={doc._id || index}
                     className={`
           flex items-center justify-between rounded-xl border p-4 transition-all duration-300
-          ${uploaded
-                        ? "border-gray-200 hover:bg-violet-50 hover:border-violet-300"
-                        : "border-dashed border-gray-300 bg-gray-50 opacity-70"
-                      }
-                  `}
-                  >
+          ${uploaded ? "border-gray-200 hover:bg-violet-50 hover:border-violet-300" : "border-dashed border-gray-300 bg-gray-50 opacity-70"} `} >
                     <div className="flex items-center gap-4">
-                      <div
-                        className={`
-              rounded-lg p-3
-              ${uploaded
-                            ? "bg-violet-100"
-                            : "bg-gray-200"
-                          }
-                     `}
-                      >
-                        <FileText
-                          className={`h-6 w-6 ${uploaded ? "text-violet-600" : "text-gray-400"
-                            }`}
-                        />
+                      <div className={`  rounded-lg p-3 ${uploaded ? "bg-violet-100" : "bg-gray-200"}`} >
+                        <FileText className={`h-6 w-6 ${uploaded ? "text-violet-600" : "text-gray-400"}`} />
                       </div>
-
                       <div>
-                        <h4
-                          className={`font-semibold ${uploaded ? "text-gray-800" : "text-gray-500"
-                            }`}
-                        >
+                        <h4 className={`font-semibold ${uploaded ? "text-gray-800" : "text-gray-500"}`}>
                           {doc.docType}
                         </h4>
-
                         <p className="text-sm">
-                          Status :
-                          <span
-                            className={`ml-2 font-medium ${uploaded
-                              ? "text-green-600"
-                              : "text-amber-600"
-                              }`}
-                          >
+                          Status : <span className={`ml-2 font-medium ${uploaded ? "text-green-600" : "text-amber-600"}`} >
                             {uploaded ? "Uploaded" : "Pending Upload"}
                           </span>
                         </p>
                       </div>
                     </div>
-
                     <div className="flex items-center gap-2">
                       <button
                         disabled={!uploaded}
                         onClick={() => handleViewDocument(doc._id)}
-                        className={`
-              flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all
-              ${uploaded
-                            ? "bg-violet-100 text-violet-700 hover:bg-violet-600 hover:text-white"
-                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          }
-            `}
-                      >
+                        className={` flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all
+                         ${uploaded ? "bg-violet-100 text-violet-700 hover:bg-violet-600 hover:text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"} `} >
                         <Eye size={16} />
                         View
                       </button>
-
-                      <button
-                        disabled={!uploaded}
-                        onClick={() =>
-                          handleDownloadDocument(doc._id, doc.docType)
-                        }
-                        className={`
-              flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all
-              ${uploaded
-                            ? "bg-green-100 text-green-700 hover:bg-green-600 hover:text-white"
-                            : "bg-gray-200 text-gray-400 cursor-not-allowed"
-                          }
-            `}
-                      >
+                      <button disabled={!uploaded} onClick={() => handleDownloadDocument(doc._id, doc.docType)}
+                        className={` flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-sm font-medium transition-all 
+                        ${uploaded ? "bg-green-100 text-green-700 hover:bg-green-600 hover:text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"} `} >
                         <Download size={16} />
                         Download
                       </button>

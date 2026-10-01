@@ -48,7 +48,6 @@ const CRMPage = () => {
   const [selectedClient, setSelectedClient] = useState(null);
   const [showClientDetailModal, setShowClientDetailModal] = useState(false);
   const [clientForm, setClientForm] = useState({ company: '', notes: '', tags: [] });
-
   const [loading, setLoading] = useState(false);
 
   // ============ FETCH DATA ============

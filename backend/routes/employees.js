@@ -1,20 +1,21 @@
 const express = require('express');
 const router = express.Router();
-const { createEmployee, 
-    sendOfferLetter, 
-    sendCredentials, 
-    getAllEmployees, 
+const { createEmployee,
+    sendOfferLetter,
+    sendCredentials,
+    getAllEmployees,
     getEmployee,
-     updateEmployee, 
-     updateOwnProfile,
-      deleteEmployee,
-      setEmployeeStatus,
-      getTeamMembers,
-      getProfileCompletion,
-       uploadProfilePhoto, 
-       deleteProfilePhoto,
-        getMyProfile,
-        attachEmployeeDocs } = require('../controllers/employeeController');
+    updateEmployee,
+    updateOwnProfile,
+    deleteEmployee,
+    setEmployeeStatus,
+    updateInternshipStatus,
+    getTeamMembers,
+    getProfileCompletion,
+    uploadProfilePhoto,
+    deleteProfilePhoto,
+    getMyProfile,
+    attachEmployeeDocs } = require('../controllers/employeeController');
 const { protect } = require('../middleware/auth');
 const { moduleAccess } = require('../middleware/roleCheck');
 const uploadProfilePhoto_middleware = require('../middleware/uploadProfilePhoto');
@@ -40,11 +41,12 @@ router.put('/me/profile', updateOwnProfile);
 router.post('/', hrEmployeesEdit, createEmployee);
 router.post('/send-offer', hrEmployeesEdit, sendOfferLetter);
 router.post('/send-credentials', hrEmployeesEdit, sendCredentials);
-router.get('/', hrEmployeesView, getAllEmployees);
+router.get('/', getAllEmployees);
 router.get('/:id', getEmployee);
 router.put('/:id', hrEmployeesEdit, updateEmployee);
 router.patch('/:id/status', hrEmployeesEdit, setEmployeeStatus);
 router.delete('/:id', hrEmployeesEdit, deleteEmployee);
+router.patch('/:id/internship', hrEmployeesEdit, updateInternshipStatus);
 router.post('/:id/attach-docs', hrEmployeesEdit, uploadEmployeeDocs_middleware.fields([{ name: 'joiningLetter', maxCount: 1 }, { name: 'idCard', maxCount: 1 }]), attachEmployeeDocs);
 
 module.exports = router;

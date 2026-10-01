@@ -75,13 +75,13 @@ io.use((socket, next) => {
 
 // Role → group room mapping
 const roleToRooms = {
-  admin:               ['all', 'admin'],
-  hr:                  ['all', 'hr'],
-  sales:               ['all', 'sales'],
-  field_sales:         ['all', 'sales'],
+  admin: ['all', 'admin'],
+  hr: ['all', 'hr'],
+  sales: ['all', 'sales'],
+  field_sales: ['all', 'sales'],
   technical_associate: ['all'],
-  bda:                 ['all'],
-  employee:            ['all'],
+  bda: ['all'],
+  employee: ['all'],
 };
 
 io.on('connection', (socket) => {
@@ -146,7 +146,7 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {});
+  socket.on('disconnect', () => { });
 });
 
 // =======================
@@ -193,11 +193,23 @@ app.use('/api/holidays', require('./routes/holidays'));
 app.use('/api/quotations', require('./routes/quotations'));
 app.use('/api/purchase-orders', require('./routes/purchaseOrders'));
 app.use('/api/recruitment', require('./routes/recruitment'));
-app.use('/api/products',    require('./routes/products'));
+app.use('/api/products', require('./routes/products'));
 app.use('/api/field-leads', require('./routes/fieldLeads'));
 app.use('/api/automation', require('./routes/automation'));
-app.use('/api/kt',         require('./routes/kt'));
-app.use('/api/chat',       require('./routes/chat'));
+app.use('/api/kt', require('./routes/kt'));
+app.use('/api/chat', require('./routes/chat'));
+app.use('/api/departments', require('./routes/departmentRoutes'));
+app.use('/api/projects', require('./routes/projectRoutes'));
+// app.use('/api/tasks', require('./routes/projectTaskRoutes'));
+
+
+app.use('/api/lead-custom-fields', require('./routes/leadCustomFieldRoutes'));
+app.use('/api/leads/:leadId/custom-fields', require('./routes/leadCustomFieldValueRoutes'));
+
+//  workspace server apis
+app.use("/api/workspace", require("./routes/workspaceRoutes"));
+app.use("/api/workflow-stages", require("./routes/workflowStageRoutes"));
+
 
 // =======================
 // ❤️ HEALTH CHECK

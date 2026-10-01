@@ -1,11 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const {
-  getDepartments, createDepartment, updateDepartment, deleteDepartment,
   getLeavePolicies, createLeavePolicy, updateLeavePolicy,
   getAttendanceReport, getLeaveReport, getPayrollReport, getCrmReport, getDashboardStats,
   getProfitSummary,
 } = require('../controllers/adminController');
+const { createDepartment,getDepartments,getDepartment,updateDepartment,deleteDepartment} = require('../controllers/departmentController');
 const { protect } = require('../middleware/auth');
 const { roleCheck, moduleAccess } = require('../middleware/roleCheck');
 

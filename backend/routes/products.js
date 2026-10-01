@@ -4,7 +4,7 @@ const { protect } = require('../middleware/auth');
 const { roleCheck } = require('../middleware/roleCheck');
 const ctrl       = require('../controllers/productController');
 
-const crmAccess = roleCheck('admin', 'sales', 'hr');
+const crmAccess = roleCheck('admin', 'sales', 'hr' , 'inside-sales' , 'manager');
 
 // Products
 router.get('/',          protect, crmAccess, ctrl.getProducts);

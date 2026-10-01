@@ -10,9 +10,8 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
-// HR / Admin: Create employee
 exports.createEmployee = async (req, res) => {
-  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess } = req.body;
+  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess, internship } = req.body;
   try {
     if (!employeeId || !employeeId.trim()) return res.status(400).json({ message: 'Employee ID is required' });
 
@@ -35,11 +34,22 @@ exports.createEmployee = async (req, res) => {
       isFirstLogin: true,
       employeeType: employeeType || null,
       moduleAccess: sanitizeModuleAccess(moduleAccess) || [],
+      ...(employeeType === 'intern' && internship && {
+        internship: {
+          startDate: internship.startDate ? new Date(internship.startDate) : undefined,
+          endDate: internship.endDate ? new Date(internship.endDate) : undefined,
+          durationMonths: internship.durationMonths || undefined,
+          candidateType: ['fresher', 'experienced'].includes(internship.candidateType) ? internship.candidateType : 'fresher',
+          status: internship.status || 'active',
+        },
+      }),
     });
 
-    // Seed required document slots for new employees with onboarding type
-    if (employeeType && ['fresher', 'experienced'].includes(employeeType)) {
-      const requiredDocs = getRequiredDocs(employeeType);
+    // Seed onboarding docs: for fresher/experienced employees, or for
+    // interns using their selected candidateType checklist.
+    const docTrack = employeeType === 'intern' ? internship?.candidateType : employeeType;
+    if (docTrack && ['fresher', 'experienced'].includes(docTrack)) {
+      const requiredDocs = getRequiredDocs(docTrack);
       await Document.insertMany(
         requiredDocs.map(docType => ({ employee: employee._id, docType, status: 'pending_upload' }))
       );
@@ -149,13 +159,43 @@ exports.getTeamMembers = async (req, res) => {
 };
 
 // HR / Admin: Get all employees
+// HR / Admin: Get all employees
 exports.getAllEmployees = async (req, res) => {
   try {
-    const filter = { role: { $ne: 'admin' } };
-    const employees = await User.find(filter).populate('department').sort({ employeeId: 1 });
+    const { department, isActive, search,} = req.query;
+
+    const filter = { role: { $ne: 'admin' },};
+
+    // Filter by department
+    if (department) {
+      filter.department = department;
+    }
+
+    // Filter by active/inactive status
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true';
+    }
+    // Search employees
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { employeeId: { $regex: search, $options: 'i' } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
+
+    const employees = await User.find(filter)
+      .populate('department', 'name code')
+      .select('name employeeId email role designation department isActive employeeType profilePicture')
+      .sort({ name: 1 });
+
     res.json(employees);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Get All Employees:', err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
@@ -172,12 +212,12 @@ exports.getEmployee = async (req, res) => {
 
 // HR / Admin: Update employee
 exports.updateEmployee = async (req, res) => {
-  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role'];
+  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role' ,'employeeType'];
   const { email, sendNewCredentials } = req.body;
   try {
     const employee = await User.findById(req.params.id);
     if (!employee) return res.status(404).json({ message: 'Employee not found' });
-    
+
     allowed.forEach(field => {
       if (req.body[field] !== undefined) {
         employee[field] = field === 'department' ? req.body[field] || null : req.body[field];
@@ -268,7 +308,7 @@ exports.setEmployeeStatus = async (req, res) => {
         message: 'Your account has been reactivated. You can now log in.',
         type: 'general',
         link: '/dashboard',
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     const updated = await User.findById(employee._id).populate('department');
@@ -408,6 +448,42 @@ exports.attachEmployeeDocs = async (req, res) => {
     const updated = await User.findById(employee._id).populate('department');
     res.json({ message: 'Documents attached successfully', employee: updated });
   } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// HR / Admin: Update internship status (accept / reject / extend)
+exports.updateInternshipStatus = async (req, res) => {
+  try {
+    const employee = await User.findById(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    if (employee.employeeType !== 'intern') return res.status(400).json({ message: 'Employee is not an intern' });
+
+    const { status, reason, newEndDate, convertToFullTime, employeeId } = req.body;
+
+    const current = employee.internship?.toObject?.() ?? employee.internship ?? {};
+    const next = { ...current };
+
+    if (status) next.status = status;
+    if (newEndDate) next.endDate = new Date(newEndDate);
+    if (reason) next.rejectionReason = reason;
+
+    if (convertToFullTime) {
+      if (employeeId && employeeId.trim() && employeeId.trim() !== employee.employeeId) {
+        const idExists = await User.findOne({ employeeId: employeeId.trim(), _id: { $ne: employee._id } });
+        if (idExists) return res.status(400).json({ message: 'Employee ID already in use' });
+        employee.employeeId = employeeId.trim();
+      }
+      employee.employeeType = 'experienced';
+      next.status = 'accepted';
+    }
+
+    employee.internship = next;
+    await employee.save();
+    const updated = await User.findById(employee._id).populate('department');
+    res.json(updated);
+  } catch (err) {
+    if (err.code === 11000) return res.status(400).json({ message: 'Employee ID already in use' });
     res.status(500).json({ message: err.message });
   }
 };

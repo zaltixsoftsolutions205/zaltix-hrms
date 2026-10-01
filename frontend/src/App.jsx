@@ -3,7 +3,7 @@ import { Component } from 'react';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ChatProvider } from './contexts/ChatContext';
 import { PageLoader } from './components/UI/Spinner';
-import { canAccessModule, canEditModule } from './constants/modules';
+import { canAccessView, canAccessEdit } from './constants/modules';
 import Layout from './components/Layout/Layout';
 import PWAInstallBanner from './components/PWAInstallBanner';
 import ChatWidget from './components/Chat/ChatWidget';
@@ -39,7 +39,7 @@ import LeavePage from './pages/Leaves/LeavePage';
 import TimesheetPage from './pages/Timesheets/TimesheetPage';
 import TimesheetApprovals from './pages/Timesheets/TimesheetApprovals';
 import PayslipsPage from './pages/Payslips/PayslipsPage';
-import TasksPage from './pages/Tasks/TasksPage';
+import Workspace from './pages/Workspace/Workspace';
 import CRMPage from './pages/CRM/CRMPage';
 import ProductDetailPage from './pages/CRM/ProductDetailPage';
 import TeamPage from './pages/Team/TeamPage';
@@ -76,6 +76,19 @@ import AdminFieldSales from './pages/Admin/AdminFieldSales';
 import AdminKnowledgeCenter from './pages/Admin/KnowledgeCenter';
 import HRKnowledgeCenter from './pages/HR/HRKnowledgeCenter';
 import KnowledgeCenter from './pages/KnowledgeCenter/KnowledgeCenter';
+import Projects from './pages/Workspace/Projects';
+import ProjectDetails from './pages/Workspace/Project/Project';
+// Department Details Page
+import DepartmentDetails from "./pages/Department/DepartmentDetails";
+
+// sale and crm pages 
+import Lead from './pages/CRM/lead';
+import Visits from './pages/CRM/visits';
+import Feedback from './pages/CRM/feedback';
+import Registration from './pages/CRM/Registration';
+import DataUpdation from './pages/CRM/DataUpdation';
+import Demos from './pages/CRM/domos';
+
 
 const ProtectedRoute = ({ children, roles, allowEmployeeIds, module, requireEdit = false, allowFirstLogin = false }) => {
   const { user, loading } = useAuth();
@@ -85,7 +98,7 @@ const ProtectedRoute = ({ children, roles, allowEmployeeIds, module, requireEdit
 
   // Module-based gating (primary). Admin always passes via canAccessModule.
   if (module) {
-    const ok = requireEdit ? canEditModule(user, module) : canAccessModule(user, module);
+    const ok = requireEdit ? canAccessEdit(user, module) : canAccessView(user, module);
     if (!ok) return <Navigate to="/dashboard" replace />;
     return children;
   }
@@ -120,12 +133,13 @@ const AppRoutes = () => {
         <Route path="/timesheets" element={<TimesheetPage />} />
         <Route path="/timesheets/approvals" element={<TimesheetApprovals />} />
         <Route path="/payslips" element={<PayslipsPage />} />
-        <Route path="/tasks" element={<TasksPage />} />
+        <Route path="/admin/employee-management/workspace" element={<Workspace />} />
         <Route path="/team" element={<TeamPage />} />
         <Route path="/knowledge-center" element={<KnowledgeCenter />} />
-        <Route path="/crm" element={<ProtectedRoute module="crm"><CRMPage /></ProtectedRoute>} />
+        <Route path="/crm" element={<ProtectedRoute module="crm"><CRMPage/></ProtectedRoute>} />
         <Route path="/field-sales/leads" element={<ProtectedRoute module="field_sales"><FieldLeadsPage /></ProtectedRoute>} />
         <Route path="/crm/products/:productId" element={<ProtectedRoute module="crm"><ProductDetailPage /></ProtectedRoute>} />
+        <Route path="/projects/:id" element={<ProtectedRoute roles={['admin', 'manager', 'team-lead', 'hr']}><ProjectDetails /></ProtectedRoute>} />
 
         {/* HR Routes */}
         <Route path="/hr/employees" element={<ProtectedRoute module="hr_employees"><HREmployees /></ProtectedRoute>} />
@@ -136,21 +150,34 @@ const AppRoutes = () => {
         <Route path="/hr/payslips" element={<ProtectedRoute module="hr_payslips"><HRPayslips /></ProtectedRoute>} />
         <Route path="/hr/knowledge-center" element={<ProtectedRoute module="knowledge_center"><HRKnowledgeCenter /></ProtectedRoute>} />
 
+        {/* HMS Routes */}
+        <Route path="/workspace/department" element={<ProtectedRoute module="department"><AdminDepartments /> </ProtectedRoute>} />
+        <Route path="/workspace/project" element={<ProtectedRoute module="project"><Projects /></ProtectedRoute>} />
+
+
+        {/* sale and crm routes */}
+        <Route path="/sale/lead" element={<ProtectedRoute module="lead" roles={['admin', 'manager', 'inside-sales', 'hr', 'product-executive', 'sales']}><Lead /></ProtectedRoute>} />
+        <Route path="/sale/visit" element={<ProtectedRoute module="visits" roles={['admin', 'manager', 'inside-sales', 'hr', 'product-executive', 'sales']}><Visits /></ProtectedRoute>} />
+        <Route path="/sale/feedback" element={<ProtectedRoute module="feedback" roles={['admin', 'manager', 'inside-sales', 'hr', 'product-executive', 'sales']}><Feedback /></ProtectedRoute>} />
+        <Route path="/sale/registration" element={<ProtectedRoute module="registration" roles={['admin', 'manager', 'inside-sales', 'hr', 'product-executive', 'sales']}><Registration /></ProtectedRoute>} />
+        <Route path="/sale/dataupdation" element={<ProtectedRoute module="data_updation" roles={['admin', 'manager', 'inside-sales', 'hr', 'product-executive', 'sales']}><DataUpdation /></ProtectedRoute>} />
+        <Route path="/sale/demos" element={<ProtectedRoute module="demos" roles={['admin', 'manager', 'inside-sales', 'hr', 'product-executive', 'sales']}><Demos /></ProtectedRoute>} />
+
         {/* Admin Routes */}
-        <Route path="/admin/employees" element={<ProtectedRoute roles={['admin']}><AdminEmployees /></ProtectedRoute>} />
-        <Route path="/admin/departments" element={<ProtectedRoute roles={['admin']}><AdminDepartments /></ProtectedRoute>} />
-        <Route path="/admin/attendance" element={<ProtectedRoute roles={['admin']}><AdminAttendance /></ProtectedRoute>} />
-        <Route path="/admin/leaves" element={<ProtectedRoute roles={['admin']}><AdminLeaves /></ProtectedRoute>} />
+        <Route path="/admin/employee-management/employees" element={<ProtectedRoute roles={['admin']}><AdminEmployees /></ProtectedRoute>} />
+        <Route path="/admin/employee-management/departments" element={<ProtectedRoute roles={['admin']}><AdminDepartments /></ProtectedRoute>} />
+        <Route path="/admin/employee-management/attendance" element={<ProtectedRoute roles={['admin']}><AdminAttendance /></ProtectedRoute>} />
+        <Route path="/admin/employee-management/leaves" element={<ProtectedRoute roles={['admin']}><AdminLeaves /></ProtectedRoute>} />
         <Route path="/admin/tasks" element={<ProtectedRoute roles={['admin']}><AdminTasks /></ProtectedRoute>} />
         <Route path="/admin/payslips" element={<ProtectedRoute roles={['admin']}><AdminPayslips /></ProtectedRoute>} />
-        <Route path="/admin/policies" element={<ProtectedRoute roles={['admin']}><AdminPolicies /></ProtectedRoute>} />
+        <Route path="/admin/employee-management/leave-policies" element={<ProtectedRoute roles={['admin']}><AdminPolicies /></ProtectedRoute>} />
         <Route path="/admin/reports" element={<ProtectedRoute module="reports"><AdminReports /></ProtectedRoute>} />
         <Route path="/admin/crm" element={<ProtectedRoute roles={['admin']}><AdminCRM /></ProtectedRoute>} />
         <Route path="/admin/field-sales" element={<ProtectedRoute roles={['admin']}><AdminFieldSales /></ProtectedRoute>} />
         <Route path="/admin/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />
         <Route path="/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />
-        <Route path="/admin/announcements" element={<ProtectedRoute module="announcements"><AnnouncementsPage /></ProtectedRoute>} />
-        <Route path="/admin/holidays" element={<ProtectedRoute module="holidays"><HolidaysPage /></ProtectedRoute>} />
+        <Route path="/admin/employee-management/announcements" element={<ProtectedRoute module="announcements"><AnnouncementsPage /></ProtectedRoute>} />
+        <Route path="/admin/employee-management/holidays" element={<ProtectedRoute module="holidays"><HolidaysPage /></ProtectedRoute>} />
         <Route path="/admin/my-tasks" element={<ProtectedRoute roles={['admin']}><AdminMyTasks /></ProtectedRoute>} />
         <Route path="/admin/recruitment" element={<ProtectedRoute module="recruitment"><RecruitmentPage /></ProtectedRoute>} />
         <Route path="/admin/recruitment/p/:projectId" element={<ProtectedRoute module="recruitment"><RecruitmentProjectPage /></ProtectedRoute>} />
@@ -158,6 +185,7 @@ const AppRoutes = () => {
         <Route path="/admin/automation" element={<ProtectedRoute roles={['admin', 'hr']}><AutomationPage /></ProtectedRoute>} />
         <Route path="/admin/employee-management" element={<ProtectedRoute roles={['admin']}><AdminEmployeeHub /></ProtectedRoute>} />
         <Route path="/admin/knowledge-center" element={<ProtectedRoute roles={['admin']}><AdminKnowledgeCenter /></ProtectedRoute>} />
+        <Route path="/admin/departments/:id" element={<ProtectedRoute roles={['admin', 'manager', 'team-lead', 'hr']}><DepartmentDetails /></ProtectedRoute>} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />

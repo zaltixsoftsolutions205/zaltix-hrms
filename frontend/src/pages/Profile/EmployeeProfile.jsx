@@ -220,8 +220,8 @@ const EmployeeProfile = () => {
                 {/* Hover overlay with edit icon */}
                 <span className="absolute inset-0 bg-black/40 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
                   <svg width={20} height={20} viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
-                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                    <path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z" />
                   </svg>
                   <span className="text-white text-[10px] font-semibold mt-1">Edit Photo</span>
                 </span>
@@ -229,7 +229,7 @@ const EmployeeProfile = () => {
                 {(photoLoading || photoDeleting) && (
                   <span className="absolute inset-0 bg-black/40 flex items-center justify-center">
                     <svg className="w-6 h-6 animate-spin text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                      <circle cx={12} cy={12} r={10}/>
+                      <circle cx={12} cy={12} r={10} />
                     </svg>
                   </span>
                 )}
@@ -237,8 +237,8 @@ const EmployeeProfile = () => {
               {/* Camera badge */}
               <span className="absolute bottom-0.5 right-0.5 w-6 h-6 rounded-full bg-white shadow border border-gray-200 flex items-center justify-center pointer-events-none">
                 <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" className="text-violet-600">
-                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/>
-                  <circle cx={12} cy={13} r={4}/>
+                  <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
+                  <circle cx={12} cy={13} r={4} />
                 </svg>
               </span>
             </div>
@@ -264,9 +264,8 @@ const EmployeeProfile = () => {
                 <span className="w-1.5 h-1.5 bg-violet-500 rounded-full" /> Active
               </span>
               {docsData?.employeeType && (
-                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${
-                  docsData.employeeType === 'fresher' ? 'bg-violet-100 text-violet-700' : 'bg-violet-100 text-violet-700'
-                }`}>
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${docsData.employeeType === 'fresher' ? 'bg-violet-100 text-violet-700' : 'bg-violet-100 text-violet-700'
+                  }`}>
                   {docsData.employeeType}
                 </span>
               )}
@@ -279,12 +278,7 @@ const EmployeeProfile = () => {
           {/* Completion circle */}
           {!profileLoading && profileCompletion && (
             <div className="flex-shrink-0">
-              <ProfileCompletionIndicator
-                percentage={profileCompletion.percentage}
-                size={88}
-                mobileSize={60}
-                showLabel={true}
-              />
+              <ProfileCompletionIndicator percentage={profileCompletion.percentage} size={88} mobileSize={60} showLabel={true}/>
             </div>
           )}
         </div>
@@ -292,12 +286,19 @@ const EmployeeProfile = () => {
 
       {/* Info Grid */}
       <Card>
-        <h3 className="font-bold text-violet-900 mb-3 sm:mb-4">Professional Information</h3>
+        <h3 className="font-bold text-violet-900 mb-3 sm:mb-4">
+          Professional Information
+        </h3>
+
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-          {info.map(item => (
-            <div key={item.label} className="p-2.5 sm:p-3 bg-violet-50/60 rounded-xl">
-              <p className="text-[10px] sm:text-xs text-violet-500 font-medium uppercase tracking-wide">{item.label}</p>
-              <p className="text-xs sm:text-sm font-semibold text-violet-900 mt-0.5 capitalize">{item.value || '—'}</p>
+          {info.map((item) => (
+            <div key={item.label} className="min-w-0 p-2.5 sm:p-3 bg-violet-50/60 rounded-xl overflow-hidden">
+              <p className="text-[10px] sm:text-xs text-violet-500 font-medium uppercase tracking-wide">
+                {item.label}
+              </p>
+              <p className=" text-xs sm:text-sm font-semibold text-violet-900 mt-0.5 capitalize break-words whitespace-normal overflow-wrap-anywhere">
+                {item.value || "—"}
+              </p>
             </div>
           ))}
         </div>
@@ -311,7 +312,6 @@ const EmployeeProfile = () => {
             <button onClick={() => setEditing(true)} className="btn-secondary btn-sm whitespace-nowrap text-xs sm:text-sm">Edit</button>
           )}
         </div>
-
         {!editing ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div className="p-2.5 sm:p-3 bg-violet-50/60 rounded-xl">
@@ -459,7 +459,6 @@ const EmployeeProfile = () => {
           </div>
         )}
       </Card>
-
       {/* Documents Section */}
       {docsData?.employeeType && (
         <Card>
@@ -492,7 +491,7 @@ const EmployeeProfile = () => {
           {!allApproved && (
             <div className="mb-3 sm:mb-4 p-2.5 sm:p-3 bg-amber-50 border border-amber-200 rounded-xl text-[10px] sm:text-xs text-amber-800 flex items-start gap-1.5 sm:gap-2">
               <svg width={14} height={14} className="sm:w-4 sm:h-4 flex-shrink-0 mt-0.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" />
               </svg>
               <span>Payslip downloads are locked until all documents are approved by HR.</span>
             </div>
@@ -545,9 +544,8 @@ const EmployeeProfile = () => {
                         <button
                           onClick={() => fileInputRefs.current[doc.docType]?.click()}
                           disabled={uploading === doc.docType}
-                          className={`btn-sm text-[10px] sm:text-xs flex items-center gap-1 sm:gap-1.5 whitespace-nowrap w-full sm:w-auto justify-center py-1.5 sm:py-2 ${
-                            doc.status === 'uploaded' ? 'btn-secondary' : 'btn-primary'
-                          }`}
+                          className={`btn-sm text-[10px] sm:text-xs flex items-center gap-1 sm:gap-1.5 whitespace-nowrap w-full sm:w-auto justify-center py-1.5 sm:py-2 ${doc.status === 'uploaded' ? 'btn-secondary' : 'btn-primary'
+                            }`}
                         >
                           {uploading === doc.docType ? (
                             <>
@@ -595,7 +593,7 @@ const EmployeeProfile = () => {
           <div className="space-y-2 mb-4">
             {[
               { key: 'joiningLetter', label: 'Joining Letter', icon: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z' },
-              { key: 'idCard',        label: 'ID Card',        icon: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2' },
+              { key: 'idCard', label: 'ID Card', icon: 'M10 6H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V8a2 2 0 00-2-2h-5m-4 0V5a2 2 0 114 0v1m-4 0a2 2 0 104 0m-5 8a2 2 0 100-4 2 2 0 000 4zm0 0c1.306 0 2.417.835 2.83 2M9 14a3.001 3.001 0 00-2.83 2' },
             ].map(({ key, label, icon }) => {
               const filePath = myProfile?.[key];
               const fileUrl = filePath ? (() => {

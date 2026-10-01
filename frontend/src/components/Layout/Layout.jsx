@@ -45,7 +45,7 @@ const Layout = () => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const location = useLocation();
   const title = pageTitles[location.pathname] || 'HRMS';
-
+ 
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
 
   return (
