@@ -11,6 +11,7 @@ const productivityScoreSchema = new mongoose.Schema(
     taskScore: { type: Number, default: 0 },
     attendanceScore: { type: Number, default: 0 },
     crmScore: { type: Number, default: null }, // null for non-sales roles
+    timesheetScore: { type: Number, default: null }, // null when there's no work-day data to score yet
 
     // Final weighted score
     totalScore: { type: Number, default: 0 },
@@ -26,6 +27,16 @@ const productivityScoreSchema = new mongoose.Schema(
     leadsConverted: { type: Number, default: 0 },
     leadsTotal: { type: Number, default: 0 },
     leadsWithActivity: { type: Number, default: 0 },
+
+    // Raw inputs backing timesheetScore
+    tsEntriesLogged: { type: Number, default: 0 },
+    tsDaysUpdated: { type: Number, default: 0 },
+    tsWorkingDays: { type: Number, default: 0 },
+    tsTasksCompleted: { type: Number, default: 0 },
+    tsTasksTotal: { type: Number, default: 0 },
+    tsOnTimeCompleted: { type: Number, default: 0 },
+    tsLoggedHours: { type: Number, default: 0 },
+    tsEstimatedHours: { type: Number, default: 0 },
   },
   { timestamps: true }
 );

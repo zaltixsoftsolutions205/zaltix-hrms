@@ -24,7 +24,11 @@ const Leave           = require('../models/Leave');
 const Holiday         = require('../models/Holiday');
 const Document        = require('../models/Document');
 const ProductivityScore = require('../models/ProductivityScore');
+const Timesheet        = require('../models/Timesheet');
 const { notify, notifyMany } = require('./notificationService');
+const { sendMail } = require('../config/mail');
+const fs = require('fs');
+const { buildWeeklySummary, buildWeeklyReportPDF } = require('../controllers/timesheetController');
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -743,9 +747,67 @@ async function calculateProductivityScores(weekLabel) {
         : clamp((leadsConverted / leadsTotal) * 60 + (leadsWithActivity / Math.max(activeLeads.length, 1)) * 40);
     }
 
+    // ── Timesheet Score ──
+    // Based on: task completion %, on-time completion %, daily-update consistency,
+    // and a mild estimate-vs-actual efficiency adjustment (never "fewer hours = better").
+    const weekStart = new Date(start);
+    const weekEnd = new Date(end);
+    const tsDocs = await Timesheet.find({ employee: emp._id, date: { $gte: weekStart, $lte: weekEnd } });
+
+    let timesheetScore = null;
+    let tsEntriesLogged = 0, tsDaysUpdated = 0, tsTasksCompleted = 0, tsTasksTotal = 0;
+    let tsOnTimeCompleted = 0, tsLoggedHours = 0, tsEstimatedHours = 0;
+
+    if (workDays.length > 0) {
+      for (const ts of tsDocs) {
+        if (ts.dailyUpdate?.savedAt) tsDaysUpdated += 1;
+        for (const entry of ts.entries || []) {
+          tsEntriesLogged += 1;
+          tsLoggedHours += entry.hours || 0;
+          tsEstimatedHours += entry.estimatedHours || 0;
+          // Only entries with a due date count toward completion/on-time tracking —
+          // undated work-log lines aren't deadline-bound.
+          if (entry.dueDate) {
+            tsTasksTotal += 1;
+            if (entry.status === 'Completed') {
+              tsTasksCompleted += 1;
+              // No discrete per-entry "completed at" timestamp in this day-grain
+              // model — use the parent timesheet's day as a completion-day proxy.
+              if (ts.date <= entry.dueDate) tsOnTimeCompleted += 1;
+            }
+          } else if (entry.status === 'Completed') {
+            tsTasksCompleted += 1;
+          }
+        }
+      }
+      // Entries without a due date still count toward a completion denominator
+      // (fall back to total entries) so a week of undated-but-done work isn't
+      // scored as 0% completion.
+      if (tsTasksTotal === 0) tsTasksTotal = tsEntriesLogged;
+
+      const completionPct = tsTasksTotal === 0 ? 100 : (tsTasksCompleted / tsTasksTotal) * 100;
+      const onTimePct = tsTasksCompleted === 0 ? 100 : (tsOnTimeCompleted / tsTasksCompleted) * 100;
+      const consistencyPct = (tsDaysUpdated / workDays.length) * 100;
+
+      let efficiencyAdjustment = 0;
+      if (tsEstimatedHours > 0) {
+        const ratio = tsLoggedHours / tsEstimatedHours;
+        if (ratio > 1.5) efficiencyAdjustment = -10;
+        else if (ratio < 0.5 && completionPct < 80) efficiencyAdjustment = -10;
+      }
+
+      timesheetScore = clamp(
+        completionPct * 0.4 + onTimePct * 0.35 + consistencyPct * 0.25 + efficiencyAdjustment
+      );
+    }
+
     // ── Total Score (weighted) ──
     let totalScore;
-    if (crmScore !== null) {
+    if (timesheetScore !== null) {
+      totalScore = crmScore !== null
+        ? clamp(taskScore * 0.3 + attendanceScore * 0.3 + crmScore * 0.15 + timesheetScore * 0.25)
+        : clamp(taskScore * 0.35 + attendanceScore * 0.35 + timesheetScore * 0.30);
+    } else if (crmScore !== null) {
       totalScore = clamp(taskScore * 0.4 + attendanceScore * 0.4 + crmScore * 0.2);
     } else {
       totalScore = clamp(taskScore * 0.5 + attendanceScore * 0.5);
@@ -760,6 +822,7 @@ async function calculateProductivityScores(weekLabel) {
         taskScore,
         attendanceScore,
         crmScore,
+        timesheetScore,
         totalScore,
         tasksCompleted,
         tasksTotal,
@@ -771,11 +834,19 @@ async function calculateProductivityScores(weekLabel) {
         leadsConverted,
         leadsTotal,
         leadsWithActivity,
+        tsEntriesLogged,
+        tsDaysUpdated,
+        tsWorkingDays: workDays.length,
+        tsTasksCompleted,
+        tsTasksTotal,
+        tsOnTimeCompleted,
+        tsLoggedHours,
+        tsEstimatedHours,
       },
       { upsert: true, new: true }
     );
 
-    scores.push({ emp, totalScore, taskScore, attendanceScore, crmScore });
+    scores.push({ emp, totalScore, taskScore, attendanceScore, crmScore, timesheetScore });
   }
 
   return scores;
@@ -886,6 +957,81 @@ async function checkTaskDurationReminders() {
   }
 }
 
+// ─── WEEKLY TIMESHEET REPORT EMAIL ───────────────────────────────────────────
+// Runs every Monday at 09:00, alongside sendWeeklyReport. Emails each active
+// non-admin employee their own previous-week timesheet PDF (plain-language
+// summary + task rows) — the same PDF the "Export PDF" button produces,
+// automated so nobody has to remember to click it.
+async function sendWeeklyTimesheetEmails() {
+  try {
+    const employees = await User.find({ isActive: true, role: { $ne: 'admin' } }).select('_id name email').lean();
+    // Last week's Monday (anchor date for buildWeeklySummary's own isoWeek range).
+    const now = new Date();
+    const dayOfWeek = now.getDay() === 0 ? 7 : now.getDay(); // Mon=1..Sun=7
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() - (dayOfWeek - 1));
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+
+    let sent = 0, skipped = 0;
+    for (const emp of employees) {
+      if (!emp.email) { skipped += 1; continue; }
+      try {
+        const summary = await buildWeeklySummary(emp._id, lastMonday);
+        if (summary.tasksTotal === 0) { skipped += 1; continue; } // nothing to report
+        const filepath = await buildWeeklyReportPDF(summary);
+        await sendMail({
+          to: emp.email,
+          subject: `[Zaltix] Your Weekly Timesheet Report — ${summary.weekStart} to ${summary.weekEnd}`,
+          html: `<div style="font-family:Inter,sans-serif;padding:16px"><p>${summary.summary}</p><p style="color:#7c3aed">Full report attached.</p></div>`,
+          attachments: [{ filename: `Weekly_Report_${summary.weekStart}.pdf`, path: filepath }],
+        });
+        fs.unlink(filepath, () => {}); // best-effort cleanup, don't block on it
+        sent += 1;
+      } catch (err) {
+        console.error(`[Automation] sendWeeklyTimesheetEmails failed for ${emp._id}:`, err.message);
+        skipped += 1;
+      }
+    }
+    console.log(`[Automation] Weekly timesheet emails sent: ${sent}, skipped: ${skipped}.`);
+  } catch (err) {
+    console.error('[Automation] sendWeeklyTimesheetEmails error:', err.message);
+  }
+}
+
+// ─── TIMESHEET DAILY UPDATE REMINDER ─────────────────────────────────────────
+// Runs Mon–Sat at 18:00. Employee-only — no manager-facing notification.
+async function remindMissingDailyUpdate() {
+  try {
+    const today = todayStr();
+    const employees = await User.find({ isActive: true, role: { $ne: 'admin' } }, '_id');
+    const todayStart = new Date(`${today}T00:00:00.000Z`);
+    const todayEnd = new Date(`${today}T23:59:59.999Z`);
+
+    const todaysTimesheets = await Timesheet.find(
+      { date: { $gte: todayStart, $lte: todayEnd } },
+      'employee dailyUpdate'
+    ).lean();
+    const updatedIds = new Set(
+      todaysTimesheets.filter(t => t.dailyUpdate?.savedAt).map(t => String(t.employee))
+    );
+
+    for (const emp of employees) {
+      if (updatedIds.has(String(emp._id))) continue;
+      await notify(emp._id, {
+        title: 'Daily Update Reminder',
+        message: "Don't forget to save today's work update before you log off.",
+        type: 'task',
+        link: '/timesheets',
+        dedupKey: `daily-update-${today}-${emp._id}`,
+        dedupWindowMs: 20 * 60 * 60 * 1000,
+      });
+    }
+  } catch (err) {
+    console.error('[Automation] remindMissingDailyUpdate error:', err.message);
+  }
+}
+
 // ─── SCHEDULER ────────────────────────────────────────────────────────────────
 
 let started = false;
@@ -919,11 +1065,18 @@ function startAutomation() {
   // Weekly report + productivity scores — every Monday at 09:00
   cron.schedule('0 9 * * 1', sendWeeklyReport, { timezone: 'Asia/Kolkata' });
 
+  // Weekly timesheet report email — every Monday at 09:05, each employee gets
+  // their own previous-week timesheet PDF.
+  cron.schedule('5 9 * * 1', sendWeeklyTimesheetEmails, { timezone: 'Asia/Kolkata' });
+
   // Holiday reminder — every evening at 18:00: if tomorrow is a holiday,
   // tell everyone. Runs all 7 days so a holiday before a Sunday is covered.
   cron.schedule('0 18 * * *', remindUpcomingHoliday, { timezone: 'Asia/Kolkata' });
 
-  console.log('[Automation] Scheduler started. 9 jobs active.');
+  // Timesheet daily update reminder — Mon–Sat at 18:00 (employee-only, no manager notification)
+  cron.schedule('0 18 * * 1-6', remindMissingDailyUpdate, { timezone: 'Asia/Kolkata' });
+
+  console.log('[Automation] Scheduler started. 11 jobs active.');
 }
 
 module.exports = {
@@ -940,6 +1093,8 @@ module.exports = {
   sendEveningSummary,
   calculateProductivityScores,
   sendWeeklyReport,
+  sendWeeklyTimesheetEmails,
   currentWeekLabel,
   prevWeekLabel,
+  remindMissingDailyUpdate,
 };

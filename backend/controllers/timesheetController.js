@@ -1,12 +1,20 @@
 const Timesheet = require('../models/Timesheet');
+const Project = require('../models/Project');
 const User = require('../models/User');
 const Department = require('../models/Department');
+const Attendance = require('../models/Attendance');
+const Holiday = require('../models/Holiday');
+const ProductivityScore = require('../models/ProductivityScore');
 const notificationService = require('../services/notificationService');
+const generateTimesheetReportPDF = require('../utils/generateTimesheetReportPDF');
+const { analyseEntry } = require('../services/taskIntelligence');
+const fs = require('fs');
 const moment = require('moment');
 
 // Normalise a date to the start of its day (midnight) so the per-day unique index
 // and lookups are stable regardless of the time component sent by the client.
 const startOfDay = (d) => moment(d).startOf('day').toDate();
+const ymd = (d) => moment(d).format('YYYY-MM-DD');
 
 // Match a department name against a keyword, case-insensitively.
 const deptNameMatches = (name, keyword) =>
@@ -14,23 +22,16 @@ const deptNameMatches = (name, keyword) =>
 
 /**
  * Resolve who an employee's timesheet should be routed to for approval.
+ * Kept only for the legacy review flow (getApprovals/reviewTimesheet) — the
+ * new daily-work flow no longer routes or requires approval.
  * Returns { approverId, routedRole } where routedRole is 'admin' | 'hr' | 'lead'.
- *
- * Rules:
- *   - HR              -> Admin
- *   - Marketing/Sales -> HR
- *   - Technical       -> Technical department head (tech lead)
- *                        (the tech lead's own timesheet -> Admin)
- *   - anyone else / fallback -> Admin
  */
 const resolveApprover = async (user) => {
   const admin = await User.findOne({ role: 'admin', isActive: true }).select('_id').lean();
   const adminRoute = { approverId: admin?._id || null, routedRole: 'admin' };
 
-  // HR -> Admin
   if (user.role === 'hr') return adminRoute;
 
-  // Load the employee's department (name + head) once.
   const dept = user.department
     ? await Department.findById(user.department).select('name headOf').lean()
     : null;
@@ -44,14 +45,12 @@ const resolveApprover = async (user) => {
     deptNameMatches(deptName, 'engineering') ||
     deptNameMatches(deptName, 'development');
 
-  // Marketing / Sales -> HR
   if (isMarketing || isSales) {
     const hr = await User.findOne({ role: 'hr', isActive: true }).select('_id').lean();
     if (hr) return { approverId: hr._id, routedRole: 'hr' };
-    return adminRoute; // no HR configured — fall back to Admin
+    return adminRoute;
   }
 
-  // Technical -> tech lead (department head); the lead themselves -> Admin
   if (isTechnical) {
     const leadId = dept?.headOf;
     if (leadId && String(leadId) !== String(user._id)) {
@@ -60,11 +59,22 @@ const resolveApprover = async (user) => {
     return adminRoute;
   }
 
-  // Everyone else -> Admin
   return adminRoute;
 };
 
-// Employee: create or update today's (or a given date's) timesheet.
+// Is this user the head of their own department (the "manager" concept used
+// for Team View, mirroring Sidebar.jsx's isTechLead check)?
+const isDeptHeadOf = async (userId, departmentId) => {
+  if (!departmentId) return false;
+  const dept = await Department.findById(departmentId).select('headOf').lean();
+  return !!dept && String(dept.headOf) === String(userId);
+};
+
+// ─── Employee: daily work log ────────────────────────────────────────────────
+
+// Create or update a day's timesheet (whole-day upsert — used by legacy bulk
+// submit and still useful for seeding a day). No approval gating: employees can
+// always edit their own entries regardless of status.
 exports.submitTimesheet = async (req, res) => {
   try {
     const { date, entries } = req.body;
@@ -72,52 +82,28 @@ exports.submitTimesheet = async (req, res) => {
       return res.status(400).json({ message: 'At least one timesheet entry is required.' });
     }
     for (const e of entries) {
-      if (!e.task || e.hours == null || e.hours < 0) {
-        return res.status(400).json({ message: 'Each entry needs a task and valid hours.' });
-      }
+      if (!e.task) return res.status(400).json({ message: 'Each entry needs a task, start time and end time.' });
+    }
+    // Hours/estimate/insight are system-derived from start/end time.
+    for (let i = 0; i < entries.length; i++) {
+      const analysed = await analyseEntry(entries[i]);
+      if (analysed.error) return res.status(400).json({ message: analysed.error });
+      entries[i] = analysed.entry;
     }
 
     const day = startOfDay(date || new Date());
-    const { approverId, routedRole } = await resolveApprover(req.user);
-
     let timesheet = await Timesheet.findOne({ employee: req.user._id, date: day });
 
     if (timesheet) {
-      // Don't allow editing an already-approved timesheet.
-      if (timesheet.status === 'approved') {
-        return res.status(400).json({ message: 'An approved timesheet cannot be edited.' });
-      }
       timesheet.entries = entries;
-      timesheet.status = 'pending';
-      timesheet.routedTo = approverId;
-      timesheet.routedRole = routedRole;
-      timesheet.reviewedBy = null;
-      timesheet.reviewDate = null;
-      timesheet.reviewerComments = '';
       await timesheet.save();
     } else {
-      timesheet = await Timesheet.create({
-        employee: req.user._id,
-        date: day,
-        entries,
-        routedTo: approverId,
-        routedRole,
-      });
-    }
-
-    // Notify the approver.
-    if (approverId) {
-      await notificationService.notify(approverId, {
-        title: 'Timesheet Submitted',
-        message: `${req.user.name} submitted a timesheet for ${moment(day).format('DD MMM YYYY')} (${timesheet.totalHours}h).`,
-        type: 'task',
-        link: '/timesheets/approvals',
-      });
+      timesheet = await Timesheet.create({ employee: req.user._id, date: day, entries });
     }
 
     const populated = await Timesheet.findById(timesheet._id)
       .populate('employee', 'name employeeId')
-      .populate('routedTo', 'name role');
+      .populate('entries.project', 'name');
     res.status(201).json(populated);
   } catch (err) {
     if (err.code === 11000) {
@@ -140,6 +126,7 @@ exports.getMyTimesheets = async (req, res) => {
     const timesheets = await Timesheet.find(filter)
       .populate('routedTo', 'name role')
       .populate('reviewedBy', 'name')
+      .populate('entries.project', 'name')
       .sort({ date: -1 });
     res.json(timesheets);
   } catch (err) {
@@ -147,8 +134,757 @@ exports.getMyTimesheets = async (req, res) => {
   }
 };
 
-// Approver: timesheets routed to me awaiting (or already actioned) review.
-// Admin sees everything; others see only what was routed to them.
+// Add one task entry to a day (find-or-create the day's doc).
+exports.addEntry = async (req, res) => {
+  try {
+    const { date, entry } = req.body;
+    if (!entry || !entry.task) {
+      return res.status(400).json({ message: 'Entry needs a task, start time and end time.' });
+    }
+
+    let project = null, projectLabel = entry.projectLabel || '';
+    if (entry.project) {
+      const proj = await Project.findById(entry.project).select('name').lean();
+      if (proj) { project = proj._id; projectLabel = proj.name; }
+    }
+
+    // Hours come from start/end time; estimate + insight are decided by the system.
+    const analysed = await analyseEntry({ ...entry, project, projectLabel });
+    if (analysed.error) return res.status(400).json({ message: analysed.error });
+    const entryDoc = analysed.entry;
+
+    const day = startOfDay(date || new Date());
+    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: day });
+
+    if (timesheet) {
+      timesheet.entries.push(entryDoc);
+      await timesheet.save();
+    } else {
+      timesheet = await Timesheet.create({ employee: req.user._id, date: day, entries: [entryDoc] });
+    }
+
+    const populated = await Timesheet.findById(timesheet._id).populate('entries.project', 'name');
+    res.status(201).json(populated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Update a single entry by id. Owner-only (or admin).
+exports.updateEntry = async (req, res) => {
+  try {
+    const timesheet = await Timesheet.findById(req.params.timesheetId);
+    if (!timesheet) return res.status(404).json({ message: 'Timesheet not found.' });
+    if (String(timesheet.employee) !== String(req.user._id) && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'You can only edit your own entries.' });
+    }
+
+    const entry = timesheet.entries.id(req.params.entryId);
+    if (!entry) return res.status(404).json({ message: 'Entry not found.' });
+
+    const body = { ...req.body };
+    if (body.project) {
+      const proj = await Project.findById(body.project).select('name').lean();
+      if (proj) body.projectLabel = proj.name;
+    }
+    // Never trust client-supplied hours/estimate/insight — recompute from the merged entry.
+    delete body.hours; delete body.estimatedHours; delete body.insight;
+    Object.assign(entry, body);
+
+    const analysed = await analyseEntry(
+      { task: entry.task, workCategory: entry.workCategory, status: entry.status, startTime: entry.startTime, endTime: entry.endTime },
+      { excludeEntryId: entry._id }
+    );
+    if (analysed.error) return res.status(400).json({ message: analysed.error });
+    entry.hours = analysed.entry.hours;
+    entry.estimatedHours = analysed.entry.estimatedHours;
+    entry.insight = analysed.entry.insight;
+    await timesheet.save();
+
+    const populated = await Timesheet.findById(timesheet._id).populate('entries.project', 'name');
+    res.json(populated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Delete a single entry by id. Owner-only (or admin).
+exports.deleteEntry = async (req, res) => {
+  try {
+    const timesheet = await Timesheet.findById(req.params.timesheetId);
+    if (!timesheet) return res.status(404).json({ message: 'Timesheet not found.' });
+    if (String(timesheet.employee) !== String(req.user._id) && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'You can only edit your own entries.' });
+    }
+
+    const entry = timesheet.entries.id(req.params.entryId);
+    if (!entry) return res.status(404).json({ message: 'Entry not found.' });
+    entry.deleteOne();
+    await timesheet.save();
+
+    const populated = await Timesheet.findById(timesheet._id).populate('entries.project', 'name');
+    res.json(populated);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Save the day's Daily Update (no approval — visible immediately to managers/HR/Admin).
+exports.saveDailyUpdate = async (req, res) => {
+  try {
+    const { date, completedToday, continuingTomorrow, blockers, dayStatus } = req.body;
+    const day = startOfDay(date || new Date());
+
+    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: day });
+    const dailyUpdate = {
+      completedToday: completedToday || '',
+      continuingTomorrow: continuingTomorrow || '',
+      blockers: blockers || '',
+      dayStatus: dayStatus || null,
+      savedAt: new Date(),
+    };
+
+    if (timesheet) {
+      timesheet.dailyUpdate = dailyUpdate;
+      await timesheet.save();
+    } else {
+      timesheet = await Timesheet.create({ employee: req.user._id, date: day, entries: [], dailyUpdate });
+    }
+
+    res.json(timesheet);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── Calendar ─────────────────────────────────────────────────────────────────
+
+exports.getCalendarMonth = async (req, res) => {
+  try {
+    const now = new Date();
+    const month = parseInt(req.query.month) || now.getMonth() + 1;
+    const year = parseInt(req.query.year) || now.getFullYear();
+    const start = moment(`${year}-${month}-01`, 'YYYY-M-DD').startOf('month');
+    const end = moment(start).endOf('month');
+
+    const [timesheets, holidays] = await Promise.all([
+      Timesheet.find({ employee: req.user._id, date: { $gte: start.toDate(), $lte: end.toDate() } }),
+      Holiday.find({ year }),
+    ]);
+    const holidaySet = new Set(holidays.map(h => ymd(h.date)));
+    const tsByDay = new Map(timesheets.map(t => [ymd(t.date), t]));
+
+    const today = moment().startOf('day');
+    const days = {};
+    const cur = moment(start);
+    while (cur.isSameOrBefore(end)) {
+      const key = cur.format('YYYY-MM-DD');
+      const isFuture = cur.isAfter(today);
+      const isWeekOff = cur.day() === 0; // Sunday, matching attendance convention
+      const isHoliday = holidaySet.has(key);
+      const ts = tsByDay.get(key);
+      const hasEntries = !!ts && ts.entries.length > 0;
+      const hasUpdate = !!ts?.dailyUpdate?.savedAt;
+
+      let status;
+      if (isHoliday || isWeekOff) status = 'holiday';
+      else if (isFuture) status = 'future';
+      else if (hasEntries && hasUpdate) status = 'complete';
+      else if (hasEntries || hasUpdate) status = 'partial';
+      else status = 'not-updated';
+
+      days[key] = {
+        status,
+        totalHours: ts?.totalHours || 0,
+        entryCount: ts?.entries.length || 0,
+        dailyUpdateSaved: hasUpdate,
+      };
+      cur.add(1, 'day');
+    }
+
+    res.json({ month, year, days });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.getDayDetail = async (req, res) => {
+  try {
+    const day = startOfDay(req.params.date);
+    const employeeId = req.query.employeeId || req.user._id;
+
+    // Only self, or a dept-head/HR/admin viewing a report, may view another's day.
+    if (String(employeeId) !== String(req.user._id)) {
+      const target = await User.findById(employeeId).select('department').lean();
+      const allowed =
+        ['hr', 'admin'].includes(req.user.role) ||
+        (await isDeptHeadOf(req.user._id, target?.department));
+      if (!allowed) return res.status(403).json({ message: 'Not authorized to view this timesheet.' });
+    }
+
+    const timesheet = await Timesheet.findOne({ employee: employeeId, date: day })
+      .populate('entries.project', 'name');
+    const attendance = await Attendance.findOne({ employee: employeeId, date: ymd(day) }).lean();
+
+    if (!timesheet) {
+      return res.json({
+        date: ymd(day), entries: [], totalHours: 0, dailyUpdate: null,
+        attendance: attendance ? { checkIn: attendance.checkIn, checkOut: attendance.checkOut, workHours: attendance.workHours } : null,
+      });
+    }
+
+    res.json({
+      ...timesheet.toObject(),
+      attendance: attendance ? { checkIn: attendance.checkIn, checkOut: attendance.checkOut, workHours: attendance.workHours } : null,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Self-service overdue-task alert: any of the employee's own task entries
+// (across all days, not just today) with a past dueDate and not Completed.
+exports.getMyOverdueTasks = async (req, res) => {
+  try {
+    const now = new Date();
+    const timesheets = await Timesheet.find({
+      employee: req.user._id,
+      'entries.dueDate': { $lt: now },
+    }).populate('entries.project', 'name').lean();
+
+    const overdue = [];
+    for (const ts of timesheets) {
+      for (const entry of ts.entries || []) {
+        if (entry.dueDate && new Date(entry.dueDate) < now && entry.status !== 'Completed') {
+          overdue.push({
+            timesheetId: ts._id,
+            entryId: entry._id,
+            date: ymd(ts.date),
+            task: entry.task,
+            project: entry.project?.name || entry.projectLabel || '',
+            dueDate: ymd(entry.dueDate),
+            status: entry.status,
+          });
+        }
+      }
+    }
+    overdue.sort((a, b) => a.dueDate.localeCompare(b.dueDate));
+    res.json(overdue);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Self-service "This Week" view: every day's entries + daily update for the
+// current (or given) week, so an employee can spot gaps before Friday instead
+// of only seeing one day at a time on the Today tab.
+exports.getMyWeek = async (req, res) => {
+  try {
+    const { start, end } = weekRange(req.query.date);
+    const timesheets = await Timesheet.find({ employee: req.user._id, date: { $gte: start, $lte: end } })
+      .populate('entries.project', 'name')
+      .lean();
+    const byDay = new Map(timesheets.map(t => [ymd(t.date), t]));
+
+    const days = [];
+    const cur = moment(start);
+    const endM = moment(end);
+    while (cur.isSameOrBefore(endM, 'day')) {
+      const key = cur.format('YYYY-MM-DD');
+      const ts = byDay.get(key);
+      days.push({
+        date: key,
+        isWeekOff: cur.day() === 0,
+        totalHours: ts?.totalHours || 0,
+        entries: ts?.entries || [],
+        dailyUpdateSaved: !!ts?.dailyUpdate?.savedAt,
+      });
+      cur.add(1, 'day');
+    }
+
+    res.json({ weekStart: ymd(start), weekEnd: ymd(end), days });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── Shared rollup helper (Team View / Org View / Reports) ──────────────────
+
+const buildEmployeeRollup = async (employeeIds, start, end) => {
+  const timesheets = await Timesheet.find({
+    employee: { $in: employeeIds },
+    date: { $gte: start, $lte: end },
+  }).lean();
+
+  const byEmployee = new Map(employeeIds.map(id => [String(id), {
+    totalHours: 0, totalTasks: 0, completedTasks: 0, pendingTasks: 0, blockedTasks: 0,
+    daysUpdated: 0,
+  }]));
+
+  for (const ts of timesheets) {
+    const row = byEmployee.get(String(ts.employee));
+    if (!row) continue;
+    row.totalHours += ts.totalHours || 0;
+    // "Updated" = touched their timesheet that day at all — either saved a
+    // Daily Update or logged at least one task entry — not just completed work.
+    if (ts.dailyUpdate?.savedAt || (ts.entries || []).length > 0) row.daysUpdated += 1;
+    for (const entry of ts.entries || []) {
+      row.totalTasks += 1;
+      if (entry.status === 'Completed') row.completedTasks += 1;
+      else if (entry.status === 'Blocked') row.blockedTasks += 1;
+      else row.pendingTasks += 1;
+    }
+  }
+
+  for (const row of byEmployee.values()) {
+    row.productivityPct = row.totalTasks === 0 ? 0 : Math.round((row.completedTasks / row.totalTasks) * 100);
+    row.totalHours = Math.round(row.totalHours * 10) / 10;
+  }
+
+  return byEmployee;
+};
+
+const monthRange = (req) => {
+  const now = new Date();
+  const month = parseInt(req.query.month) || now.getMonth() + 1;
+  const year = parseInt(req.query.year) || now.getFullYear();
+  const start = moment(`${year}-${month}-01`, 'YYYY-M-DD').startOf('month').toDate();
+  const end = moment(start).endOf('month').toDate();
+  return { start, end, month, year };
+};
+
+// The calendar month immediately before the one monthRange(req) resolved to.
+const prevMonthRange = ({ month, year }) => {
+  const start = moment(`${year}-${month}-01`, 'YYYY-M-DD').subtract(1, 'month').startOf('month').toDate();
+  const end = moment(start).endOf('month').toDate();
+  return { start, end };
+};
+
+// Week containing `anchorDate` (defaults to today), Monday–Sunday.
+const weekRange = (anchorDate) => {
+  const start = moment(anchorDate || new Date()).startOf('isoWeek').toDate();
+  const end = moment(start).endOf('isoWeek').toDate();
+  return { start, end };
+};
+
+// Count Mon–Sat days in [start, end] (Sunday-off convention used elsewhere in
+// this codebase, e.g. attendanceController's working-days calculation).
+const countWorkingDays = (start, end) => {
+  let count = 0;
+  const cur = moment(start);
+  const endM = moment(end);
+  while (cur.isSameOrBefore(endM, 'day')) {
+    if (cur.day() !== 0) count += 1;
+    cur.add(1, 'day');
+  }
+  return count;
+};
+
+// Days-updated consistency % per employee for [start, end] — a lighter query
+// than the full rollup, used just for the previous-period trend comparison.
+const daysUpdatedPctMap = async (employeeIds, start, end) => {
+  const workingDays = countWorkingDays(start, moment(end).isAfter(new Date()) ? new Date() : end);
+  const timesheets = await Timesheet.find(
+    { employee: { $in: employeeIds }, date: { $gte: start, $lte: end } },
+    'employee entries dailyUpdate'
+  ).lean();
+  const daysUpdated = new Map(employeeIds.map(id => [String(id), 0]));
+  for (const ts of timesheets) {
+    if (ts.dailyUpdate?.savedAt || (ts.entries || []).length > 0) {
+      const key = String(ts.employee);
+      daysUpdated.set(key, (daysUpdated.get(key) || 0) + 1);
+    }
+  }
+  const pctMap = new Map();
+  for (const [id, count] of daysUpdated) {
+    pctMap.set(id, workingDays === 0 ? null : Math.round((count / workingDays) * 100));
+  }
+  return pctMap;
+};
+
+// ─── Manager Team View ───────────────────────────────────────────────────────
+
+exports.getTeamView = async (req, res) => {
+  try {
+    const me = await User.findById(req.user._id).select('department role').lean();
+    const isHead = req.user.role === 'admin' || (await isDeptHeadOf(req.user._id, me?.department));
+    if (!isHead) return res.status(403).json({ message: 'Only a department head can view Team View.' });
+    if (!me?.department) return res.json({ workingDaysInRange: 0, rows: [] });
+
+    const { start, end, month, year } = monthRange(req);
+    const workingDaysInRange = countWorkingDays(start, moment(end).isAfter(new Date()) ? new Date() : end);
+    const teamMembers = await User.find({ department: me.department, isActive: true })
+      .select('name employeeId role');
+    const employeeIds = teamMembers.map(m => m._id);
+    const rollup = await buildEmployeeRollup(employeeIds, start, end);
+
+    const prev = prevMonthRange({ month, year });
+    const prevPctMap = await daysUpdatedPctMap(employeeIds, prev.start, prev.end);
+
+    const rows = teamMembers.map(m => {
+      const row = rollup.get(String(m._id));
+      const curPct = workingDaysInRange === 0 ? null : Math.round((row.daysUpdated / workingDaysInRange) * 100);
+      const prevPct = prevPctMap.get(String(m._id));
+      return {
+        employee: { _id: m._id, name: m.name, employeeId: m.employeeId },
+        ...row,
+        daysUpdatedTrend: (curPct != null && prevPct != null) ? curPct - prevPct : null,
+      };
+    });
+    res.json({ workingDaysInRange, rows });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── HR/Admin Org View ───────────────────────────────────────────────────────
+
+exports.getOrgView = async (req, res) => {
+  try {
+    const { start, end, month, year } = monthRange(req);
+    const workingDaysInRange = countWorkingDays(start, moment(end).isAfter(new Date()) ? new Date() : end);
+    const userFilter = { isActive: true };
+    if (req.query.departmentId) userFilter.department = req.query.departmentId;
+    if (req.query.role) userFilter.role = req.query.role;
+    if (req.query.employeeId) userFilter._id = req.query.employeeId;
+
+    const employees = await User.find(userFilter).select('name employeeId role department').populate('department', 'name');
+    const employeeIds = employees.map(e => e._id);
+    const rollup = await buildEmployeeRollup(employeeIds, start, end);
+
+    const prev = prevMonthRange({ month, year });
+    const prevPctMap = await daysUpdatedPctMap(employeeIds, prev.start, prev.end);
+
+    const today = ymd(new Date());
+    const todayTimesheets = await Timesheet.find({
+      employee: { $in: employeeIds },
+      date: { $gte: startOfDay(today), $lte: moment(today).endOf('day').toDate() },
+    }).select('employee dailyUpdate').lean();
+    const updatedToday = new Set(todayTimesheets.filter(t => t.dailyUpdate?.savedAt).map(t => String(t.employee)));
+
+    let totalHours = 0, totalCompletedTasks = 0;
+    const workCategoryTotals = {};
+    const blockers = [];
+    const workload = [];
+
+    const tsDocs = await Timesheet.find({ employee: { $in: employeeIds }, date: { $gte: start, $lte: end } })
+      .populate('employee', 'name employeeId');
+    for (const ts of tsDocs) {
+      totalHours += ts.totalHours || 0;
+      for (const entry of ts.entries || []) {
+        if (entry.status === 'Completed') totalCompletedTasks += 1;
+        workCategoryTotals[entry.workCategory] = (workCategoryTotals[entry.workCategory] || 0) + (entry.hours || 0);
+        if (entry.status === 'Blocked') {
+          blockers.push({
+            employee: ts.employee?.name, date: ymd(ts.date), task: entry.task, blocker: entry.blocker,
+          });
+        }
+      }
+    }
+
+    for (const emp of employees) {
+      const row = rollup.get(String(emp._id));
+      const curPct = workingDaysInRange === 0 ? null : Math.round((row.daysUpdated / workingDaysInRange) * 100);
+      const prevPct = prevPctMap.get(String(emp._id));
+      workload.push({
+        employee: emp.name, employeeId: emp.employeeId, department: emp.department?.name,
+        ...row,
+        daysUpdatedTrend: (curPct != null && prevPct != null) ? curPct - prevPct : null,
+      });
+    }
+
+    res.json({
+      totalEmployees: employees.length,
+      updatedToday: updatedToday.size,
+      missingToday: employees.length - updatedToday.size,
+      totalHours: Math.round(totalHours * 10) / 10,
+      totalCompletedTasks,
+      workCategoryDistribution: workCategoryTotals,
+      workingDaysInRange,
+      workload,
+      blockers,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── Analytics ────────────────────────────────────────────────────────────────
+
+exports.getWorkCategoryAnalytics = async (req, res) => {
+  try {
+    const employeeId = req.query.employeeId || req.user._id;
+    if (String(employeeId) !== String(req.user._id) && !['hr', 'admin'].includes(req.user.role)) {
+      const target = await User.findById(employeeId).select('department').lean();
+      if (!(await isDeptHeadOf(req.user._id, target?.department))) {
+        return res.status(403).json({ message: 'Not authorized.' });
+      }
+    }
+
+    const { start, end } = monthRange(req);
+    const timesheets = await Timesheet.find({ employee: employeeId, date: { $gte: start, $lte: end } }).lean();
+
+    const totals = {};
+    for (const ts of timesheets) {
+      for (const entry of ts.entries || []) {
+        totals[entry.workCategory] = (totals[entry.workCategory] || 0) + (entry.hours || 0);
+      }
+    }
+    res.json(Object.entries(totals).map(([category, hours]) => ({ category, hours: Math.round(hours * 10) / 10 })));
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Attendance office-hours vs Timesheet logged-hours comparison (read-only).
+exports.getAttendanceComparison = async (req, res) => {
+  try {
+    const employeeId = req.query.employeeId || req.user._id;
+    if (String(employeeId) !== String(req.user._id) && !['hr', 'admin'].includes(req.user.role)) {
+      const target = await User.findById(employeeId).select('department').lean();
+      if (!(await isDeptHeadOf(req.user._id, target?.department))) {
+        return res.status(403).json({ message: 'Not authorized.' });
+      }
+    }
+
+    const { start, end } = monthRange(req);
+    const [timesheets, attendance] = await Promise.all([
+      Timesheet.find({ employee: employeeId, date: { $gte: start, $lte: end } }).lean(),
+      Attendance.find({ employee: employeeId, date: { $gte: ymd(start), $lte: ymd(end) } }).lean(),
+    ]);
+
+    const tsByDay = new Map(timesheets.map(t => [ymd(t.date), t]));
+    const attByDay = new Map(attendance.map(a => [a.date, a]));
+    const allDays = new Set([...tsByDay.keys(), ...attByDay.keys()]);
+
+    const rows = [...allDays].sort().map(date => {
+      const att = attByDay.get(date);
+      const ts = tsByDay.get(date);
+      const officeHours = att?.workHours || 0;
+      const loggedHours = ts?.totalHours || 0;
+      return { date, officeHours, loggedHours, delta: Math.round((loggedHours - officeHours) * 10) / 10 };
+    });
+
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── Reports ──────────────────────────────────────────────────────────────────
+
+const buildReportRows = async (query) => {
+  const { start, end } = monthRange({ query });
+  const userFilter = { isActive: true };
+  if (query.employeeId) userFilter._id = query.employeeId;
+  if (query.departmentId) userFilter.department = query.departmentId;
+  if (query.role) userFilter.role = query.role;
+
+  const employees = await User.find(userFilter).select('name employeeId department').populate('department', 'name');
+  const employeeIds = employees.map(e => e._id);
+  const empById = new Map(employees.map(e => [String(e._id), e]));
+
+  const tsFilter = { employee: { $in: employeeIds }, date: { $gte: start, $lte: end } };
+  const timesheets = await Timesheet.find(tsFilter).populate('entries.project', 'name').lean();
+
+  const rows = [];
+  for (const ts of timesheets) {
+    const emp = empById.get(String(ts.employee));
+    for (const entry of ts.entries || []) {
+      if (query.status && entry.status !== query.status) continue;
+      if (query.workCategory && entry.workCategory !== query.workCategory) continue;
+      if (query.projectId && String(entry.project?._id || entry.project) !== String(query.projectId)) continue;
+      rows.push({
+        date: ymd(ts.date),
+        employee: emp?.name || '',
+        employeeId: emp?.employeeId || '',
+        department: emp?.department?.name || '',
+        project: entry.projectLabel || entry.project?.name || '',
+        task: entry.task,
+        workCategory: entry.workCategory,
+        status: entry.status,
+        hours: entry.hours,
+        estimatedHours: entry.estimatedHours ?? '',
+        timeVerdict: entry.insight?.verdict || '',
+        completionPercentage: entry.completionPercentage ?? '',
+        dueDate: entry.dueDate ? ymd(entry.dueDate) : '',
+        blocker: entry.blocker || '',
+      });
+    }
+  }
+  return rows;
+};
+
+exports.getReportsData = async (req, res) => {
+  try {
+    const rows = await buildReportRows(req.query);
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+exports.downloadReportPDF = async (req, res) => {
+  try {
+    const rows = await buildReportRows(req.query);
+    const columns = [
+      { key: 'date', label: 'Date' },
+      { key: 'employee', label: 'Employee' },
+      { key: 'department', label: 'Department' },
+      { key: 'project', label: 'Project' },
+      { key: 'task', label: 'Task' },
+      { key: 'workCategory', label: 'Category' },
+      { key: 'status', label: 'Status' },
+      { key: 'hours', label: 'Hours' },
+      { key: 'estimatedHours', label: 'Est. Hrs' },
+      { key: 'dueDate', label: 'Due Date' },
+    ];
+    const filepath = await generateTimesheetReportPDF({ title: 'Timesheet Report', columns, rows });
+    const filename = 'Timesheet_Report.pdf';
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    fs.createReadStream(filepath).pipe(res);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── Weekly Report (self-service, with a plain-language intelligence summary) ─
+
+// Builds the week's row data plus a short auto-generated summary paragraph —
+// computed entirely from existing fields, no external AI call.
+const buildWeeklySummary = async (employeeId, anchorDate) => {
+  const { start, end } = weekRange(anchorDate);
+  const employee = await User.findById(employeeId).select('name employeeId').lean();
+  const timesheets = await Timesheet.find({ employee: employeeId, date: { $gte: start, $lte: end } })
+    .populate('entries.project', 'name')
+    .sort({ date: 1 })
+    .lean();
+
+  const rows = [];
+  let totalHours = 0, tasksTotal = 0, tasksCompleted = 0, tasksOverdue = 0, blockedCount = 0, daysUpdated = 0;
+  const categoryTotals = {};
+  const blockers = [];
+
+  for (const ts of timesheets) {
+    totalHours += ts.totalHours || 0;
+    if (ts.dailyUpdate?.savedAt) daysUpdated += 1;
+    for (const entry of ts.entries || []) {
+      tasksTotal += 1;
+      if (entry.status === 'Completed') tasksCompleted += 1;
+      if (entry.status === 'Blocked') { blockedCount += 1; blockers.push({ date: ymd(ts.date), task: entry.task, blocker: entry.blocker }); }
+      if (entry.dueDate && entry.status !== 'Completed' && new Date(entry.dueDate) < new Date()) tasksOverdue += 1;
+      categoryTotals[entry.workCategory] = (categoryTotals[entry.workCategory] || 0) + (entry.hours || 0);
+      rows.push({
+        date: ymd(ts.date),
+        task: entry.task,
+        project: entry.projectLabel || entry.project?.name || '',
+        workCategory: entry.workCategory,
+        status: entry.status,
+        hours: entry.hours,
+        dueDate: entry.dueDate ? ymd(entry.dueDate) : '',
+      });
+    }
+  }
+
+  const workingDaysInWeek = 6; // Mon-Sat, matching this codebase's Sunday-off convention
+  const completionPct = tasksTotal === 0 ? 0 : Math.round((tasksCompleted / tasksTotal) * 100);
+  const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
+
+  // Previous week, for the trend comparison.
+  const prevWeek = weekRange(moment(start).subtract(1, 'week').toDate());
+  const prevTimesheets = await Timesheet.find({ employee: employeeId, date: { $gte: prevWeek.start, $lte: prevWeek.end } }).lean();
+  let prevHours = 0, prevTasksTotal = 0, prevTasksCompleted = 0;
+  for (const ts of prevTimesheets) {
+    prevHours += ts.totalHours || 0;
+    for (const entry of ts.entries || []) {
+      prevTasksTotal += 1;
+      if (entry.status === 'Completed') prevTasksCompleted += 1;
+    }
+  }
+  const prevCompletionPct = prevTasksTotal === 0 ? null : Math.round((prevTasksCompleted / prevTasksTotal) * 100);
+  const hoursTrend = prevHours > 0 ? Math.round(((totalHours - prevHours) / prevHours) * 100) : null;
+  const completionTrend = prevCompletionPct != null ? completionPct - prevCompletionPct : null;
+
+  // Performance score for this week, if already calculated.
+  const weekLabel = moment(start).format('GGGG-[W]WW');
+  const score = await ProductivityScore.findOne({ employee: employeeId, week: weekLabel }).lean();
+
+  const summaryParts = [
+    `Logged ${Math.round(totalHours * 10) / 10}h across ${tasksTotal} task${tasksTotal === 1 ? '' : 's'}, ${tasksCompleted} completed (${completionPct}%).`,
+  ];
+  if (topCategory) summaryParts.push(`Mostly ${topCategory[0]} work (${Math.round(topCategory[1] * 10) / 10}h).`);
+  if (blockedCount > 0) summaryParts.push(`${blockedCount} blocker${blockedCount === 1 ? '' : 's'} reported.`);
+  if (tasksOverdue > 0) summaryParts.push(`${tasksOverdue} task${tasksOverdue === 1 ? '' : 's'} overdue.`);
+  if (daysUpdated < workingDaysInWeek) summaryParts.push(`Daily update saved on ${daysUpdated}/${workingDaysInWeek} working days.`);
+  if (hoursTrend != null) summaryParts.push(`Hours ${hoursTrend >= 0 ? 'up' : 'down'} ${Math.abs(hoursTrend)}% vs last week.`);
+  if (completionTrend != null) summaryParts.push(`Completion ${completionTrend >= 0 ? 'up' : 'down'} ${Math.abs(completionTrend)} pts vs last week.`);
+  if (score?.timesheetScore != null) summaryParts.push(`Performance (Timesheet) score this week: ${score.timesheetScore}%.`);
+
+  return {
+    employee,
+    weekStart: ymd(start),
+    weekEnd: ymd(end),
+    totalHours: Math.round(totalHours * 10) / 10,
+    tasksTotal,
+    tasksCompleted,
+    tasksOverdue,
+    completionPct,
+    daysUpdated,
+    workingDaysInWeek,
+    categoryTotals,
+    blockers,
+    trend: { hoursTrend, completionTrend, prevHours: Math.round(prevHours * 10) / 10, prevCompletionPct },
+    performanceScore: score ? { timesheetScore: score.timesheetScore, totalScore: score.totalScore } : null,
+    summary: summaryParts.join(' '),
+    rows,
+  };
+};
+
+exports.getWeeklySummary = async (req, res) => {
+  try {
+    const summary = await buildWeeklySummary(req.user._id, req.query.date);
+    res.json(summary);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+const WEEKLY_REPORT_COLUMNS = [
+  { key: 'date', label: 'Date' },
+  { key: 'task', label: 'Task' },
+  { key: 'project', label: 'Project' },
+  { key: 'workCategory', label: 'Category' },
+  { key: 'status', label: 'Status' },
+  { key: 'hours', label: 'Hours' },
+  { key: 'dueDate', label: 'Due Date' },
+];
+
+// Shared by the download endpoint and the Monday auto-email cron job.
+const buildWeeklyReportPDF = (summary) => generateTimesheetReportPDF({
+  title: `Weekly Report — ${summary.weekStart} to ${summary.weekEnd}`,
+  columns: WEEKLY_REPORT_COLUMNS,
+  rows: summary.rows,
+  summary: summary.summary,
+});
+
+exports.buildWeeklySummary = buildWeeklySummary;
+exports.buildWeeklyReportPDF = buildWeeklyReportPDF;
+
+exports.downloadWeeklyReportPDF = async (req, res) => {
+  try {
+    const summary = await buildWeeklySummary(req.user._id, req.query.date);
+    const filepath = await buildWeeklyReportPDF(summary);
+    res.setHeader('Content-Disposition', `attachment; filename="Weekly_Report_${summary.weekStart}.pdf"`);
+    res.setHeader('Access-Control-Expose-Headers', 'Content-Disposition');
+    fs.createReadStream(filepath).pipe(res);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── Legacy review flow (unchanged — sidelined from the new daily-work flow) ──
+
 exports.getApprovals = async (req, res) => {
   try {
     const { status } = req.query;
@@ -169,7 +905,6 @@ exports.getApprovals = async (req, res) => {
   }
 };
 
-// Approver: approve or reject a timesheet routed to them (admin may action any).
 exports.reviewTimesheet = async (req, res) => {
   try {
     const { status, comments } = req.body;
@@ -208,11 +943,4 @@ exports.reviewTimesheet = async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
-};
-
-module.exports = {
-  submitTimesheet: exports.submitTimesheet,
-  getMyTimesheets: exports.getMyTimesheets,
-  getApprovals: exports.getApprovals,
-  reviewTimesheet: exports.reviewTimesheet,
 };

@@ -183,6 +183,7 @@ app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/payslips', require('./routes/payslips'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/timesheets', require('./routes/timesheets'));
+app.use('/api/projects', require('./routes/projects'));
 app.use('/api/leads', require('./routes/leads'));
 app.use('/api/queries', require('./routes/queries'));
 app.use('/api/admin', require('./routes/admin'));

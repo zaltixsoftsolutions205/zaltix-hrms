@@ -17,8 +17,10 @@ const {
   sendEveningSummary,
   calculateProductivityScores,
   sendWeeklyReport,
+  sendWeeklyTimesheetEmails,
   currentWeekLabel,
   prevWeekLabel,
+  remindMissingDailyUpdate,
 } = require('../services/automationService');
 
 // ─── GET /api/automation/dashboard ───────────────────────────────────────────
@@ -195,6 +197,8 @@ exports.runJob = async (req, res) => {
     evening:             sendEveningSummary,
     weekly:              sendWeeklyReport,
     scores:              () => calculateProductivityScores(req.body?.week),
+    dailyUpdateReminder: remindMissingDailyUpdate,
+    weeklyTimesheetEmails: sendWeeklyTimesheetEmails,
   };
 
   if (!jobs[job]) return res.status(400).json({ message: `Unknown job: ${job}` });
