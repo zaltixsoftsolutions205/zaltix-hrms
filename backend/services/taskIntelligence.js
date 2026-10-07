@@ -99,6 +99,60 @@ const buildInsight = ({ actual, estimated, status }) => {
   };
 };
 
+const verdictFor = (actual, estimated) => {
+  if (actual > estimated * (1 + TOLERANCE)) return 'over';
+  if (actual < estimated * (1 - TOLERANCE)) return 'under';
+  return 'on-target';
+};
+
+// First existing entry whose time range overlaps `candidate`'s (touching ends,
+// e.g. 9–10 then 10–11, do not overlap). `excludeId` skips the entry being edited.
+const findOverlap = (entries, candidate, excludeId) => {
+  const s = toMinutes(candidate.startTime), e = toMinutes(candidate.endTime);
+  if (s == null || e == null) return null;
+  return (entries || []).find((other) => {
+    if (excludeId && String(other._id) === String(excludeId)) return false;
+    const os = toMinutes(other.startTime), oe = toMinutes(other.endTime);
+    if (os == null || oe == null) return false;
+    return s < oe && os < e;
+  }) || null;
+};
+
+// Roll a set of entries up into time-intelligence numbers. Only completed tasks
+// that have a system estimate are compared (in-progress work isn't finished, so
+// it can't be judged fast or slow); totalHours counts everything logged.
+const summariseEntries = (entries = []) => {
+  let totalHours = 0, actual = 0, estimated = 0, analysed = 0, over = 0, under = 0, onTarget = 0;
+  for (const en of entries) {
+    totalHours += en.hours || 0;
+    if (en.status !== 'Completed' || !(en.estimatedHours > 0) || !(en.hours > 0)) continue;
+    analysed += 1;
+    actual += en.hours;
+    estimated += en.estimatedHours;
+    const v = verdictFor(en.hours, en.estimatedHours);
+    if (v === 'over') over += 1; else if (v === 'under') under += 1; else onTarget += 1;
+  }
+  const ratioPct = estimated > 0 ? Math.round((actual / estimated) * 100) : null;
+  const plural = analysed === 1 ? '' : 's';
+
+  let message = 'No completed tasks to analyse yet.';
+  if (analysed > 0) {
+    if (ratioPct > (1 + TOLERANCE) * 100) {
+      message = `Took ${round1(actual)}h on ${analysed} completed task${plural} against ${round1(estimated)}h estimated`
+        + ` (${over} ran over). Try to stay within the estimated hours.`;
+    } else if (ratioPct < (1 - TOLERANCE) * 100) {
+      message = `Finished ${analysed} task${plural} in ${round1(actual)}h against ${round1(estimated)}h estimated — faster than expected.`;
+    } else {
+      message = `Well done! Completed ${analysed} task${plural} in ${round1(actual)}h against ${round1(estimated)}h estimated.`;
+    }
+  }
+  return {
+    totalHours: round1(totalHours), analysedTasks: analysed,
+    actualHours: round1(actual), estimatedHours: round1(estimated),
+    ratioPct, over, under, onTarget, message,
+  };
+};
+
 // Fills in hours (from start/end time), the system estimate and the insight on
 // an entry-shaped object. Returns { entry } or { error }.
 const analyseEntry = async (entry, { excludeEntryId } = {}) => {
@@ -118,4 +172,6 @@ const analyseEntry = async (entry, { excludeEntryId } = {}) => {
   };
 };
 
-module.exports = { hoursFromTimes, estimateHours, buildInsight, analyseEntry };
+module.exports = {
+  hoursFromTimes, estimateHours, buildInsight, analyseEntry, verdictFor, findOverlap, summariseEntries,
+};

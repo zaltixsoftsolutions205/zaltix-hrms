@@ -7,7 +7,7 @@ const Holiday = require('../models/Holiday');
 const ProductivityScore = require('../models/ProductivityScore');
 const notificationService = require('../services/notificationService');
 const generateTimesheetReportPDF = require('../utils/generateTimesheetReportPDF');
-const { analyseEntry } = require('../services/taskIntelligence');
+const { analyseEntry, findOverlap, summariseEntries, verdictFor } = require('../services/taskIntelligence');
 const fs = require('fs');
 const moment = require('moment');
 
@@ -69,6 +69,17 @@ const isDeptHeadOf = async (userId, departmentId) => {
   const dept = await Department.findById(departmentId).select('headOf').lean();
   return !!dept && String(dept.headOf) === String(userId);
 };
+
+// Same visibility rule as getDayDetail: self, or HR/admin/the employee's dept head.
+const canViewEmployee = async (viewer, employeeId) => {
+  if (String(employeeId) === String(viewer._id)) return true;
+  if (['hr', 'admin'].includes(viewer.role)) return true;
+  const target = await User.findById(employeeId).select('department').lean();
+  return isDeptHeadOf(viewer._id, target?.department);
+};
+
+const overlapMessage = (other) =>
+  `This time overlaps with "${other.task}" (${other.startTime}–${other.endTime}). Adjust the start or end time.`;
 
 // ─── Employee: daily work log ────────────────────────────────────────────────
 
@@ -157,6 +168,8 @@ exports.addEntry = async (req, res) => {
     let timesheet = await Timesheet.findOne({ employee: req.user._id, date: day });
 
     if (timesheet) {
+      const clash = findOverlap(timesheet.entries, entryDoc);
+      if (clash) return res.status(409).json({ message: overlapMessage(clash) });
       timesheet.entries.push(entryDoc);
       await timesheet.save();
     } else {
@@ -196,6 +209,8 @@ exports.updateEntry = async (req, res) => {
       { excludeEntryId: entry._id }
     );
     if (analysed.error) return res.status(400).json({ message: analysed.error });
+    const clash = findOverlap(timesheet.entries, entry, entry._id);
+    if (clash) return res.status(409).json({ message: overlapMessage(clash) });
     entry.hours = analysed.entry.hours;
     entry.estimatedHours = analysed.entry.estimatedHours;
     entry.insight = analysed.entry.insight;
@@ -666,6 +681,201 @@ exports.getAttendanceComparison = async (req, res) => {
     });
 
     res.json(rows);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// ─── Daily history + time intelligence ───────────────────────────────────────
+
+const byStartTime = (a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
+
+// Past days (up to yesterday) of work slots + the Daily Update posted each day,
+// each with its own time-intelligence summary. Self by default; HR/admin/dept
+// head may pass ?employeeId=.
+exports.getHistory = async (req, res) => {
+  try {
+    const employeeId = req.query.employeeId || req.user._id;
+    if (!(await canViewEmployee(req.user, employeeId))) {
+      return res.status(403).json({ message: 'Not authorized to view this history.' });
+    }
+    const days = Math.min(Math.max(parseInt(req.query.days) || 14, 1), 90);
+    const start = moment().subtract(days, 'days').startOf('day').toDate();
+    const end = moment().subtract(1, 'day').endOf('day').toDate();
+
+    const [employee, timesheets] = await Promise.all([
+      User.findById(employeeId).select('name employeeId').lean(),
+      Timesheet.find({ employee: employeeId, date: { $gte: start, $lte: end } })
+        .populate('entries.project', 'name')
+        .sort({ date: -1 })
+        .lean(),
+    ]);
+
+    const rows = timesheets
+      .filter(ts => (ts.entries || []).length > 0 || ts.dailyUpdate?.savedAt)
+      .map(ts => {
+        const entries = [...(ts.entries || [])].sort(byStartTime);
+        return {
+          _id: ts._id,
+          date: ymd(ts.date),
+          dailyUpdate: ts.dailyUpdate?.savedAt ? ts.dailyUpdate : null,
+          entries,
+          summary: summariseEntries(entries),
+        };
+      });
+
+    res.json({
+      employee,
+      days: rows,
+      overall: summariseEntries(rows.flatMap(r => r.entries)),
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// HR/Admin Org view: what every employee posted — work slots, hours, Daily Update
+// text and time intelligence — for one day or one Mon–Sun week.
+exports.getOrgUpdates = async (req, res) => {
+  try {
+    const view = req.query.view === 'week' ? 'week' : 'day';
+    const anchor = req.query.date || ymd(new Date());
+    const { start, end } = view === 'week'
+      ? weekRange(anchor)
+      : { start: startOfDay(anchor), end: moment(anchor).endOf('day').toDate() };
+
+    const userFilter = { isActive: true };
+    if (req.query.departmentId) userFilter.department = req.query.departmentId;
+    if (req.query.role) userFilter.role = req.query.role;
+    const employees = await User.find(userFilter).select('name employeeId department').populate('department', 'name').lean();
+
+    const timesheets = await Timesheet.find({
+      employee: { $in: employees.map(e => e._id) },
+      date: { $gte: start, $lte: end },
+    }).populate('entries.project', 'name').sort({ date: 1 }).lean();
+
+    const daysByEmp = new Map();
+    for (const ts of timesheets) {
+      const entries = [...(ts.entries || [])].sort(byStartTime);
+      const hasUpdate = !!ts.dailyUpdate?.savedAt;
+      if (entries.length === 0 && !hasUpdate) continue;
+      const k = String(ts.employee);
+      if (!daysByEmp.has(k)) daysByEmp.set(k, []);
+      daysByEmp.get(k).push({
+        date: ymd(ts.date),
+        dailyUpdate: hasUpdate ? ts.dailyUpdate : null,
+        entries,
+        summary: summariseEntries(entries),
+      });
+    }
+
+    const rows = employees.map(e => {
+      const days = daysByEmp.get(String(e._id)) || [];
+      const allEntries = days.flatMap(d => d.entries);
+      return {
+        employee: { _id: e._id, name: e.name, employeeId: e.employeeId, department: e.department?.name || '' },
+        days,
+        daysPosted: days.filter(d => d.dailyUpdate).length,
+        taskCount: allEntries.length,
+        completedCount: allEntries.filter(en => en.status === 'Completed').length,
+        summary: summariseEntries(allEntries),
+      };
+    }).sort((a, b) => (b.days.length > 0) - (a.days.length > 0) || a.employee.name.localeCompare(b.employee.name));
+
+    res.json({
+      view, start: ymd(start), end: ymd(end),
+      totals: {
+        employees: rows.length,
+        posted: rows.filter(r => r.daysPosted > 0).length,
+        noActivity: rows.filter(r => r.days.length === 0).length,
+        totalHours: Math.round(rows.reduce((s, r) => s + r.summary.totalHours, 0) * 10) / 10,
+      },
+      employees: rows,
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Admin/HR: time intelligence across everyone for a month — who runs over/under
+// estimates, which kinds of work overrun, and the biggest individual overruns.
+exports.getIntelligence = async (req, res) => {
+  try {
+    const { start, end } = monthRange(req);
+    const userFilter = { isActive: true };
+    if (req.query.departmentId) userFilter.department = req.query.departmentId;
+    if (req.query.employeeId) userFilter._id = req.query.employeeId;
+
+    const employees = await User.find(userFilter).select('name employeeId department').populate('department', 'name').lean();
+    const empById = new Map(employees.map(e => [String(e._id), e]));
+    const timesheets = await Timesheet.find({
+      employee: { $in: employees.map(e => e._id) },
+      date: { $gte: start, $lte: end },
+    }).populate('entries.project', 'name').lean();
+
+    const entriesByEmp = new Map();
+    const entriesByCategory = new Map();
+    const allEntries = [];
+    const overruns = [];
+
+    for (const ts of timesheets) {
+      const emp = empById.get(String(ts.employee));
+      for (const entry of ts.entries || []) {
+        allEntries.push(entry);
+        const k = String(ts.employee);
+        if (!entriesByEmp.has(k)) entriesByEmp.set(k, []);
+        entriesByEmp.get(k).push(entry);
+        const cat = entry.workCategory || 'Other';
+        if (!entriesByCategory.has(cat)) entriesByCategory.set(cat, []);
+        entriesByCategory.get(cat).push(entry);
+
+        if (entry.status === 'Completed' && entry.estimatedHours > 0 && entry.hours > 0
+          && verdictFor(entry.hours, entry.estimatedHours) === 'over') {
+          overruns.push({
+            employee: emp?.name || '', employeeId: String(ts.employee), date: ymd(ts.date), task: entry.task,
+            category: cat, project: entry.projectLabel || entry.project?.name || '',
+            actualHours: entry.hours, estimatedHours: entry.estimatedHours,
+            overBy: Math.round((entry.hours - entry.estimatedHours) * 10) / 10,
+            remarks: entry.remarks || '',
+          });
+        }
+      }
+    }
+
+    const statusOf = (s) => s.analysedTasks === 0 ? 'no-data' : s.ratioPct > 120 ? 'over' : s.ratioPct < 80 ? 'fast' : 'on-target';
+
+    const employeeRows = employees.map(e => {
+      const s = summariseEntries(entriesByEmp.get(String(e._id)) || []);
+      return {
+        employee: { _id: e._id, name: e.name, employeeId: e.employeeId, department: e.department?.name || '' },
+        ...s, status: statusOf(s),
+      };
+    }).sort((a, b) => (b.ratioPct ?? -1) - (a.ratioPct ?? -1));
+
+    const categoryRows = [...entriesByCategory.entries()].map(([category, list]) => {
+      const s = summariseEntries(list);
+      return { category, ...s, status: statusOf(s) };
+    }).filter(c => c.analysedTasks > 0).sort((a, b) => b.ratioPct - a.ratioPct);
+
+    const overall = summariseEntries(allEntries);
+
+    // Plain-language highlights for the CEO (≥3 analysed tasks before naming anyone).
+    const highlights = [overall.message];
+    const names = list => list.slice(0, 3).map(r => `${r.employee.name} (${r.ratioPct}%)`).join(', ');
+    const overEmps = employeeRows.filter(r => r.status === 'over' && r.analysedTasks >= 3);
+    if (overEmps.length) highlights.push(`Running over estimated time: ${names(overEmps)}.`);
+    const worstCat = categoryRows.find(c => c.status === 'over' && c.analysedTasks >= 3);
+    if (worstCat) highlights.push(`${worstCat.category} work is the biggest overrun — ${worstCat.ratioPct}% of estimated time on average.`);
+    const fastEmps = employeeRows.filter(r => r.status === 'fast' && r.analysedTasks >= 3);
+    if (fastEmps.length) highlights.push(`Finishing faster than estimated: ${names(fastEmps)}.`);
+    const accurate = employeeRows
+      .filter(r => r.status === 'on-target' && r.analysedTasks >= 3)
+      .sort((a, b) => Math.abs(a.ratioPct - 100) - Math.abs(b.ratioPct - 100))[0];
+    if (accurate) highlights.push(`Most consistent with estimates: ${accurate.employee.name} (${accurate.ratioPct}%).`);
+
+    overruns.sort((a, b) => b.overBy - a.overBy);
+
+    res.json({ overall, highlights, employees: employeeRows, categories: categoryRows, overruns: overruns.slice(0, 15) });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }

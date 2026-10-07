@@ -19,6 +19,9 @@ const {
   downloadWeeklyReportPDF,
   getMyOverdueTasks,
   getMyWeek,
+  getHistory,
+  getIntelligence,
+  getOrgUpdates,
   getApprovals,
   reviewTimesheet,
 } = require('../controllers/timesheetController');
@@ -36,6 +39,8 @@ router.get('/analytics/work-category', moduleAccess('timesheets', 'view'), getWo
 router.get('/attendance-comparison', moduleAccess('timesheets', 'view'), getAttendanceComparison);
 router.get('/my-overdue', moduleAccess('timesheets', 'view'), getMyOverdueTasks);
 router.get('/my-week', moduleAccess('timesheets', 'view'), getMyWeek);
+// Daily history (self; HR/admin/dept head via ?employeeId= — checked in the controller).
+router.get('/daily-history', moduleAccess('timesheets', 'view'), getHistory);
 
 // Self-service weekly report (own week only, with a plain-language intelligence summary)
 router.get('/weekly-summary', moduleAccess('timesheets', 'view'), getWeeklySummary);
@@ -54,6 +59,8 @@ router.get('/team', moduleAccess('timesheets', 'view'), getTeamView);
 // HR/Admin Org View + Reports — hr/admin ARE real role strings, so a plain
 // roleCheck is the right tool here.
 router.get('/org', roleCheck('hr', 'admin'), getOrgView);
+router.get('/org-updates', roleCheck('hr', 'admin'), getOrgUpdates);
+router.get('/intelligence', roleCheck('hr', 'admin'), getIntelligence);
 router.get('/reports', roleCheck('hr', 'admin'), getReportsData);
 router.get('/reports/pdf', roleCheck('hr', 'admin'), downloadReportPDF);
 
