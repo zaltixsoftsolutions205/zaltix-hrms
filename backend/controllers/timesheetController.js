@@ -13,8 +13,22 @@ const moment = require('moment');
 
 // Normalise a date to the start of its day (midnight) so the per-day unique index
 // and lookups are stable regardless of the time component sent by the client.
-const startOfDay = (d) => moment(d).startOf('day').toDate();
-const ymd = (d) => moment(d).format('YYYY-MM-DD');
+// All timesheet days are Indian-business days (IST, UTC+05:30). Pinning the offset here
+// keeps "which day is this?" identical on a UTC server (prod/Docker) and an IST dev
+// machine that share one database — otherwise a day saved from one shows up as the
+// previous/next day on the other.
+const IST_OFFSET_MIN = 330;
+const DATE_ONLY = /^d{4}-d{1,2}-d{1,2}$/;
+// IST-view moment for a Date / ISO string / 'YYYY-MM-DD' (date-only = that IST calendar day).
+const ist = (d) => {
+  if (typeof d === 'string' && DATE_ONLY.test(d)) return moment.utc(d, 'YYYY-M-DD').utcOffset(IST_OFFSET_MIN, true);
+  return (d === undefined ? moment() : moment(d)).utcOffset(IST_OFFSET_MIN);
+};
+const startOfDay = (d) => ist(d).startOf('day').toDate();
+const ymd = (d) => ist(d).format('YYYY-MM-DD');
+// A day's timesheet is found by range, not exact instant, so days stored as midnight-UTC
+// by an older UTC server and as midnight-IST by an IST server both resolve to one day.
+const dayFilter = (day) => ({ $gte: day, $lt: new Date(day.getTime() + 24 * 60 * 60 * 1000) });
 
 // Match a department name against a keyword, case-insensitively.
 const deptNameMatches = (name, keyword) =>
@@ -103,7 +117,7 @@ exports.submitTimesheet = async (req, res) => {
     }
 
     const day = startOfDay(date || new Date());
-    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: day });
+    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: dayFilter(day) });
 
     if (timesheet) {
       timesheet.entries = entries;
@@ -130,8 +144,8 @@ exports.getMyTimesheets = async (req, res) => {
     const filter = { employee: req.user._id };
     const { month, year } = req.query;
     if (month && year) {
-      const start = moment(`${year}-${month}-01`, 'YYYY-M-DD').startOf('month').toDate();
-      const end = moment(start).endOf('month').toDate();
+      const start = ist(`${year}-${month}-01`).startOf('month').toDate();
+      const end = ist(start).endOf('month').toDate();
       filter.date = { $gte: start, $lte: end };
     }
     const timesheets = await Timesheet.find(filter)
@@ -165,7 +179,7 @@ exports.addEntry = async (req, res) => {
     const entryDoc = analysed.entry;
 
     const day = startOfDay(date || new Date());
-    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: day });
+    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: dayFilter(day) });
 
     if (timesheet) {
       const clash = findOverlap(timesheet.entries, entryDoc);
@@ -250,7 +264,7 @@ exports.saveDailyUpdate = async (req, res) => {
     const { date, completedToday, continuingTomorrow, blockers, dayStatus } = req.body;
     const day = startOfDay(date || new Date());
 
-    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: day });
+    let timesheet = await Timesheet.findOne({ employee: req.user._id, date: dayFilter(day) });
     const dailyUpdate = {
       completedToday: completedToday || '',
       continuingTomorrow: continuingTomorrow || '',
@@ -279,8 +293,8 @@ exports.getCalendarMonth = async (req, res) => {
     const now = new Date();
     const month = parseInt(req.query.month) || now.getMonth() + 1;
     const year = parseInt(req.query.year) || now.getFullYear();
-    const start = moment(`${year}-${month}-01`, 'YYYY-M-DD').startOf('month');
-    const end = moment(start).endOf('month');
+    const start = ist(`${year}-${month}-01`).startOf('month');
+    const end = ist(start).endOf('month');
 
     const [timesheets, holidays] = await Promise.all([
       Timesheet.find({ employee: req.user._id, date: { $gte: start.toDate(), $lte: end.toDate() } }),
@@ -289,9 +303,9 @@ exports.getCalendarMonth = async (req, res) => {
     const holidaySet = new Set(holidays.map(h => ymd(h.date)));
     const tsByDay = new Map(timesheets.map(t => [ymd(t.date), t]));
 
-    const today = moment().startOf('day');
+    const today = ist().startOf('day');
     const days = {};
-    const cur = moment(start);
+    const cur = ist(start);
     while (cur.isSameOrBefore(end)) {
       const key = cur.format('YYYY-MM-DD');
       const isFuture = cur.isAfter(today);
@@ -337,7 +351,7 @@ exports.getDayDetail = async (req, res) => {
       if (!allowed) return res.status(403).json({ message: 'Not authorized to view this timesheet.' });
     }
 
-    const timesheet = await Timesheet.findOne({ employee: employeeId, date: day })
+    const timesheet = await Timesheet.findOne({ employee: employeeId, date: dayFilter(day) })
       .populate('entries.project', 'name');
     const attendance = await Attendance.findOne({ employee: employeeId, date: ymd(day) }).lean();
 
@@ -402,8 +416,8 @@ exports.getMyWeek = async (req, res) => {
     const byDay = new Map(timesheets.map(t => [ymd(t.date), t]));
 
     const days = [];
-    const cur = moment(start);
-    const endM = moment(end);
+    const cur = ist(start);
+    const endM = ist(end);
     while (cur.isSameOrBefore(endM, 'day')) {
       const key = cur.format('YYYY-MM-DD');
       const ts = byDay.get(key);
@@ -463,22 +477,22 @@ const monthRange = (req) => {
   const now = new Date();
   const month = parseInt(req.query.month) || now.getMonth() + 1;
   const year = parseInt(req.query.year) || now.getFullYear();
-  const start = moment(`${year}-${month}-01`, 'YYYY-M-DD').startOf('month').toDate();
-  const end = moment(start).endOf('month').toDate();
+  const start = ist(`${year}-${month}-01`).startOf('month').toDate();
+  const end = ist(start).endOf('month').toDate();
   return { start, end, month, year };
 };
 
 // The calendar month immediately before the one monthRange(req) resolved to.
 const prevMonthRange = ({ month, year }) => {
-  const start = moment(`${year}-${month}-01`, 'YYYY-M-DD').subtract(1, 'month').startOf('month').toDate();
-  const end = moment(start).endOf('month').toDate();
+  const start = ist(`${year}-${month}-01`).subtract(1, 'month').startOf('month').toDate();
+  const end = ist(start).endOf('month').toDate();
   return { start, end };
 };
 
 // Week containing `anchorDate` (defaults to today), Monday–Sunday.
 const weekRange = (anchorDate) => {
-  const start = moment(anchorDate || new Date()).startOf('isoWeek').toDate();
-  const end = moment(start).endOf('isoWeek').toDate();
+  const start = ist(anchorDate || new Date()).startOf('isoWeek').toDate();
+  const end = ist(start).endOf('isoWeek').toDate();
   return { start, end };
 };
 
@@ -486,8 +500,8 @@ const weekRange = (anchorDate) => {
 // this codebase, e.g. attendanceController's working-days calculation).
 const countWorkingDays = (start, end) => {
   let count = 0;
-  const cur = moment(start);
-  const endM = moment(end);
+  const cur = ist(start);
+  const endM = ist(end);
   while (cur.isSameOrBefore(endM, 'day')) {
     if (cur.day() !== 0) count += 1;
     cur.add(1, 'day');
@@ -498,7 +512,7 @@ const countWorkingDays = (start, end) => {
 // Days-updated consistency % per employee for [start, end] — a lighter query
 // than the full rollup, used just for the previous-period trend comparison.
 const daysUpdatedPctMap = async (employeeIds, start, end) => {
-  const workingDays = countWorkingDays(start, moment(end).isAfter(new Date()) ? new Date() : end);
+  const workingDays = countWorkingDays(start, ist(end).isAfter(new Date()) ? new Date() : end);
   const timesheets = await Timesheet.find(
     { employee: { $in: employeeIds }, date: { $gte: start, $lte: end } },
     'employee entries dailyUpdate'
@@ -527,7 +541,7 @@ exports.getTeamView = async (req, res) => {
     if (!me?.department) return res.json({ workingDaysInRange: 0, rows: [] });
 
     const { start, end, month, year } = monthRange(req);
-    const workingDaysInRange = countWorkingDays(start, moment(end).isAfter(new Date()) ? new Date() : end);
+    const workingDaysInRange = countWorkingDays(start, ist(end).isAfter(new Date()) ? new Date() : end);
     const teamMembers = await User.find({ department: me.department, isActive: true })
       .select('name employeeId role');
     const employeeIds = teamMembers.map(m => m._id);
@@ -557,7 +571,7 @@ exports.getTeamView = async (req, res) => {
 exports.getOrgView = async (req, res) => {
   try {
     const { start, end, month, year } = monthRange(req);
-    const workingDaysInRange = countWorkingDays(start, moment(end).isAfter(new Date()) ? new Date() : end);
+    const workingDaysInRange = countWorkingDays(start, ist(end).isAfter(new Date()) ? new Date() : end);
     const userFilter = { isActive: true };
     if (req.query.departmentId) userFilter.department = req.query.departmentId;
     if (req.query.role) userFilter.role = req.query.role;
@@ -573,7 +587,7 @@ exports.getOrgView = async (req, res) => {
     const today = ymd(new Date());
     const todayTimesheets = await Timesheet.find({
       employee: { $in: employeeIds },
-      date: { $gte: startOfDay(today), $lte: moment(today).endOf('day').toDate() },
+      date: { $gte: startOfDay(today), $lte: ist(today).endOf('day').toDate() },
     }).select('employee dailyUpdate').lean();
     const updatedToday = new Set(todayTimesheets.filter(t => t.dailyUpdate?.savedAt).map(t => String(t.employee)));
 
@@ -700,8 +714,8 @@ exports.getHistory = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to view this history.' });
     }
     const days = Math.min(Math.max(parseInt(req.query.days) || 14, 1), 90);
-    const start = moment().subtract(days, 'days').startOf('day').toDate();
-    const end = moment().subtract(1, 'day').endOf('day').toDate();
+    const start = ist().subtract(days, 'days').startOf('day').toDate();
+    const end = ist().subtract(1, 'day').endOf('day').toDate();
 
     const [employee, timesheets] = await Promise.all([
       User.findById(employeeId).select('name employeeId').lean(),
@@ -742,7 +756,7 @@ exports.getOrgUpdates = async (req, res) => {
     const anchor = req.query.date || ymd(new Date());
     const { start, end } = view === 'week'
       ? weekRange(anchor)
-      : { start: startOfDay(anchor), end: moment(anchor).endOf('day').toDate() };
+      : { start: startOfDay(anchor), end: ist(anchor).endOf('day').toDate() };
 
     const userFilter = { isActive: true };
     if (req.query.departmentId) userFilter.department = req.query.departmentId;
@@ -1002,7 +1016,7 @@ const buildWeeklySummary = async (employeeId, anchorDate) => {
   const topCategory = Object.entries(categoryTotals).sort((a, b) => b[1] - a[1])[0];
 
   // Previous week, for the trend comparison.
-  const prevWeek = weekRange(moment(start).subtract(1, 'week').toDate());
+  const prevWeek = weekRange(ist(start).subtract(1, 'week').toDate());
   const prevTimesheets = await Timesheet.find({ employee: employeeId, date: { $gte: prevWeek.start, $lte: prevWeek.end } }).lean();
   let prevHours = 0, prevTasksTotal = 0, prevTasksCompleted = 0;
   for (const ts of prevTimesheets) {
@@ -1017,7 +1031,7 @@ const buildWeeklySummary = async (employeeId, anchorDate) => {
   const completionTrend = prevCompletionPct != null ? completionPct - prevCompletionPct : null;
 
   // Performance score for this week, if already calculated.
-  const weekLabel = moment(start).format('GGGG-[W]WW');
+  const weekLabel = ist(start).format('GGGG-[W]WW');
   const score = await ProductivityScore.findOne({ employee: employeeId, week: weekLabel }).lean();
 
   const summaryParts = [
@@ -1140,7 +1154,7 @@ exports.reviewTimesheet = async (req, res) => {
 
     await notificationService.notify(timesheet.employee._id, {
       title: `Timesheet ${status.charAt(0).toUpperCase() + status.slice(1)}`,
-      message: `Your timesheet for ${moment(timesheet.date).format('DD MMM YYYY')} has been ${status}.`,
+      message: `Your timesheet for ${ist(timesheet.date).format('DD MMM YYYY')} has been ${status}.`,
       type: 'task',
       link: '/timesheets',
     });
