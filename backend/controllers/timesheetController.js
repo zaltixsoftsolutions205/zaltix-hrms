@@ -7,7 +7,9 @@ const Holiday = require('../models/Holiday');
 const ProductivityScore = require('../models/ProductivityScore');
 const notificationService = require('../services/notificationService');
 const generateTimesheetReportPDF = require('../utils/generateTimesheetReportPDF');
-const { analyseEntry, findOverlap, summariseEntries, verdictFor } = require('../services/taskIntelligence');
+const {
+  analyseEntry, findOverlap, summariseEntries, verdictFor, singleTopicStreak, focusMessage, STREAK_TRIGGER,
+} = require('../services/taskIntelligence');
 const fs = require('fs');
 const moment = require('moment');
 
@@ -707,7 +709,7 @@ exports.getAttendanceComparison = async (req, res) => {
 
 const byStartTime = (a, b) => (a.startTime || '99:99').localeCompare(b.startTime || '99:99');
 
-// Past days (up to yesterday) of work slots + the Daily Update posted each day,
+// Recent days (including today) of work slots + the Daily Update posted each day,
 // each with its own time-intelligence summary. Self by default; HR/admin/dept
 // head may pass ?employeeId=.
 exports.getHistory = async (req, res) => {
@@ -718,7 +720,7 @@ exports.getHistory = async (req, res) => {
     }
     const days = Math.min(Math.max(parseInt(req.query.days) || 14, 1), 90);
     const start = ist().subtract(days, 'days').startOf('day').toDate();
-    const end = ist().subtract(1, 'day').endOf('day').toDate();
+    const end = ist().endOf('day').toDate(); // includes today, so a just-saved Daily Update shows up straight away
 
     const [employee, timesheets] = await Promise.all([
       User.findById(employeeId).select('name employeeId').lean(),
@@ -735,6 +737,7 @@ exports.getHistory = async (req, res) => {
         return {
           _id: ts._id,
           date: ymd(ts.date),
+          focusReason: ts.focusReason || '',
           dailyUpdate: ts.dailyUpdate?.savedAt ? ts.dailyUpdate : null,
           entries,
           summary: summariseEntries(entries),
@@ -746,6 +749,53 @@ exports.getHistory = async (req, res) => {
       days: rows,
       overall: summariseEntries(rows.flatMap(r => r.entries)),
     });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// task titles per IST day, merging any duplicate docs for the same day.
+const topicsByDayOf = (timesheets) => {
+  const map = new Map();
+  for (const ts of timesheets) {
+    const k = ymd(ts.date);
+    if (!map.has(k)) map.set(k, []);
+    map.get(k).push(...(ts.entries || []).map(e => e.task));
+  }
+  return map;
+};
+
+// Self-service one-topic check for today: has the employee logged a single topic
+// for several working days in a row? If so, returns the question to ask them.
+exports.getFocusCheck = async (req, res) => {
+  try {
+    const today = ymd(new Date());
+    const since = startOfDay(ist().subtract(14, 'days').format('YYYY-MM-DD'));
+    const docs = await Timesheet.find({ employee: req.user._id, date: { $gte: since } })
+      .select('date entries.task focusReason').lean();
+
+    const { streak, topic } = singleTopicStreak(topicsByDayOf(docs), today);
+    const reason = docs.filter(d => ymd(d.date) === today).map(d => d.focusReason).find(Boolean) || '';
+    res.json({
+      streak, topic, reason,
+      show: streak >= STREAK_TRIGGER,
+      severity: streak >= 3 ? 'high' : 'medium',
+      message: streak >= STREAK_TRIGGER ? focusMessage(streak, topic) : '',
+    });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// Employee's answer to "why only one topic?" — stored on today's timesheet.
+exports.saveFocusReason = async (req, res) => {
+  try {
+    const reason = String(req.body.reason || '').trim().slice(0, 1000);
+    if (!reason) return res.status(400).json({ message: 'Please write a short reason.' });
+    const ts = await Timesheet.findOne({ employee: req.user._id, date: dayFilter(startOfDay(new Date())) }).select('_id');
+    if (!ts) return res.status(400).json({ message: 'Log a task for today first.' });
+    await Timesheet.updateOne({ _id: ts._id }, { $set: { focusReason: reason } });
+    res.json({ reason });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -771,6 +821,20 @@ exports.getOrgUpdates = async (req, res) => {
       date: { $gte: start, $lte: end },
     }).populate('entries.project', 'name').sort({ date: 1 }).lean();
 
+    // One-topic check: streak of single-topic working days ending at the last day
+    // shown (today at most), so it needs a little history before the range starts.
+    const endYmd = ymd(end) < ymd(new Date()) ? ymd(end) : ymd(new Date());
+    const history = await Timesheet.find({
+      employee: { $in: employees.map(e => e._id) },
+      date: { $gte: startOfDay(ist(endYmd).subtract(14, 'days').format('YYYY-MM-DD')), $lte: end },
+    }).select('employee date entries.task').lean();
+    const historyByEmp = new Map();
+    for (const ts of history) {
+      const k = String(ts.employee);
+      if (!historyByEmp.has(k)) historyByEmp.set(k, []);
+      historyByEmp.get(k).push(ts);
+    }
+
     const daysByEmp = new Map();
     for (const ts of timesheets) {
       const entries = [...(ts.entries || [])].sort(byStartTime);
@@ -780,6 +844,7 @@ exports.getOrgUpdates = async (req, res) => {
       if (!daysByEmp.has(k)) daysByEmp.set(k, []);
       daysByEmp.get(k).push({
         date: ymd(ts.date),
+        focusReason: ts.focusReason || '',
         dailyUpdate: hasUpdate ? ts.dailyUpdate : null,
         entries,
         summary: summariseEntries(entries),
@@ -789,8 +854,10 @@ exports.getOrgUpdates = async (req, res) => {
     const rows = employees.map(e => {
       const days = daysByEmp.get(String(e._id)) || [];
       const allEntries = days.flatMap(d => d.entries);
+      const oneTopic = singleTopicStreak(topicsByDayOf(historyByEmp.get(String(e._id)) || []), endYmd);
       return {
         employee: { _id: e._id, name: e.name, employeeId: e.employeeId, department: e.department?.name || '' },
+        singleTopic: oneTopic.streak >= STREAK_TRIGGER ? { streak: oneTopic.streak, topic: oneTopic.topic } : null,
         days,
         daysPosted: days.filter(d => d.dailyUpdate).length,
         taskCount: allEntries.length,
@@ -834,9 +901,17 @@ exports.getIntelligence = async (req, res) => {
     const entriesByCategory = new Map();
     const allEntries = [];
     const overruns = [];
+    // Days with exactly one topic logged, per employee, for the one-topic insight.
+    const dayTopics = new Map();
 
     for (const ts of timesheets) {
       const emp = empById.get(String(ts.employee));
+      if ((ts.entries || []).length > 0) {
+        const k = String(ts.employee);
+        if (!dayTopics.has(k)) dayTopics.set(k, new Map());
+        const m = dayTopics.get(k), d = ymd(ts.date);
+        m.set(d, [...(m.get(d) || []), ...ts.entries.map(e => e.task)]);
+      }
       for (const entry of ts.entries || []) {
         allEntries.push(entry);
         const k = String(ts.employee);
@@ -863,9 +938,11 @@ exports.getIntelligence = async (req, res) => {
 
     const employeeRows = employees.map(e => {
       const s = summariseEntries(entriesByEmp.get(String(e._id)) || []);
+      const days = [...(dayTopics.get(String(e._id))?.values() || [])];
+      const singleTopicDays = days.filter(titles => new Set(titles.map(t => String(t).trim().toLowerCase())).size === 1).length;
       return {
         employee: { _id: e._id, name: e.name, employeeId: e.employeeId, department: e.department?.name || '' },
-        ...s, status: statusOf(s),
+        ...s, status: statusOf(s), loggedDays: days.length, singleTopicDays,
       };
     }).sort((a, b) => (b.ratioPct ?? -1) - (a.ratioPct ?? -1));
 
@@ -889,6 +966,14 @@ exports.getIntelligence = async (req, res) => {
       .filter(r => r.status === 'on-target' && r.analysedTasks >= 3)
       .sort((a, b) => Math.abs(a.ratioPct - 100) - Math.abs(b.ratioPct - 100))[0];
     if (accurate) highlights.push(`Most consistent with estimates: ${accurate.employee.name} (${accurate.ratioPct}%).`);
+
+    // Focus: working one topic on most logged days (≥3 such days, ≥60% of days).
+    const narrow = employeeRows
+      .filter(r => r.singleTopicDays >= 3 && r.singleTopicDays / r.loggedDays >= 0.6)
+      .sort((a, b) => b.singleTopicDays - a.singleTopicDays);
+    if (narrow.length) {
+      highlights.push(`Working only one topic on most days: ${narrow.slice(0, 3).map(r => `${r.employee.name} (${r.singleTopicDays} of ${r.loggedDays} days)`).join(', ')}. Consider giving them more varied work.`);
+    }
 
     overruns.sort((a, b) => b.overBy - a.overBy);
 

@@ -22,6 +22,8 @@ const {
   getHistory,
   getIntelligence,
   getOrgUpdates,
+  getFocusCheck,
+  saveFocusReason,
   getApprovals,
   reviewTimesheet,
 } = require('../controllers/timesheetController');
@@ -41,6 +43,9 @@ router.get('/my-overdue', moduleAccess('timesheets', 'view'), getMyOverdueTasks)
 router.get('/my-week', moduleAccess('timesheets', 'view'), getMyWeek);
 // Daily history (self; HR/admin/dept head via ?employeeId= — checked in the controller).
 router.get('/daily-history', moduleAccess('timesheets', 'view'), getHistory);
+// One-topic check ("why only one task for several days?") — own data only.
+router.get('/focus-check', moduleAccess('timesheets', 'view'), getFocusCheck);
+router.post('/focus-reason', moduleAccess('timesheets', 'edit'), saveFocusReason);
 
 // Self-service weekly report (own week only, with a plain-language intelligence summary)
 router.get('/weekly-summary', moduleAccess('timesheets', 'view'), getWeeklySummary);

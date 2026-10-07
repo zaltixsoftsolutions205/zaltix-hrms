@@ -183,6 +183,40 @@ const summariseEntries = (entries = []) => {
   };
 };
 
+// ── One-topic check ──────────────────────────────────────────────────────────
+// Working a single topic all day is fine now and then; doing it day after day
+// usually means low variety or slow progress, so after STREAK_TRIGGER working days
+// in a row we ask the employee why and nudge them to take on more.
+const STREAK_TRIGGER = 2;
+const STREAK_STRONG = 3;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const ymdDow = (ymd) => new Date(`${ymd}T00:00:00Z`).getUTCDay();
+const ymdPrev = (ymd) => new Date(new Date(`${ymd}T00:00:00Z`).getTime() - DAY_MS).toISOString().slice(0, 10);
+
+// topicsByDay: Map<'YYYY-MM-DD', string[]> of task titles logged that day.
+// Counts consecutive working days (Sundays skipped) ending at endYmd on which exactly
+// one distinct topic was logged. A day with nothing logged, or 2+ topics, ends it.
+const singleTopicStreak = (topicsByDay, endYmd) => {
+  let cur = endYmd, streak = 0, topic = '';
+  for (let i = 0; i < 14; i++) {
+    if (ymdDow(cur) === 0 && cur !== endYmd) { cur = ymdPrev(cur); continue; }
+    const titles = topicsByDay.get(cur) || [];
+    if (new Set(titles.map(normalise)).size !== 1) break;
+    streak += 1;
+    if (!topic) topic = titles[0];
+    cur = ymdPrev(cur);
+  }
+  return { streak, topic };
+};
+
+const focusMessage = (streak, topic) => {
+  const lead = `You have worked on only one topic ("${topic}") for ${streak} days in a row. Why only one task?`;
+  return streak >= STREAK_STRONG
+    ? `${lead} Please improve how you use your time and take up multiple tasks each day.`
+    : `${lead} Try to improve your time and work on more than one task a day.`;
+};
+
 // Fills in hours (from start/end time), the system estimate and the insight on
 // an entry-shaped object. Returns { entry } or { error }.
 const analyseEntry = async (entry, { excludeEntryId, employeeId } = {}) => {
@@ -206,4 +240,5 @@ const analyseEntry = async (entry, { excludeEntryId, employeeId } = {}) => {
 
 module.exports = {
   hoursFromTimes, estimateHours, buildInsight, analyseEntry, verdictFor, findOverlap, summariseEntries,
+  singleTopicStreak, focusMessage, STREAK_TRIGGER, STREAK_STRONG,
 };

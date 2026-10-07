@@ -72,6 +72,10 @@ const timesheetSchema = new mongoose.Schema(
       dayStatus: { type: String, enum: ['Productive', 'Partially Productive', 'Blocked', null], default: null },
       savedAt: { type: Date, default: null },
     },
+
+    // Employee's answer when asked why only one topic was worked on for several
+    // days in a row (see taskIntelligence.singleTopicStreak).
+    focusReason: { type: String, default: '' },
   },
   { timestamps: true }
 );
