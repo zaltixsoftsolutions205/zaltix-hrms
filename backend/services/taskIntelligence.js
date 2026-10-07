@@ -12,7 +12,8 @@ const DEFAULT_HOURS = {
 };
 
 const MIN_TASK_SAMPLES = 3;      // same task title, across the whole company
-const MIN_CATEGORY_SAMPLES = 5;  // same work category
+const MIN_OWN_SAMPLES = 3;       // the employee's own completed work in the category
+const MIN_CATEGORY_SAMPLES = 5;  // same work category, everyone
 const HISTORY_LIMIT = 1000;      // most recent completed entries considered per category
 const TOLERANCE = 0.2;           // ±20% of the estimate counts as "on target"
 
@@ -42,18 +43,43 @@ const hoursFromTimes = (startTime, endTime) => {
   return { hours: round2((e - s) / 60) };
 };
 
-// System-decided estimate for a task: same task title first, then the work
-// category, then a sensible default. Median of completed entries, so one
-// outlier day doesn't skew it. `excludeEntryId` keeps an entry from being
-// benchmarked against itself when it is edited.
-const estimateHours = async ({ task, workCategory, excludeEntryId }) => {
+// Used while there's too little history: what the *wording* of the task suggests
+// (checked against the title first, then the description; first match wins), so
+// "Team standup" and "Build payments module" don't both get the same flat number.
+const KEYWORD_HOURS = [
+  [/\b(meeting|call|stand-?up|sync|demo|interview)\b/i, 1],
+  [/\b(review|feedback|follow-?up|approval)\b/i, 1],
+  [/\b(bug|fix|issue|hot-?fix|debug|error|crash)\b/i, 2],
+  [/\b(test|testing|qa|regression)\b/i, 2],
+  [/\b(document|documentation|docs?|readme|report)\b/i, 2],
+  [/\b(plan|planning|discuss|discussion|brainstorm|estimate)\b/i, 1.5],
+  [/\b(research|analysis|analy[sz]e|investigate|poc|study)\b/i, 3],
+  [/\b(design|ui|ux|mock-?up|wireframe|prototype)\b/i, 3],
+  [/\b(implement|develop|build|integrat\w*|api|module|feature|migrat\w*|setup|set up|deploy)\b/i, 4],
+];
+
+const defaultHours = ({ task, description, category }) => {
+  for (const text of [task, description]) {
+    if (!text) continue;
+    const hit = KEYWORD_HOURS.find(([re]) => re.test(text));
+    if (hit) return hit[1];
+  }
+  return DEFAULT_HOURS[category] ?? DEFAULT_HOURS.Other;
+};
+
+// System-decided estimate, most specific history first: the same task title
+// (company-wide), then this employee's own work in the category, then everyone's
+// work in the category, and only then a wording-based default. Median of completed
+// entries, so one outlier day doesn't skew it. `excludeEntryId` keeps an entry
+// from being benchmarked against itself when it is edited.
+const estimateHours = async ({ task, description, workCategory, employeeId, excludeEntryId }) => {
   const category = workCategory || 'Other';
   const rows = await Timesheet.aggregate([
     { $sort: { date: -1 } },
     { $unwind: '$entries' },
     { $match: { 'entries.workCategory': category, 'entries.status': 'Completed', 'entries.hours': { $gt: 0 } } },
     { $limit: HISTORY_LIMIT },
-    { $project: { _id: 0, entryId: '$entries._id', task: '$entries.task', hours: '$entries.hours' } },
+    { $project: { _id: 0, entryId: '$entries._id', employee: 1, task: '$entries.task', hours: '$entries.hours' } },
   ]);
   const pool = rows.filter((r) => !excludeEntryId || String(r.entryId) !== String(excludeEntryId));
 
@@ -62,10 +88,14 @@ const estimateHours = async ({ task, workCategory, excludeEntryId }) => {
   if (sameTask.length >= MIN_TASK_SAMPLES) {
     return { hours: round1(median(sameTask)), basis: 'task', sampleSize: sameTask.length };
   }
+  const mine = employeeId ? pool.filter((r) => String(r.employee) === String(employeeId)).map((r) => r.hours) : [];
+  if (mine.length >= MIN_OWN_SAMPLES) {
+    return { hours: round1(median(mine)), basis: 'own', sampleSize: mine.length };
+  }
   if (pool.length >= MIN_CATEGORY_SAMPLES) {
     return { hours: round1(median(pool.map((r) => r.hours))), basis: 'category', sampleSize: pool.length };
   }
-  return { hours: DEFAULT_HOURS[category] ?? DEFAULT_HOURS.Other, basis: 'default', sampleSize: 0 };
+  return { hours: defaultHours({ task, description, category }), basis: 'default', sampleSize: 0 };
 };
 
 // Compare actual vs estimated and word the feedback for the employee.
@@ -155,11 +185,13 @@ const summariseEntries = (entries = []) => {
 
 // Fills in hours (from start/end time), the system estimate and the insight on
 // an entry-shaped object. Returns { entry } or { error }.
-const analyseEntry = async (entry, { excludeEntryId } = {}) => {
+const analyseEntry = async (entry, { excludeEntryId, employeeId } = {}) => {
   const t = hoursFromTimes(entry.startTime, entry.endTime);
   if (t.error) return { error: t.error };
 
-  const est = await estimateHours({ task: entry.task, workCategory: entry.workCategory, excludeEntryId });
+  const est = await estimateHours({
+    task: entry.task, description: entry.description, workCategory: entry.workCategory, employeeId, excludeEntryId,
+  });
   const insight = buildInsight({ actual: t.hours, estimated: est.hours, status: entry.status });
 
   return {

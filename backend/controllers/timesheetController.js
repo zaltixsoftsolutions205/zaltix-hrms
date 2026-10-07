@@ -111,7 +111,7 @@ exports.submitTimesheet = async (req, res) => {
     }
     // Hours/estimate/insight are system-derived from start/end time.
     for (let i = 0; i < entries.length; i++) {
-      const analysed = await analyseEntry(entries[i]);
+      const analysed = await analyseEntry(entries[i], { employeeId: req.user._id });
       if (analysed.error) return res.status(400).json({ message: analysed.error });
       entries[i] = analysed.entry;
     }
@@ -174,7 +174,7 @@ exports.addEntry = async (req, res) => {
     }
 
     // Hours come from start/end time; estimate + insight are decided by the system.
-    const analysed = await analyseEntry({ ...entry, project, projectLabel });
+    const analysed = await analyseEntry({ ...entry, project, projectLabel }, { employeeId: req.user._id });
     if (analysed.error) return res.status(400).json({ message: analysed.error });
     const entryDoc = analysed.entry;
 
@@ -219,8 +219,11 @@ exports.updateEntry = async (req, res) => {
     Object.assign(entry, body);
 
     const analysed = await analyseEntry(
-      { task: entry.task, workCategory: entry.workCategory, status: entry.status, startTime: entry.startTime, endTime: entry.endTime },
-      { excludeEntryId: entry._id }
+      {
+        task: entry.task, description: entry.description, workCategory: entry.workCategory, status: entry.status,
+        startTime: entry.startTime, endTime: entry.endTime,
+      },
+      { excludeEntryId: entry._id, employeeId: timesheet.employee }
     );
     if (analysed.error) return res.status(400).json({ message: analysed.error });
     const clash = findOverlap(timesheet.entries, entry, entry._id);

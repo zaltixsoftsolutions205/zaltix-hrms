@@ -28,7 +28,7 @@ const entrySchema = new mongoose.Schema({
   insight: {
     verdict: { type: String, enum: ['on-target', 'over', 'under', 'in-progress', null], default: null },
     message: { type: String, default: '' },
-    basis: { type: String, enum: ['task', 'category', 'default', null], default: null },
+    basis: { type: String, enum: ['task', 'own', 'category', 'default', null], default: null },
     sampleSize: { type: Number, default: 0 },
   },
   workCategory: {
