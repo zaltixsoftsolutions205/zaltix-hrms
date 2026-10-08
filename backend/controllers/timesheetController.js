@@ -580,9 +580,14 @@ exports.getOrgView = async (req, res) => {
     const userFilter = { isActive: true };
     if (req.query.departmentId) userFilter.department = req.query.departmentId;
     if (req.query.role) userFilter.role = req.query.role;
-    if (req.query.employeeId) userFilter._id = req.query.employeeId;
 
-    const employees = await User.find(userFilter).select('name employeeId role department').populate('department', 'name');
+    // Everyone matching the department/role filters — feeds the employee picker, so it
+    // still lists the others after one person has been selected.
+    const allMatching = await User.find(userFilter).select('name employeeId role department').populate('department', 'name').sort({ name: 1 });
+    const employeeOptions = allMatching.map(e => ({ _id: e._id, name: e.name, employeeId: e.employeeId, department: e.department?.name || '' }));
+    const employees = req.query.employeeId
+      ? allMatching.filter(e => String(e._id) === String(req.query.employeeId))
+      : allMatching;
     const employeeIds = employees.map(e => e._id);
     const rollup = await buildEmployeeRollup(employeeIds, start, end);
 
@@ -593,21 +598,54 @@ exports.getOrgView = async (req, res) => {
     const todayTimesheets = await Timesheet.find({
       employee: { $in: employeeIds },
       date: { $gte: startOfDay(today), $lte: ist(today).endOf('day').toDate() },
-    }).select('employee dailyUpdate').lean();
-    const updatedToday = new Set(todayTimesheets.filter(t => t.dailyUpdate?.savedAt).map(t => String(t.employee)));
+    }).select('employee dailyUpdate entries.hours').lean();
+    // "Updated today" = logged at least one task OR saved a Daily Update (matching how
+    // days-updated is counted everywhere else), not only those who saved the update.
+    const todayInfo = new Map();
+    for (const t of todayTimesheets) {
+      const k = String(t.employee);
+      const cur = todayInfo.get(k) || { tasks: 0, hours: 0, dailyUpdate: false };
+      cur.tasks += (t.entries || []).length;
+      cur.hours += (t.entries || []).reduce((s, e) => s + (e.hours || 0), 0);
+      cur.dailyUpdate = cur.dailyUpdate || !!t.dailyUpdate?.savedAt;
+      todayInfo.set(k, cur);
+    }
+    const updatedToday = new Set([...todayInfo].filter(([, v]) => v.tasks > 0 || v.dailyUpdate).map(([k]) => k));
+    const person = (e) => ({ _id: e._id, name: e.name, employeeId: e.employeeId, department: e.department?.name || '' });
+    const updatedTodayList = employees.filter(e => updatedToday.has(String(e._id))).map(e => {
+      const v = todayInfo.get(String(e._id));
+      return { ...person(e), tasks: v.tasks, hours: Math.round(v.hours * 10) / 10, dailyUpdate: v.dailyUpdate };
+    });
+    const missingTodayList = employees.filter(e => !updatedToday.has(String(e._id))).map(person);
 
     let totalHours = 0, totalCompletedTasks = 0;
     const workCategoryTotals = {};
+    const categoryPeople = {}; // category -> employeeId -> { employee, hours, tasks }
+    const completedTasks = [];
     const blockers = [];
     const workload = [];
 
     const tsDocs = await Timesheet.find({ employee: { $in: employeeIds }, date: { $gte: start, $lte: end } })
-      .populate('employee', 'name employeeId');
+      .populate('employee', 'name employeeId')
+      .sort({ date: -1 });
     for (const ts of tsDocs) {
       totalHours += ts.totalHours || 0;
       for (const entry of ts.entries || []) {
-        if (entry.status === 'Completed') totalCompletedTasks += 1;
+        if (entry.status === 'Completed') {
+          totalCompletedTasks += 1;
+          if (completedTasks.length < 300) {
+            completedTasks.push({
+              employee: ts.employee?.name || '', employeeRef: ts.employee?._id, date: ymd(ts.date), task: entry.task,
+              category: entry.workCategory, project: entry.projectLabel || '', hours: entry.hours,
+            });
+          }
+        }
         workCategoryTotals[entry.workCategory] = (workCategoryTotals[entry.workCategory] || 0) + (entry.hours || 0);
+        const catMap = (categoryPeople[entry.workCategory] = categoryPeople[entry.workCategory] || {});
+        const pk = String(ts.employee?._id);
+        const row = (catMap[pk] = catMap[pk] || { _id: ts.employee?._id, employee: ts.employee?.name || '', hours: 0, tasks: 0 });
+        row.hours += entry.hours || 0;
+        row.tasks += 1;
         if (entry.status === 'Blocked') {
           blockers.push({
             employee: ts.employee?.name, date: ymd(ts.date), task: entry.task, blocker: entry.blocker,
@@ -627,6 +665,13 @@ exports.getOrgView = async (req, res) => {
       });
     }
 
+    const categoryBreakdown = {};
+    for (const [cat, people] of Object.entries(categoryPeople)) {
+      categoryBreakdown[cat] = Object.values(people)
+        .map(p => ({ ...p, hours: Math.round(p.hours * 10) / 10 }))
+        .sort((a, b) => b.hours - a.hours);
+    }
+
     res.json({
       totalEmployees: employees.length,
       updatedToday: updatedToday.size,
@@ -637,6 +682,13 @@ exports.getOrgView = async (req, res) => {
       workingDaysInRange,
       workload,
       blockers,
+      // Detail behind each card / bar on the Org page
+      employeeOptions,
+      employeesList: employees.map(person),
+      updatedTodayList,
+      missingTodayList,
+      completedTasks,
+      categoryBreakdown,
     });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -814,6 +866,7 @@ exports.getOrgUpdates = async (req, res) => {
     const userFilter = { isActive: true };
     if (req.query.departmentId) userFilter.department = req.query.departmentId;
     if (req.query.role) userFilter.role = req.query.role;
+    if (req.query.employeeId) userFilter._id = req.query.employeeId;
     const employees = await User.find(userFilter).select('name employeeId department').populate('department', 'name').lean();
 
     const timesheets = await Timesheet.find({
