@@ -231,6 +231,15 @@ const TabContent = ({ activeTab, employeeId }) => {
                       },
                     ]
                     : []),
+                  ...(latest.timesheetScore != null
+                    ? [
+                      {
+                        label: "Timesheet",
+                        value: latest.timesheetScore,
+                        details: `${latest.tsTasksCompleted}/${latest.tsTasksTotal} Tasks · ${latest.tsDaysUpdated}/${latest.tsWorkingDays} Days Updated`,
+                      },
+                    ]
+                    : []),
                 ].map((item) => (
                   <div key={item.label} className="mb-6">
 

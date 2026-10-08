@@ -73,9 +73,15 @@ const ADMIN_NAV = [
     icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4",
   },
   {
-    path: '/timesheets/approvals',
+    path: '/timesheets',
     label: 'Timesheets',
     icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    end: true,
+  },
+  {
+    path: '/admin/projects',
+    label: 'Projects',
+    icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
   },
 ];
 
@@ -85,6 +91,13 @@ const TIMESHEET_NAV = {
   label: 'My Timesheet',
   icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
   end: true, // exact match only, so /timesheets/approvals doesn't also highlight this
+};
+// Project management — reachable by HR (always) and technical leads (head of
+// their own department), matching who can create a project per the backend.
+const PROJECTS_NAV = {
+  path: '/admin/projects',
+  label: 'Projects',
+  icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
 };
 const TIMESHEET_APPROVALS_NAV = {
   path: '/timesheets/approvals',
@@ -201,15 +214,16 @@ const Sidebar = ({ isOpen, onClose }) => {
   let navItems = navKey === 'admin' ? ADMIN_NAV : (ROLE_NAV[navKey] || []);
 
   /* Timesheets: everyone logs their own time. Admin already has an entry in
-     ADMIN_NAV, so only add for non-admin roles. Approvers also see the
-     approvals view — HR (routed all marketing/sales timesheets) and technical
-     leads (the head of their own department). */
+     ADMIN_NAV (pointing at the main Timesheet page), so only add for non-admin
+     roles. The legacy approvals view is still reachable for HR and technical
+     leads (the head of their own department) even though new submissions no
+     longer route through it. */
   if (navKey !== 'admin') {
     const isTechLead =
       user?.department?.headOf &&
       String(user.department.headOf) === String(user?._id || user?.id);
     const timesheetItems = [TIMESHEET_NAV];
-    if (isHR || isTechLead) timesheetItems.push(TIMESHEET_APPROVALS_NAV);
+    if (isHR || isTechLead) timesheetItems.push(TIMESHEET_APPROVALS_NAV, PROJECTS_NAV);
     navItems = [...navItems, ...timesheetItems];
   }
 
@@ -226,12 +240,17 @@ const Sidebar = ({ isOpen, onClose }) => {
     finalItems = MODULES
       .filter(m => granted.has(m.key))
       .map(m => ({ path: m.path, label: m.label, icon: m.icon }));
-    // Keep the user's own timesheet entry (and approvals if they lead a team).
+    // Keep the user's own timesheet entry (and approvals/projects if they lead a team).
     const isTechLead =
       user?.department?.headOf &&
       String(user.department.headOf) === String(user?._id || user?.id);
-    if (isTechLead && !finalItems.some(i => i.path === TIMESHEET_APPROVALS_NAV.path)) {
-      finalItems = [...finalItems, TIMESHEET_APPROVALS_NAV];
+    if (isTechLead) {
+      if (!finalItems.some(i => i.path === TIMESHEET_APPROVALS_NAV.path)) {
+        finalItems = [...finalItems, TIMESHEET_APPROVALS_NAV];
+      }
+      if (!finalItems.some(i => i.path === PROJECTS_NAV.path)) {
+        finalItems = [...finalItems, PROJECTS_NAV];
+      }
     }
   }
 

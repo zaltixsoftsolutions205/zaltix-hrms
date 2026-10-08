@@ -356,6 +356,7 @@ export default function EmployeeDashboard() {
                       { label: 'Tasks', val: latest.taskScore, details: `${latest.tasksCompleted}/${latest.tasksTotal} completed` },
                       { label: 'Attendance', val: latest.attendanceScore, details: `${latest.attendanceDays}/${latest.workingDays} days · ${latest.lateDays} late` },
                       ...(latest.crmScore != null ? [{ label: 'CRM', val: latest.crmScore, details: `${latest.leadsConverted} converted` }] : []),
+                      ...(latest.timesheetScore != null ? [{ label: 'Timesheet', val: latest.timesheetScore, details: `${latest.tsTasksCompleted}/${latest.tsTasksTotal} tasks · ${latest.tsDaysUpdated}/${latest.tsWorkingDays} days updated` }] : []),
                     ].map(({ label, val, details }) => (
                       <div key={label} className="flex items-center gap-2">
                         <span className="text-xs text-gray-500 w-20 flex-shrink-0">{label}: {val}%</span>

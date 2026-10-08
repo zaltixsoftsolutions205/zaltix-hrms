@@ -37,7 +37,6 @@ import EmployeeProfile from './pages/Profile/EmployeeProfile';
 import AttendancePage from './pages/Attendance/AttendancePage';
 import LeavePage from './pages/Leaves/LeavePage';
 import TimesheetPage from './pages/Timesheets/TimesheetPage';
-import TimesheetApprovals from './pages/Timesheets/TimesheetApprovals';
 import PayslipsPage from './pages/Payslips/PayslipsPage';
 import TasksPage from './pages/Tasks/TasksPage';
 import CRMPage from './pages/CRM/CRMPage';
@@ -66,6 +65,7 @@ import AdminCRM from './pages/Admin/AdminCRM';
 import FinancePage from './pages/Admin/Finance/FinancePage';
 import AnnouncementsPage from './pages/Admin/AnnouncementsPage';
 import HolidaysPage from './pages/Admin/HolidaysPage';
+import ProjectsAdmin from './pages/Admin/ProjectsAdmin';
 import AdminMyTasks from './pages/Admin/AdminMyTasks';
 import RecruitmentPage from './pages/Admin/RecruitmentPage';
 import RecruitmentProjectPage from './pages/Admin/RecruitmentProjectPage';
@@ -121,7 +121,7 @@ const AppRoutes = () => {
         <Route path="/attendance" element={<AttendancePage />} />
         <Route path="/leaves" element={<LeavePage />} />
         <Route path="/timesheets" element={<TimesheetPage />} />
-        <Route path="/timesheets/approvals" element={<TimesheetApprovals />} />
+        <Route path="/admin/projects" element={<ProtectedRoute module="timesheets"><ProjectsAdmin /></ProtectedRoute>} />
         <Route path="/payslips" element={<PayslipsPage />} />
         <Route path="/tasks" element={<TasksPage />} />
         <Route path="/team" element={<TeamPage />} />
