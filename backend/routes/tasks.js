@@ -1,23 +1,87 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const { createTask, getMyTasks, updateTaskStatus, getAllTasks, getKpiOverview, updateTask, deleteTask, sendTaskReminder, getActiveSelfTask } = require('../controllers/taskController');
-const { protect } = require('../middleware/auth');
-const { roleCheck, moduleAccess } = require('../middleware/roleCheck');
 
-const hrTasksView = moduleAccess('hr_tasks', 'view');
-const hrTasksEdit = moduleAccess('hr_tasks', 'edit');
+const { createTask, importTasks, getTasks, getTask, updateTask, deleteTask,getTaskSummary,} = require("../controllers/taskController");
+const { protect } = require("../middleware/auth");
+const { moduleAccess, canModifyTask, } = require("../middleware/roleCheck");
+const { taskAttachmentUpload } = require("../middleware/taskUpload");
 
-router.use(protect);
+// Excel import middleware
+const { uploadTaskExcel, importTasksFromExcel,  } = require("../middleware/taskExcelImport");
 
-router.post('/', hrTasksEdit, createTask);
-router.get('/my', getMyTasks);
-router.get('/active-self', roleCheck('admin'), getActiveSelfTask);
-router.get('/kpi', hrTasksView, getKpiOverview);
-router.get('/', hrTasksView, getAllTasks);
-router.put('/:id/status', updateTaskStatus);
-router.put('/:id', hrTasksEdit, updateTask);
-router.post('/:id/reminder', hrTasksEdit, sendTaskReminder);
 
-router.delete('/:id', deleteTask);
+/*
+|--------------------------------------------------------------------------
+| TASK ROUTES
+|--------------------------------------------------------------------------
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| VIEW TASKS
+|--------------------------------------------------------------------------
+*/
+
+// GET /api/tasks
+router.get("/", protect, moduleAccess("tasks", "view"), getTasks);
+router.get("/summary", protect, getTaskSummary);
+
+// GET /api/tasks/:id
+router.get("/:id", protect, moduleAccess("tasks", "view"), getTask);
+
+/*
+|--------------------------------------------------------------------------
+| EXCEL IMPORT
+|--------------------------------------------------------------------------
+|
+| POST /api/tasks/import
+|
+| Flow:
+|
+| Request
+|   ↓
+| protect
+|   ↓
+| tasks -> edit permission
+|   ↓
+| uploadTaskExcel
+|   ↓
+| importTasksFromExcel
+|   ↓
+| req.importedTasks
+|   ↓
+| importTasks
+|   ↓
+| createTaskRecord()
+|
+|--------------------------------------------------------------------------
+*/
+router.post("/import", protect, moduleAccess("tasks", "edit"), uploadTaskExcel, importTasksFromExcel, importTasks);
+/*
+|--------------------------------------------------------------------------
+| CREATE TASK
+|--------------------------------------------------------------------------
+|
+| POST /api/tasks
+|
+| Normal frontend task creation.
+|
+|--------------------------------------------------------------------------
+*/
+router.post("/", protect, moduleAccess("tasks", "edit"), taskAttachmentUpload, createTask);
+/*
+|--------------------------------------------------------------------------
+| UPDATE TASK
+|--------------------------------------------------------------------------
+*/
+router.put("/:id", protect, moduleAccess("tasks", "edit"), canModifyTask, taskAttachmentUpload, updateTask);
+/*
+|--------------------------------------------------------------------------
+| DELETE TASK
+|--------------------------------------------------------------------------
+*/
+router.delete("/:id", protect, moduleAccess("tasks", "edit"), canModifyTask, deleteTask);
+
 
 module.exports = router;

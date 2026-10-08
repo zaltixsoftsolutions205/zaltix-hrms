@@ -1,12 +1,15 @@
 const mongoose = require('mongoose');
 
+// Single source of truth for pipeline stages. The controller reads this via
+// Lead.PIPELINE_STAGES, so schema enum and controller validation can never differ.
+const PIPELINE_STAGES = ['lead', 'visit', 'registration', 'demo', 'data-update', 'feedback', 'converted', 'closed-won', 'closed-lost',];
+
 const activitySchema = new mongoose.Schema({
   type: { type: String, enum: ['call', 'meeting', 'follow-up', 'note'], required: true },
   note: { type: String, required: true },
   date: { type: Date, default: Date.now },
   by: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 });
-
 const leadSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -19,8 +22,11 @@ const leadSchema = new mongoose.Schema(
     assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     activities: [activitySchema],
     convertedDate: { type: Date, default: null },
+    city: { type: String, trim: true, default: '' },
+    district: { type: String, trim: true, default: '' },
+    state: { type: String, trim: true, default: '' },
     // Pipeline & Deal fields
-    pipelineStage: { type: String, enum: ['prospect', 'qualified', 'proposal', 'negotiation', 'closed-won', 'closed-lost'], default: 'prospect' },
+    pipelineStage: { type: String, enum: PIPELINE_STAGES, default: 'lead' },
     followUpDate: { type: Date, default: null },
     dealValue: { type: Number, default: 0 },
     probability: { type: Number, default: 0 },
@@ -30,4 +36,7 @@ const leadSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
-module.exports = mongoose.model('Lead', leadSchema);
+const Lead = mongoose.model('Lead', leadSchema);
+Lead.PIPELINE_STAGES = PIPELINE_STAGES;
+
+module.exports = Lead;

@@ -46,34 +46,50 @@ const ICON = {
  */
 export const MODULES = [
   // Self-service (the role-default baseline for a normal employee)
-  { key: 'dashboard',        label: 'Dashboard',          path: '/dashboard',            icon: ICON.dashboard, editable: false, group: 'General' },
-  { key: 'profile',          label: 'My Profile',         path: '/profile',              icon: ICON.profile,   editable: true,  group: 'General' },
-  { key: 'attendance',       label: 'My Attendance',      path: '/attendance',           icon: ICON.calendar,  editable: true,  group: 'Self-service' },
-  { key: 'leaves',           label: 'My Leaves',          path: '/leaves',               icon: ICON.leaf,      editable: true,  group: 'Self-service' },
-  { key: 'payslips',         label: 'My Payslips',        path: '/payslips',             icon: ICON.payslip,   editable: false, group: 'Self-service' },
-  { key: 'tasks',            label: 'My Tasks',           path: '/tasks',                icon: ICON.tasks,     editable: true,  group: 'Self-service' },
-  { key: 'timesheets',       label: 'Timesheets',         path: '/timesheets',           icon: ICON.clock,     editable: true,  group: 'Self-service' },
-  { key: 'knowledge_center', label: 'Knowledge Center',   path: '/knowledge-center',     icon: ICON.book,      editable: false, group: 'Self-service' },
-  { key: 'team',             label: 'My Team',            path: '/team',                 icon: ICON.people,    editable: false, group: 'Self-service' },
+  { key: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: ICON.dashboard, editable: false, group: 'General' },
+  { key: 'profile', label: 'My Profile', path: '/profile', icon: ICON.profile, editable: true, group: 'General' },
+  { key: 'attendance', label: 'My Attendance', path: '/attendance', icon: ICON.calendar, editable: true, group: 'Self-service' },
+  { key: 'leaves', label: 'My Leaves', path: '/leaves', icon: ICON.leaf, editable: true, group: 'Self-service' },
+  { key: 'payslips', label: 'My Payslips', path: '/payslips', icon: ICON.payslip, editable: false, group: 'Self-service' },
+  { key: 'tasks', label: 'workspace', path: '/admin/employee-management/workspace', icon: ICON.tasks, editable: true, group: 'Self-service' },
+  { key: 'timesheets', label: 'Timesheets', path: '/timesheets', icon: ICON.clock, editable: true, group: 'Self-service' },
+  { key: 'knowledge_center', label: 'Knowledge Center', path: '/knowledge-center', icon: ICON.book, editable: false, group: 'Self-service' },
+  { key: 'team', label: 'My Team', path: '/team', icon: ICON.people, editable: false, group: 'Self-service' },
 
   // Sales / CRM
-  { key: 'crm',              label: 'CRM',                path: '/crm',                  icon: ICON.crm,       editable: true,  group: 'Sales' },
+  // Sales
+  { key: 'crm', label: 'CRM', path: '/crm', icon: ICON.crm, editable: true, group: 'Sales' },
+
+  { key: 'lead', label: 'Leads', path: '/sale/lead', icon: ICON.field, editable: true, group: 'Sales' },
+  { key: 'visits', label: 'Visits', path: '/sale/visit', icon: ICON.field, editable: true, group: 'Sales' },
+  { key: 'registration', label: 'Registration', path: '/sale/registration', icon: ICON.book, editable: true, group: 'Sales' },
+  { key: 'demos', label: 'Demos', path: '/sale/demos', icon: ICON.book, editable: true, group: 'Sales' },
+  { key: 'data_updation', label: 'Data Updation', path: '/sale/dataupdation', icon: ICON.book, editable: true, group: 'Sales' },
+  { key: 'feedback', label: 'Feedback', path: '/sale/feedback', icon: ICON.book, editable: true, group: 'Sales' },
   { key: 'field_sales',      label: 'Field Sales',        path: '/field-sales/leads',    icon: ICON.field,     editable: true,  group: 'Sales' },
   { key: 'query_management', label: 'Query Management',   path: '/queries',              icon: ICON.approvals, editable: true,  group: 'Sales' },
 
   // HR-management modules
-  { key: 'hr_employees',     label: 'Employees (HR)',     path: '/hr/employees',         icon: ICON.people,    editable: true,  group: 'HR Management' },
-  { key: 'hr_attendance',    label: 'Attendance (HR)',    path: '/hr/attendance',        icon: ICON.calendar,  editable: true,  group: 'HR Management' },
-  { key: 'hr_leaves',        label: 'Leave Approvals',    path: '/hr/leaves',            icon: ICON.approvals, editable: true,  group: 'HR Management' },
-  { key: 'hr_tasks',         label: 'Work & KPI (HR)',    path: '/hr/tasks',             icon: ICON.tasks,     editable: true,  group: 'HR Management' },
-  { key: 'hr_payslips',      label: 'Payslips (HR)',      path: '/hr/payslips',          icon: ICON.payslip,   editable: true,  group: 'HR Management' },
+  { key: 'hr_employees', label: 'Employees (HR)', path: '/hr/employees', icon: ICON.people, editable: true, group: 'HR Management' },
+  { key: 'hr_attendance', label: 'Attendance (HR)', path: '/hr/attendance', icon: ICON.calendar, editable: true, group: 'HR Management' },
+  { key: 'hr_leaves', label: 'Leave Approvals', path: '/hr/leaves', icon: ICON.approvals, editable: true, group: 'HR Management' },
+  // { key: 'hr_tasks', label: 'Work & KPI (HR)', path: '/hr/tasks', icon: ICON.tasks, editable: true, group: 'HR Management' },
+  { key: 'hr_payslips', label: 'Payslips (HR)', path: '/hr/payslips', icon: ICON.payslip, editable: true, group: 'HR Management' },
 
   // Admin / org-wide
-  { key: 'recruitment',      label: 'Recruitment',        path: '/admin/recruitment',    icon: ICON.recruit,   editable: true,  group: 'Admin' },
-  { key: 'finance',          label: 'Finance',            path: '/admin/finance',        icon: ICON.finance,   editable: true,  group: 'Admin' },
-  { key: 'reports',          label: 'Reports',            path: '/admin/reports',        icon: ICON.report,    editable: false, group: 'Admin' },
-  { key: 'announcements',    label: 'Announcements',      path: '/admin/announcements',  icon: ICON.book,      editable: true,  group: 'Admin' },
-  { key: 'holidays',         label: 'Holidays',           path: '/admin/holidays',       icon: ICON.calendar,  editable: true,  group: 'Admin' },
+  { key: 'recruitment', label: 'Recruitment', path: '/admin/recruitment', icon: ICON.recruit, editable: true, group: 'Admin' },
+  { key: 'finance', label: 'Finance', path: '/admin/finance', icon: ICON.finance, editable: true, group: 'Admin' },
+  { key: 'reports', label: 'Reports', path: '/admin/reports', icon: ICON.report, editable: false, group: 'Admin' },
+  { key: 'announcements', label: 'Announcements', path: '/admin/announcements', icon: ICON.book, editable: true, group: 'Admin' },
+  { key: 'holidays', label: 'Holidays', path: '/admin/holidays', icon: ICON.calendar, editable: true, group: 'Admin' },
+
+  // WorkSpace Models 
+  { key: 'overview', label: 'Overview', path: '/workspace/overview', icon: ICON.dashboard, editable: true, group: 'Workspace' },
+  { key: 'department', label: 'Department', path: '/workspace/department', icon: ICON.people, editable: true, group: 'Workspace' },
+  { key: 'project', label: 'Projects', path: '/workspace/project', icon: ICON.book, editable: true, group: 'Workspace' },
+  { key: 'task', label: 'Tasks', path: '/workspace/task', icon: ICON.tasks, editable: true, group: 'Workspace' },
+
+
 ];
 
 export const MODULE_BY_KEY = MODULES.reduce((acc, m) => { acc[m.key] = m; return acc; }, {});
@@ -95,13 +111,62 @@ export const BASELINE_MODULES = ['dashboard', 'profile', 'attendance', 'leaves',
 export const BASELINE_EDITABLE = ['profile', 'attendance', 'leaves', 'tasks', 'timesheets'];
 
 export const ROLE_DEFAULT_MODULES = {
-  employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
-  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
+  employee: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
+  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback',],
+  'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task'],
+  sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'visits', 'lead', 'registration', 'query_management'],
   field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
-  hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm'],
+  hr: ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm'],
+  'inside-sales': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',
+    // Inside Sales
+    'lead',
+    'visits',
+    'feedback',
+  ],
+  'product-executive': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',
+    // Product Executive
+    'demos',
+    'data_updation',
+    'feedback',
+    'registration',
+  ],
 };
 
-const GROUP_ORDER = ['General', 'Self-service', 'Sales', 'HR Management', 'Admin'];
+export const ROLE_DEFAULT_ACCESS = {
+  employee: [],
+  manager: [
+    { module: 'overview', permission: 'edit' },
+    { module: 'department', permission: 'edit' },
+    { module: 'project', permission: 'edit' },
+    { module: 'task', permission: 'edit' },
+  ],
+
+  'team-lead': [
+    { module: 'overview', permission: 'view' },
+    { module: 'department', permission: 'view' },
+    { module: 'project', permission: 'view' },
+    { module: 'task', permission: 'edit' },
+  ],
+
+  sales: [
+    { module: 'crm', permission: 'edit' },
+  ],
+
+  field_sales: [
+    { module: 'crm', permission: 'edit' },
+    { module: 'field_sales', permission: 'edit' },
+  ],
+
+  hr: [
+    { module: 'hr_employees', permission: 'edit' },
+    { module: 'hr_attendance', permission: 'edit' },
+    { module: 'hr_leaves', permission: 'edit' },
+    { module: 'hr_tasks', permission: 'edit' },
+    { module: 'hr_payslips', permission: 'edit' },
+  ],
+};
+
+const GROUP_ORDER = ['General', 'Self-service', 'Sales', 'HR Management', 'Admin', 'Workspace'];
 
 /** Modules grouped for the picker UI, preserving GROUP_ORDER. */
 export const MODULE_GROUPS = GROUP_ORDER.map(group => ({
@@ -115,29 +180,115 @@ export const MODULE_GROUPS = GROUP_ORDER.map(group => ({
  */
 export function resolveModuleKeys(user) {
   if (!user) return new Set();
-  if (user.role === 'admin') return new Set(MODULES.map(m => m.key));
-  const access = Array.isArray(user.moduleAccess) ? user.moduleAccess : [];
-  // Explicit grants → grants + always-on baseline. No grants → role defaults.
-  if (access.length) return new Set([...BASELINE_MODULES, ...access.map(a => a.module)]);
-  return new Set(ROLE_DEFAULT_MODULES[user.role] || ROLE_DEFAULT_MODULES.employee);
+
+  if (user.role === 'admin') {
+    return new Set(MODULES.map(m => m.key));
+  }
+
+  const access = Array.isArray(user.moduleAccess)
+    ? user.moduleAccess
+    : [];
+
+  // Explicit grants → grants + always-on baseline.
+  // No grants → role defaults.
+  if (access.length) {
+    return new Set([
+      ...BASELINE_MODULES,
+      ...access.map(a => a.module)
+    ]);
+  }
+
+  return new Set(
+    ROLE_DEFAULT_MODULES[user.role] ||
+    ROLE_DEFAULT_MODULES.employee
+  );
+}
+/**
+ * Resolve the effective list of granted module keys for a user object,
+ * applying admin bypass and the role-default fallback. Returns Set of keys.
+ */
+export function canAccessView(user, moduleKey) {
+  if (!user) return false;
+
+  // Admin bypass
+  if (user.role === 'admin') {
+    return true;
+  }
+
+  const access = Array.isArray(user.moduleAccess)
+    ? user.moduleAccess
+    : [];
+
+  // Explicit permissions
+  if (access.length) {
+    // Baseline modules are always visible
+    if (BASELINE_MODULES.includes(moduleKey)) {
+      return true;
+    }
+
+    const entry = access.find(
+      a => a.module === moduleKey
+    );
+
+    return !!entry;
+  }
+
+  // Role fallback
+  return (
+    ROLE_DEFAULT_MODULES[user.role] ||
+    ROLE_DEFAULT_MODULES.employee
+  ).includes(moduleKey);
 }
 
 /** Whether the user can access a module key at all (view or edit). */
 export function canAccessModule(user, moduleKey) {
-  return resolveModuleKeys(user).has(moduleKey);
+  return canAccessView(user, moduleKey);
 }
 
 /** Whether the user has edit permission on a module key. Admin → always true. */
-export function canEditModule(user, moduleKey) {
+export function canAccessEdit(user, moduleKey) {
   if (!user) return false;
-  if (user.role === 'admin') return true;
-  const access = Array.isArray(user.moduleAccess) ? user.moduleAccess : [];
-  if (access.length) {
-    // Baseline self-service stays editable even when explicit grants exist.
-    if (BASELINE_EDITABLE.includes(moduleKey)) return true;
-    const entry = access.find(a => a.module === moduleKey);
-    return !!entry && entry.permission === PERMISSIONS.EDIT;
+
+  // Admin bypass
+  if (user.role === 'admin') {
+    return true;
   }
-  // Role-default fallback: defaults grant edit on their own self-service area.
-  return (ROLE_DEFAULT_MODULES[user.role] || ROLE_DEFAULT_MODULES.employee).includes(moduleKey);
+
+  // Check whether module supports edit
+  const module = MODULE_BY_KEY[moduleKey];
+
+  if (!module || !module.editable) {
+    return false;
+  }
+
+  const access = Array.isArray(user.moduleAccess)
+    ? user.moduleAccess
+    : [];
+
+  // Explicit permissions
+  if (access.length) {
+    // Baseline self-service edit
+    if (BASELINE_EDITABLE.includes(moduleKey)) {
+      return true;
+    }
+
+    const entry = access.find(
+      a => a.module === moduleKey
+    );
+
+    return entry?.permission === PERMISSIONS.EDIT;
+  }
+
+  // Role-based fallback
+  const roleAccess =
+    ROLE_DEFAULT_ACCESS[user.role] || [];
+
+  const entry = roleAccess.find(
+    a => a.module === moduleKey
+  );
+
+  return entry?.permission === PERMISSIONS.EDIT;
 }
+
+/** Alias kept for callers written against the earlier name (Sidebar, QueryManagement). */
+export const canEditModule = canAccessEdit;

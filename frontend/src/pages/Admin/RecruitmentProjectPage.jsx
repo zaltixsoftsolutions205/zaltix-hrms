@@ -51,18 +51,23 @@ export default function RecruitmentProjectPage() {
 
   const fetchAll = async () => {
     setLoading(true);
+
     try {
-      const [pRes, jRes, sRes] = await Promise.all([
-        api.get('/recruitment/projects'),
-        api.get('/recruitment/jobs?projectId=' + projectId),
-        api.get('/recruitment/stats?projectId=' + projectId),
+      const [projectRes, jobsRes, statsRes] = await Promise.all([
+        api.get(`/recruitment/projects/${projectId}`),
+        api.get(`/recruitment/jobs?projectId=${projectId}`),
+        api.get(`/recruitment/stats?projectId=${projectId}`)
       ]);
-      const found = pRes.data.find(p => p._id === projectId);
-      setProject(found || null);
-      setJobs(jRes.data);
-      setStats(sRes.data);
-    } catch {
-      toast.error('Failed to load');
+      console.log('projectRes', projectRes.data);
+      console.log('jobsRes', jobsRes.data);
+      console.log('statsRes', statsRes.data);
+      setProject(projectRes.data.project);
+      setJobs(jobsRes.data || []);
+      setStats(statsRes.data);
+
+    } catch (error) {
+      console.error("Fetch Recruitment Project:", error);
+      toast.error("Failed to load project");
     } finally {
       setLoading(false);
     }
@@ -181,14 +186,14 @@ export default function RecruitmentProjectPage() {
       {stats && (
         <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
           {[
-            { label: 'Open Jobs',     val: stats.totalJobs,       cls: 'text-violet-700 bg-violet-50 border-violet-200' },
-            { label: 'Resumes',       val: stats.totalApplicants, cls: 'text-gray-700 bg-gray-50 border-gray-200' },
-            { label: 'Interested',    val: stats.interested,      cls: 'text-violet-700 bg-violet-50 border-violet-200' },
-            { label: 'Not Interested',val: stats.notInterested,   cls: 'text-gray-600 bg-gray-50 border-gray-200' },
-            { label: 'Shortlisted',   val: stats.shortlisted,     cls: 'text-amber-700 bg-amber-50 border-amber-200' },
-            { label: 'Processed',     val: stats.processed,       cls: 'text-violet-700 bg-violet-50 border-violet-200' },
-            { label: 'Rejected',      val: stats.rejected,        cls: 'text-gray-900 bg-gray-100 border-gray-200' },
-            { label: 'Joined',        val: stats.joined,          cls: 'text-violet-700 bg-violet-50 border-violet-200' },
+            { label: 'Open Jobs', val: stats.totalJobs, cls: 'text-violet-700 bg-violet-50 border-violet-200' },
+            { label: 'Resumes', val: stats.totalApplicants, cls: 'text-gray-700 bg-gray-50 border-gray-200' },
+            { label: 'Interested', val: stats.interested, cls: 'text-violet-700 bg-violet-50 border-violet-200' },
+            { label: 'Not Interested', val: stats.notInterested, cls: 'text-gray-600 bg-gray-50 border-gray-200' },
+            { label: 'Shortlisted', val: stats.shortlisted, cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+            { label: 'Processed', val: stats.processed, cls: 'text-violet-700 bg-violet-50 border-violet-200' },
+            { label: 'Rejected', val: stats.rejected, cls: 'text-gray-900 bg-gray-100 border-gray-200' },
+            { label: 'Joined', val: stats.joined, cls: 'text-violet-700 bg-violet-50 border-violet-200' },
           ].map(s => (
             <div key={s.label} className={'rounded-xl border px-2 py-2 text-center ' + s.cls}>
               <p className="text-xl font-bold">{s.val ?? 0}</p>

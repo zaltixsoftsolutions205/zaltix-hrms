@@ -253,7 +253,6 @@ exports.getAllAttendance = async (req, res) => {
     let empFilter = {};
     if (departmentId) empFilter.department = departmentId;
     if (employeeId) empFilter._id = employeeId;
-
     const employees = await User.find({ ...empFilter, role: { $nin: ['admin'] } }).select('_id name employeeId');
     const empIds = employees.map(e => e._id);
 
