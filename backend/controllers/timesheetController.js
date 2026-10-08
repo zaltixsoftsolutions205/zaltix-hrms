@@ -1,5 +1,5 @@
 const Timesheet = require('../models/Timesheet');
-const Project = require('../models/Project');
+const Project = require('../models/TimesheetProject');
 const User = require('../models/User');
 const Department = require('../models/Department');
 const Attendance = require('../models/Attendance');

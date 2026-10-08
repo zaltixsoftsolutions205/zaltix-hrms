@@ -7,7 +7,7 @@ const {
   deactivateProject,
   assignEmployees,
   getAssignableEmployees,
-} = require('../controllers/projectController');
+} = require('../controllers/timesheetProjectController');
 const { protect } = require('../middleware/auth');
 
 router.use(protect);

@@ -32,7 +32,7 @@ const TaskEntryModal = ({ isOpen, onClose, date, editing, defaultStart = '', onS
 
   const fetchProjects = async () => {
     try {
-      const res = await api.get('/projects');
+      const res = await api.get('/timesheet-projects');
       setProjects(res.data);
     } catch {}
   };
@@ -93,7 +93,7 @@ const TaskEntryModal = ({ isOpen, onClose, date, editing, defaultStart = '', onS
   const createProject = async () => {
     if (!newProjectName.trim()) return;
     try {
-      const res = await api.post('/projects', { name: newProjectName.trim() });
+      const res = await api.post('/timesheet-projects', { name: newProjectName.trim() });
       setProjects(ps => [...ps, res.data]);
       update('project', res.data._id);
       setShowNewProject(false);
