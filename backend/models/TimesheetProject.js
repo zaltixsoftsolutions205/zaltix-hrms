@@ -23,4 +23,5 @@ const projectSchema = new mongoose.Schema(
 projectSchema.index({ name: 1, department: 1 }, { unique: true });
 projectSchema.index({ isActive: 1, department: 1 });
 
-module.exports = mongoose.model('Project', projectSchema);
+// Separate from the full project-management Project model (workspace/CRM side).
+module.exports = mongoose.model('TimesheetProject', projectSchema);

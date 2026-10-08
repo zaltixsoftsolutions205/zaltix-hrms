@@ -14,7 +14,7 @@ const entrySchema = new mongoose.Schema({
   // Structured project ref (new). `projectLabel` keeps a denormalised name for
   // display without a populate, and is also where old free-text values live for
   // entries created before this field existed (project stays null for those).
-  project: { type: mongoose.Schema.Types.ObjectId, ref: 'Project', default: null },
+  project: { type: mongoose.Schema.Types.ObjectId, ref: 'TimesheetProject', default: null },
   projectLabel: { type: String, default: '' },
   task: { type: String, required: true },
   description: { type: String, default: '' },

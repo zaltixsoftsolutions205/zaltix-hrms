@@ -36,7 +36,7 @@ const ProjectsAdmin = () => {
   const fetchProjects = async () => {
     setLoading(true);
     try {
-      const res = await api.get('/projects', { params: showInactive ? { includeInactive: true } : {} });
+      const res = await api.get('/timesheet-projects', { params: showInactive ? { includeInactive: true } : {} });
       setProjects(res.data);
     } catch { /* silent */ }
     finally { setLoading(false); }
@@ -68,10 +68,10 @@ const ProjectsAdmin = () => {
     try {
       const payload = { name: form.name.trim(), description: form.description.trim(), department: form.department || null };
       if (editingId) {
-        await api.put(`/projects/${editingId}`, payload);
+        await api.put(`/timesheet-projects/${editingId}`, payload);
         toast.success('Project updated');
       } else {
-        await api.post('/projects', payload);
+        await api.post('/timesheet-projects', payload);
         toast.success('Project added');
       }
       setShowForm(false);
@@ -88,7 +88,7 @@ const ProjectsAdmin = () => {
     setAssignTarget(project);
     setSelectedEmployeeIds((project.assignedEmployees || []).map(e => e._id));
     try {
-      const res = await api.get('/projects/assignable-employees');
+      const res = await api.get('/timesheet-projects/assignable-employees');
       setAssignableEmployees(res.data);
     } catch {
       toast.error('Failed to load employees');
@@ -102,7 +102,7 @@ const ProjectsAdmin = () => {
   const saveAssignment = async () => {
     setAssigning(true);
     try {
-      await api.put(`/projects/${assignTarget._id}/assign`, { employeeIds: selectedEmployeeIds });
+      await api.put(`/timesheet-projects/${assignTarget._id}/assign`, { employeeIds: selectedEmployeeIds });
       toast.success('Assignment saved');
       setAssignTarget(null);
       fetchProjects();
@@ -116,7 +116,7 @@ const ProjectsAdmin = () => {
   const handleDeactivate = async (id) => {
     if (!window.confirm('Deactivate this project? It will no longer appear for new task entries.')) return;
     try {
-      await api.put(`/projects/${id}/deactivate`);
+      await api.put(`/timesheet-projects/${id}/deactivate`);
       toast.success('Project deactivated');
       fetchProjects();
     } catch {
@@ -145,7 +145,7 @@ const ProjectsAdmin = () => {
         const description = String(row.description || row.Description || '').trim();
         const department = deptName ? deptByName.get(deptName.toLowerCase()) || null : null;
         try {
-          await api.post('/projects', { name, description, department });
+          await api.post('/timesheet-projects', { name, description, department });
           created += 1;
         } catch {
           failed += 1;
