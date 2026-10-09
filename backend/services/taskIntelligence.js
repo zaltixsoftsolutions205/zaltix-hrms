@@ -12,8 +12,6 @@ const DEFAULT_HOURS = {
 };
 
 const MIN_TASK_SAMPLES = 3;      // same task title, across the whole company
-const MIN_OWN_SAMPLES = 3;       // the employee's own completed work in the category
-const MIN_CATEGORY_SAMPLES = 5;  // same work category, everyone
 const HISTORY_LIMIT = 1000;      // most recent completed entries considered per category
 const TOLERANCE = 0.2;           // ±20% of the estimate counts as "on target"
 
@@ -43,59 +41,157 @@ const hoursFromTimes = (startTime, endTime) => {
   return { hours: round2((e - s) / 60) };
 };
 
-// Used while there's too little history: what the *wording* of the task suggests
-// (checked against the title first, then the description; first match wins), so
-// "Team standup" and "Build payments module" don't both get the same flat number.
-const KEYWORD_HOURS = [
-  [/\b(meeting|call|stand-?up|sync|demo|interview)\b/i, 1],
-  [/\b(review|feedback|follow-?up|approval)\b/i, 1],
-  [/\b(bug|fix|issue|hot-?fix|debug|error|crash)\b/i, 2],
-  [/\b(test|testing|qa|regression)\b/i, 2],
-  [/\b(document|documentation|docs?|readme|report)\b/i, 2],
-  [/\b(plan|planning|discuss|discussion|brainstorm|estimate)\b/i, 1.5],
-  [/\b(research|analysis|analy[sz]e|investigate|poc|study)\b/i, 3],
-  [/\b(design|ui|ux|mock-?up|wireframe|prototype)\b/i, 3],
-  [/\b(implement|develop|build|integrat\w*|api|module|feature|migrat\w*|setup|set up|deploy)\b/i, 4],
-];
+// ── Estimating from what was typed ───────────────────────────────────────────
+// 1) the same task title done 3+ times, 2) completed tasks whose WORDING is similar
+// (title + description), 3) a breakdown of the text itself — kind of work, how many
+// separate things it covers, how big the scope sounds. Nothing leaves the server.
 
-const defaultHours = ({ task, description, category }) => {
-  for (const text of [task, description]) {
-    if (!text) continue;
-    const hit = KEYWORD_HOURS.find(([re]) => re.test(text));
-    if (hit) return hit[1];
-  }
-  return DEFAULT_HOURS[category] ?? DEFAULT_HOURS.Other;
+const STOPWORDS = new Set(('the and for with from this that was were are has have had into onto over under about after before then '
+  + 'than also just some more most very been being our your their his her its can will would should could may might not but all any '
+  + 'per via etc new old today work worked working task tasks done doing did make made got get').split(' '));
+
+// Light stemmer: "updated/updates/update" -> "updat", "timesheets" -> "timesheet".
+const stem = (w) => {
+  let s = w;
+  if (s.length > 5 && /ing$/.test(s)) s = s.slice(0, -3);
+  else if (s.length > 4 && /ed$/.test(s)) s = s.slice(0, -2);
+  else if (s.length > 4 && /es$/.test(s)) s = s.slice(0, -2);
+  else if (s.length > 3 && /s$/.test(s) && !/ss$/.test(s)) s = s.slice(0, -1);
+  if (s.length > 3 && s.endsWith('e')) s = s.slice(0, -1);
+  return s;
+};
+const tokenize = (text) => normalise(text).replace(/[^a-z0-9\s]/g, ' ').split(' ')
+  .filter((w) => w.length > 2 && !STOPWORDS.has(w)).map(stem);
+
+// Term-count vector; title words count double since they name the task.
+const vectorOf = (task, description) => {
+  const v = new Map();
+  for (const t of tokenize(task)) v.set(t, (v.get(t) || 0) + 2);
+  for (const t of tokenize(description)) v.set(t, (v.get(t) || 0) + 1);
+  return v;
 };
 
-// System-decided estimate, most specific history first: the same task title
-// (company-wide), then this employee's own work in the category, then everyone's
-// work in the category, and only then a wording-based default. Median of completed
-// entries, so one outlier day doesn't skew it. `excludeEntryId` keeps an entry
-// from being benchmarked against itself when it is edited.
-const estimateHours = async ({ task, description, workCategory, employeeId, excludeEntryId }) => {
+const cosine = (a, b, idf) => {
+  let dot = 0, na = 0, nb = 0;
+  for (const [t, c] of a) { const w = c * (idf.get(t) || 1); na += w * w; if (b.has(t)) dot += w * b.get(t) * (idf.get(t) || 1); }
+  for (const [t, c] of b) { const w = c * (idf.get(t) || 1); nb += w * w; }
+  return na && nb ? dot / Math.sqrt(na * nb) : 0;
+};
+
+const weightedMedian = (pairs) => { // [{ value, weight }]
+  const s = [...pairs].sort((x, y) => x.value - y.value);
+  const total = s.reduce((n, p) => n + p.weight, 0);
+  let run = 0;
+  for (const p of s) { run += p.weight; if (run >= total / 2) return p.value; }
+  return s[s.length - 1].value;
+};
+
+// Kind of work -> typical hours for one such task (first match wins; title is checked before description).
+const ACTIONS = [
+  [/\b(meeting|call|stand-?up|sync|demo|interview|discussion|discuss)\b/i, 'a meeting / discussion', 1],
+  [/\b(review|feedback|follow-?up|approval|approve)\b/i, 'a review', 1],
+  [/\b(bug|fix|issue|hot-?fix|debug|error|crash|resolve)\b/i, 'a bug fix', 2],
+  [/\b(test|testing|qa|regression|verify|validate|validation)\b/i, 'testing', 2],
+  [/\b(document|documentation|docs?|readme|report|write-?up)\b/i, 'documentation', 2],
+  [/\b(plan|planning|brainstorm|estimate|research|analy[sz]\w*|investigat\w*|poc|study|explore)\b/i, 'planning / research', 2.5],
+  [/\b(design|ui|ux|mock-?up|wireframe|prototype|layout|styling)\b/i, 'design work', 3],
+  [/\b(implement\w*|develop\w*|build|creat\w*|integrat\w*|api|module|feature|migrat\w*|set-?up|deploy\w*|configur\w*|refactor\w*)\b/i, 'development', 3.5],
+  [/\b(update|change|modify|improv\w*|enhanc\w*|add|adjust)\b/i, 'an update', 2],
+];
+const SMALL_RE = /\b(typo|minor|small|tiny|quick|tweak|simple|rename|spelling|text change)\b/i;
+const BIG_WORDS = /\b(complete|entire|whole|full|end-to-end|e2e|multiple|major|complex|large|migration|architecture|platform|system|module|dashboard|workflow|integration|all)\b/gi;
+
+const roundQuarter = (n) => Math.round(n * 4) / 4;
+
+// Estimate by reading the wording alone.
+const estimateFromWording = ({ task, description, category }) => {
+  const text = `${task || ''} ${description || ''}`;
+  let base = null, label = null;
+  for (const src of [task, description]) {
+    if (!src) continue;
+    const hit = ACTIONS.find(([re]) => re.test(src));
+    if (hit) { label = hit[1]; base = hit[2]; break; }
+  }
+  if (base == null) { label = `${String(category || 'Other').toLowerCase()} work`; base = DEFAULT_HOURS[category] ?? DEFAULT_HOURS.Other; }
+
+  let hours = base;
+  const notes = [`looks like ${label} (about ${base}h)`];
+  // Nothing in the wording said what kind of work this is — be upfront that it's a guess.
+  if (label.endsWith(' work') && !ACTIONS.some(([re]) => re.test(text))) notes.push('add a short description for a sharper estimate');
+
+  // How many separate things does the description cover?
+  const items = (description || '').split(/[,;\n•+]|\band\b|\bthen\b|\balso\b|\bwhen\b|\bif\b/i)
+    .map((s) => s.trim()).filter((s) => s.split(/\s+/).filter(Boolean).length >= 2).length;
+  if (items >= 2) {
+    const f = 1 + 0.2 * (Math.min(items, 6) - 1);
+    hours *= f; notes.push(`covers ${items} separate things (×${round1(f)})`);
+  }
+
+  const bigHits = new Set((text.match(BIG_WORDS) || []).map((w) => w.toLowerCase()));
+  if (bigHits.size) {
+    const f = bigHits.size >= 2 ? 1.6 : 1.3;
+    hours *= f; notes.push(`large scope: ${[...bigHits].slice(0, 3).join(', ')} (×${f})`);
+  }
+  if (SMALL_RE.test(text)) { hours *= 0.5; notes.push('sounds like a small change (×0.5)'); }
+
+  const words = (description || '').trim().split(/\s+/).filter(Boolean).length;
+  if (words > 60) { hours *= 1.25; notes.push('very detailed description (×1.25)'); }
+
+  hours = Math.min(8, Math.max(0.25, roundQuarter(hours)));
+  return { hours, notes };
+};
+
+const SIMILAR_MIN = 0.3;      // a past task must be at least this similar to count
+const SIMILAR_STRONG = 0.55;  // …one that similar is enough on its own
+
+// System-decided estimate from what was typed. `excludeEntryId` keeps an entry from
+// being compared with itself when it is edited.
+const estimateHours = async ({ task, description, workCategory, excludeEntryId }) => {
   const category = workCategory || 'Other';
   const rows = await Timesheet.aggregate([
     { $sort: { date: -1 } },
     { $unwind: '$entries' },
-    { $match: { 'entries.workCategory': category, 'entries.status': 'Completed', 'entries.hours': { $gt: 0 } } },
+    { $match: { 'entries.status': 'Completed', 'entries.hours': { $gt: 0 } } },
     { $limit: HISTORY_LIMIT },
-    { $project: { _id: 0, entryId: '$entries._id', employee: 1, task: '$entries.task', hours: '$entries.hours' } },
+    { $project: { _id: 0, entryId: '$entries._id', task: '$entries.task', description: '$entries.description', category: '$entries.workCategory', hours: '$entries.hours' } },
   ]);
   const pool = rows.filter((r) => !excludeEntryId || String(r.entryId) !== String(excludeEntryId));
 
+  // 1) The very same title, done several times.
   const key = normalise(task);
   const sameTask = key ? pool.filter((r) => normalise(r.task) === key).map((r) => r.hours) : [];
   if (sameTask.length >= MIN_TASK_SAMPLES) {
-    return { hours: round1(median(sameTask)), basis: 'task', sampleSize: sameTask.length };
+    return {
+      hours: roundQuarter(median(sameTask)), basis: 'task', sampleSize: sameTask.length, similar: [],
+      explanation: `"${task}" has been completed ${sameTask.length} times before; the typical time is ${round1(median(sameTask))}h.`,
+    };
   }
-  const mine = employeeId ? pool.filter((r) => String(r.employee) === String(employeeId)).map((r) => r.hours) : [];
-  if (mine.length >= MIN_OWN_SAMPLES) {
-    return { hours: round1(median(mine)), basis: 'own', sampleSize: mine.length };
+
+  // 2) Completed tasks whose wording is similar.
+  const q = vectorOf(task, description);
+  if (q.size) {
+    const docs = pool.map((r) => ({ ...r, vec: vectorOf(r.task, r.description) }));
+    const df = new Map();
+    for (const d of [{ vec: q }, ...docs]) for (const t of d.vec.keys()) df.set(t, (df.get(t) || 0) + 1);
+    const idf = new Map([...df].map(([t, n]) => [t, Math.log(1 + (docs.length + 1) / (1 + n))]));
+    const near = docs
+      .map((d) => ({ task: d.task, hours: d.hours, sim: cosine(q, d.vec, idf) * (d.category === category ? 1 : 0.85) }))
+      .filter((d) => d.sim >= SIMILAR_MIN)
+      .sort((a, b) => b.sim - a.sim)
+      .slice(0, 5);
+    if (near.length && (near[0].sim >= SIMILAR_STRONG || near.length >= 2)) {
+      const hours = roundQuarter(weightedMedian(near.map((n) => ({ value: n.hours, weight: n.sim }))));
+      const shown = near.slice(0, 3).map((n) => `"${n.task}" (${round1(n.hours)}h)`).join(', ');
+      return {
+        hours, basis: 'similar', sampleSize: near.length, similar: near.slice(0, 3).map((n) => ({ task: n.task, hours: round1(n.hours) })),
+        explanation: `Based on ${near.length} similar completed task${near.length === 1 ? '' : 's'}: ${shown}.`,
+      };
+    }
   }
-  if (pool.length >= MIN_CATEGORY_SAMPLES) {
-    return { hours: round1(median(pool.map((r) => r.hours))), basis: 'category', sampleSize: pool.length };
-  }
-  return { hours: defaultHours({ task, description, category }), basis: 'default', sampleSize: 0 };
+
+  // 3) No similar history yet — read the wording itself.
+  const w = estimateFromWording({ task, description, category });
+  return { hours: w.hours, basis: 'text', sampleSize: 0, similar: [], explanation: `No similar past tasks yet — ${w.notes.join(', ')}.` };
 };
 
 // Compare actual vs estimated and word the feedback for the employee.
@@ -252,7 +348,7 @@ const analyseEntry = async (entry, { excludeEntryId, employeeId } = {}) => {
       ...entry,
       hours: t.hours,
       estimatedHours: est.hours,
-      insight: { ...insight, basis: est.basis, sampleSize: est.sampleSize },
+      insight: { ...insight, basis: est.basis, sampleSize: est.sampleSize, explanation: est.explanation },
     },
   };
 };

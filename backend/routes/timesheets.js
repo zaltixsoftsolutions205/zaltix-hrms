@@ -24,6 +24,7 @@ const {
   getOrgUpdates,
   getFocusCheck,
   saveFocusReason,
+  estimateTask,
   getApprovals,
   reviewTimesheet,
 } = require('../controllers/timesheetController');
@@ -46,6 +47,8 @@ router.get('/daily-history', moduleAccess('timesheets', 'view'), getHistory);
 // One-topic check ("why only one task for several days?") — own data only.
 router.get('/focus-check', moduleAccess('timesheets', 'view'), getFocusCheck);
 router.post('/focus-reason', moduleAccess('timesheets', 'edit'), saveFocusReason);
+// Live "estimated time" preview for the task form.
+router.post('/estimate', moduleAccess('timesheets', 'view'), estimateTask);
 
 // Self-service weekly report (own week only, with a plain-language intelligence summary)
 router.get('/weekly-summary', moduleAccess('timesheets', 'view'), getWeeklySummary);

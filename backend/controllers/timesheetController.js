@@ -8,7 +8,7 @@ const ProductivityScore = require('../models/ProductivityScore');
 const notificationService = require('../services/notificationService');
 const generateTimesheetReportPDF = require('../utils/generateTimesheetReportPDF');
 const {
-  analyseEntry, findOverlap, summariseEntries, verdictFor, singleTopicStreak, longestSingleTopicStreak, focusMessage, STREAK_TRIGGER,
+  analyseEntry, estimateHours, findOverlap, summariseEntries, verdictFor, singleTopicStreak, longestSingleTopicStreak, focusMessage, STREAK_TRIGGER,
 } = require('../services/taskIntelligence');
 const fs = require('fs');
 const moment = require('moment');
@@ -815,6 +815,25 @@ const topicsByDayOf = (timesheets) => {
     map.get(k).push(...(ts.entries || []).map(e => e.task));
   }
   return map;
+};
+
+// Live estimate for the task form: analyses the title/description as they are typed and
+// returns the system's estimated hours plus a plain-language reason. Uses exactly the same
+// function as saving, so the number shown here is the number that gets stored.
+exports.estimateTask = async (req, res) => {
+  try {
+    const { task = '', description = '', workCategory = 'Other', entryId } = req.body || {};
+    if (String(task).trim().length < 3 && String(description).trim().length < 12) {
+      return res.json({ hours: null });
+    }
+    const est = await estimateHours({
+      task: String(task).slice(0, 200), description: String(description).slice(0, 2000),
+      workCategory, excludeEntryId: entryId,
+    });
+    res.json(est);
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
 };
 
 // Self-service one-topic check for today: has the employee logged a single topic

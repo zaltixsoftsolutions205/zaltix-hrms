@@ -28,7 +28,9 @@ const entrySchema = new mongoose.Schema({
   insight: {
     verdict: { type: String, enum: ['on-target', 'over', 'under', 'in-progress', null], default: null },
     message: { type: String, default: '' },
-    basis: { type: String, enum: ['task', 'own', 'category', 'default', null], default: null },
+    basis: { type: String, enum: ['task', 'similar', 'text', 'own', 'category', 'default', null], default: null },
+    // Plain-language "how was this estimated" shown to the employee and admin.
+    explanation: { type: String, default: '' },
     sampleSize: { type: Number, default: 0 },
   },
   workCategory: {
