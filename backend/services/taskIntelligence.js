@@ -194,20 +194,39 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 const ymdDow = (ymd) => new Date(`${ymd}T00:00:00Z`).getUTCDay();
 const ymdPrev = (ymd) => new Date(new Date(`${ymd}T00:00:00Z`).getTime() - DAY_MS).toISOString().slice(0, 10);
 
+// Same-topic comparison key: case/spacing-insensitive, and "Timesheet" == "Timesheets".
+const topicKey = (s) => normalise(s).replace(/\b(\w{3,})s\b/g, '$1');
+
 // topicsByDay: Map<'YYYY-MM-DD', string[]> of task titles logged that day.
-// Counts consecutive working days (Sundays skipped) ending at endYmd on which exactly
-// one distinct topic was logged. A day with nothing logged, or 2+ topics, ends it.
+// Counts consecutive working days (Sundays skipped), ending at endYmd, on which the
+// employee worked on that SAME single topic and nothing else. A day with nothing logged,
+// a second topic, or a different topic ends the streak — one-task days on different
+// tasks are normal and never count.
 const singleTopicStreak = (topicsByDay, endYmd) => {
-  let cur = endYmd, streak = 0, topic = '';
+  const endTitles = topicsByDay.get(endYmd) || [];
+  const endKeys = new Set(endTitles.map(topicKey));
+  if (endKeys.size !== 1) return { streak: 0, topic: '' };
+  const [key] = endKeys;
+
+  let cur = endYmd, streak = 0;
   for (let i = 0; i < 14; i++) {
     if (ymdDow(cur) === 0 && cur !== endYmd) { cur = ymdPrev(cur); continue; }
-    const titles = topicsByDay.get(cur) || [];
-    if (new Set(titles.map(normalise)).size !== 1) break;
+    const keys = new Set((topicsByDay.get(cur) || []).map(topicKey));
+    if (keys.size !== 1 || !keys.has(key)) break;
     streak += 1;
-    if (!topic) topic = titles[0];
     cur = ymdPrev(cur);
   }
-  return { streak, topic };
+  return { streak, topic: endTitles[0] };
+};
+
+// Longest same-single-topic streak on any logged day (for the monthly admin insight).
+const longestSingleTopicStreak = (topicsByDay) => {
+  let best = { streak: 0, topic: '' };
+  for (const day of topicsByDay.keys()) {
+    const r = singleTopicStreak(topicsByDay, day);
+    if (r.streak > best.streak) best = r;
+  }
+  return best;
 };
 
 const focusMessage = (streak, topic) => {
@@ -240,5 +259,5 @@ const analyseEntry = async (entry, { excludeEntryId, employeeId } = {}) => {
 
 module.exports = {
   hoursFromTimes, estimateHours, buildInsight, analyseEntry, verdictFor, findOverlap, summariseEntries,
-  singleTopicStreak, focusMessage, STREAK_TRIGGER, STREAK_STRONG,
+  singleTopicStreak, longestSingleTopicStreak, focusMessage, STREAK_TRIGGER, STREAK_STRONG,
 };

@@ -8,7 +8,7 @@ const ProductivityScore = require('../models/ProductivityScore');
 const notificationService = require('../services/notificationService');
 const generateTimesheetReportPDF = require('../utils/generateTimesheetReportPDF');
 const {
-  analyseEntry, findOverlap, summariseEntries, verdictFor, singleTopicStreak, focusMessage, STREAK_TRIGGER,
+  analyseEntry, findOverlap, summariseEntries, verdictFor, singleTopicStreak, longestSingleTopicStreak, focusMessage, STREAK_TRIGGER,
 } = require('../services/taskIntelligence');
 const fs = require('fs');
 const moment = require('moment');
@@ -991,11 +991,12 @@ exports.getIntelligence = async (req, res) => {
 
     const employeeRows = employees.map(e => {
       const s = summariseEntries(entriesByEmp.get(String(e._id)) || []);
-      const days = [...(dayTopics.get(String(e._id))?.values() || [])];
-      const singleTopicDays = days.filter(titles => new Set(titles.map(t => String(t).trim().toLowerCase())).size === 1).length;
+      const topics = dayTopics.get(String(e._id)) || new Map();
+      const sameTopic = longestSingleTopicStreak(topics);
       return {
         employee: { _id: e._id, name: e.name, employeeId: e.employeeId, department: e.department?.name || '' },
-        ...s, status: statusOf(s), loggedDays: days.length, singleTopicDays,
+        ...s, status: statusOf(s), loggedDays: topics.size,
+        sameTopicStreak: sameTopic.streak, sameTopic: sameTopic.topic,
       };
     }).sort((a, b) => (b.ratioPct ?? -1) - (a.ratioPct ?? -1));
 
@@ -1020,12 +1021,12 @@ exports.getIntelligence = async (req, res) => {
       .sort((a, b) => Math.abs(a.ratioPct - 100) - Math.abs(b.ratioPct - 100))[0];
     if (accurate) highlights.push(`Most consistent with estimates: ${accurate.employee.name} (${accurate.ratioPct}%).`);
 
-    // Focus: working one topic on most logged days (≥3 such days, ≥60% of days).
+    // Focus: stuck on the same single task for 3+ working days in a row this month.
     const narrow = employeeRows
-      .filter(r => r.singleTopicDays >= 3 && r.singleTopicDays / r.loggedDays >= 0.6)
-      .sort((a, b) => b.singleTopicDays - a.singleTopicDays);
+      .filter(r => r.sameTopicStreak >= 3)
+      .sort((a, b) => b.sameTopicStreak - a.sameTopicStreak);
     if (narrow.length) {
-      highlights.push(`Working only one topic on most days: ${narrow.slice(0, 3).map(r => `${r.employee.name} (${r.singleTopicDays} of ${r.loggedDays} days)`).join(', ')}. Consider giving them more varied work.`);
+      highlights.push(`Staying on one task for several days in a row: ${narrow.slice(0, 3).map(r => `${r.employee.name} ("${r.sameTopic}", ${r.sameTopicStreak} days)`).join(', ')}. Consider giving them more varied work.`);
     }
 
     overruns.sort((a, b) => b.overBy - a.overBy);
