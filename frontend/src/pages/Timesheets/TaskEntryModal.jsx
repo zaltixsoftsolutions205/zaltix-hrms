@@ -23,6 +23,9 @@ const TaskEntryModal = ({ isOpen, onClose, date, editing, defaultStart = '', onS
   const [loading, setLoading] = useState(false);
   const [showNewProject, setShowNewProject] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
+  // Live estimate: the system reads the title/description as they're typed.
+  const [estimate, setEstimate] = useState(null);
+  const [estimating, setEstimating] = useState(false);
 
   const isDeptHead = user?.department?.headOf && String(user.department.headOf) === String(user?._id || user?.id);
   const canCreateProject = ['admin', 'hr'].includes(user?.role) || isDeptHead;
@@ -54,6 +57,30 @@ const TaskEntryModal = ({ isOpen, onClose, date, editing, defaultStart = '', onS
     setNewProjectName('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editing, isOpen]);
+
+  // Debounced: wait for a short pause in typing, ignore answers that arrive out of order.
+  useEffect(() => {
+    if (!isOpen) return undefined;
+    if (form.task.trim().length < 3 && form.description.trim().length < 12) {
+      setEstimate(null);
+      return undefined;
+    }
+    let cancelled = false;
+    setEstimating(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await api.post('/timesheets/estimate', {
+          task: form.task, description: form.description, workCategory: form.workCategory, entryId: editing?._id,
+        });
+        if (!cancelled) setEstimate(res.data?.hours != null ? res.data : null);
+      } catch {
+        if (!cancelled) setEstimate(null);
+      } finally {
+        if (!cancelled) setEstimating(false);
+      }
+    }, 600);
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [isOpen, form.task, form.description, form.workCategory, editing?._id]);
 
   const update = (field, value) => {
     if (field === 'project' && value === '__new__') {
@@ -169,6 +196,27 @@ const TaskEntryModal = ({ isOpen, onClose, date, editing, defaultStart = '', onS
           <label className="input-label">Description</label>
           <textarea className="input-field" rows={2} value={form.description} onChange={e => update('description', e.target.value)} />
         </div>
+
+        {(estimate || estimating) && (
+          <div className="rounded-xl border border-violet-200 bg-violet-50/60 px-3 py-2.5">
+            <div className="flex items-center gap-2">
+              <span className="text-base leading-none">⏱</span>
+              <p className="text-xs font-semibold text-violet-900">Estimated time</p>
+              {estimating && !estimate && <span className="text-xs text-violet-500">analysing…</span>}
+              {estimate && (
+                <span className={`ml-auto rounded-lg bg-white px-2 py-0.5 text-sm font-extrabold text-violet-700 ring-1 ring-violet-200 ${estimating ? 'opacity-50' : ''}`}>
+                  {estimate.hours}h
+                </span>
+              )}
+            </div>
+            {estimate?.explanation && (
+              <p className="mt-1 text-[11px] leading-snug text-violet-700">{estimate.explanation}</p>
+            )}
+            <p className="mt-1 text-[10px] text-violet-400">
+              The system decides this from what you write. Your actual time comes from your start and end time.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div>

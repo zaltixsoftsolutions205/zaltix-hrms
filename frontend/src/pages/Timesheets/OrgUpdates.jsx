@@ -126,17 +126,17 @@ const EmployeeCard = ({ row, view, defaultOpen }) => {
 
 // HR/Admin: day-wise and week-wise view of what each employee posted — Daily
 // Update, hours worked and time intelligence.
-const OrgUpdates = ({ departmentId, role }) => {
+const OrgUpdates = ({ departmentId, role, employeeId }) => {
   const [view, setView] = useState('day');
   const [date, setDate] = useState(localYmd(new Date()));
   const [data, setData] = useState(null);
 
   useEffect(() => {
     setData(null);
-    api.get('/timesheets/org-updates', { params: { view, date, departmentId: departmentId || undefined, role: role || undefined } })
+    api.get('/timesheets/org-updates', { params: { view, date, departmentId: departmentId || undefined, role: role || undefined, employeeId: employeeId || undefined } })
       .then(res => setData(res.data))
       .catch(() => setData({ error: true }));
-  }, [view, date, departmentId, role]);
+  }, [view, date, departmentId, role, employeeId]);
 
   const step = view === 'week' ? 7 : 1;
   const today = localYmd(new Date());
@@ -170,7 +170,7 @@ const OrgUpdates = ({ departmentId, role }) => {
         <>
           <p className="mb-3 text-xs text-violet-500">
             {view === 'week' ? `Week ${data.start} to ${data.end}` : fmtDayLabel(data.start)} ·{' '}
-            {data.totals.posted} of {data.totals.employees} posted a daily update · {data.totals.totalHours}h logged
+            {data.totals.employees - data.totals.noActivity} of {data.totals.employees} updated · {data.totals.posted} posted a daily update · {data.totals.totalHours}h logged
           </p>
           <div className="space-y-2">
             {data.employees.map(r => (
