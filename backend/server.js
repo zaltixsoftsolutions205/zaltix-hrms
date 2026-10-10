@@ -184,6 +184,10 @@ app.use('/api/payslips', require('./routes/payslips'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/timesheets', require('./routes/timesheets'));
 app.use('/api/timesheet-projects', require('./routes/timesheetProjects'));
+// Transition alias: the already-deployed frontend still calls /api/projects for the timesheet
+// project list. Remove once the new frontend (which uses /api/timesheet-projects) is live —
+// and before merging the workspace Project routes, which use /api/projects.
+app.use('/api/projects', require('./routes/timesheetProjects'));
 app.use('/api/leads', require('./routes/leads'));
 app.use('/api/queries', require('./routes/queries'));
 app.use('/api/admin', require('./routes/admin'));
