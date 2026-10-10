@@ -1,6 +1,6 @@
 const JobPosting = require('../models/JobPosting');
 const Applicant  = require('../models/Applicant');
-const Project    = require('../models/Project');
+const Project    = require('../models/RecruitProject');
 
 /* PROJECTS */
 
