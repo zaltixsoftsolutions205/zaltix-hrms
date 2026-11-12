@@ -5,7 +5,8 @@ const WIDTHS = { md: 'max-w-md', lg: 'max-w-xl', xl: 'max-w-2xl' };
 // New reusable primitive — the project only had a center-screen Modal
 // before this. Built to match Modal's visual language (rounded corners,
 // violet border/shadow tokens) so it doesn't look like a foreign import.
-const Drawer = ({ isOpen, onClose, title, subtitle, size = 'lg', children, footer }) => (
+// `actions`: optional buttons / links shown in the header, left of the close button.
+const Drawer = ({ isOpen, onClose, title, subtitle, size = 'lg', children, footer, actions }) => (
     <AnimatePresence>
         {isOpen && (
             <>
@@ -29,6 +30,7 @@ const Drawer = ({ isOpen, onClose, title, subtitle, size = 'lg', children, foote
                             <h3 className="font-bold text-violet-900 truncate">{title}</h3>
                             {subtitle && <p className="text-xs text-violet-400 mt-0.5 truncate">{subtitle}</p>}
                         </div>
+                        {actions && <div className="flex items-center gap-1.5 flex-shrink-0 ml-auto">{actions}</div>}
                         <button
                             onClick={onClose}
                             className="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-lg text-violet-400 hover:bg-violet-50 hover:text-violet-700 transition-colors"

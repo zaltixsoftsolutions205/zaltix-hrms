@@ -27,3 +27,7 @@ temp.bin
 
 # Stray nested copy of the frontend; the real one lives at repo root
 frontend/
+private-uploads/
+
+# Database backups written by scripts
+scripts/backups/

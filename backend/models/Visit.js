@@ -1,24 +1,28 @@
 const mongoose = require("mongoose");
 
+/**
+ * One visit to a Lead, with all of its fields. `customValues` holds the lead
+ * table's Visit form fields ({ <GlobalTableField id>: value },
+ * services/activityCustomFields.js).
+ * The allowed select values are defined in services/activityTypes.js
+ * (VISIT_DETAIL_FIELDS) and checked by the visits API.
+ */
 const visitSchema = new mongoose.Schema(
   {
-    /* =========================================================
-       LEAD
-    ========================================================= */
-
     lead: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Lead",
       required: true,
       index: true,
     },
-    /* =========================================================
-       VISIT DETAILS
-    ========================================================= */
+
+    // Calendar day of the visit (UTC midnight).
     visitDate: {
       type: Date,
       required: true,
     },
+
+    // The employee who made the visit: always the user who submitted it.
     visitedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
@@ -35,97 +39,26 @@ const visitSchema = new mongoose.Schema(
       default: null,
     },
 
-    // status: {
-    //   type: String,
-    //   enum: [
-    //     "scheduled",
-    //     "in-progress",
-    //     "completed",
-    //     "cancelled",
-    //     "rescheduled",
-    //   ],
-    //   default: "scheduled",
-    //   index: true,
-    // },
+    visitType: { type: String, trim: true, default: "" },
+    contactPerson: { type: String, trim: true, maxlength: 100, default: "" },
+    contactNumber: { type: String, trim: true, maxlength: 10, default: "" }, // 10 digits
+    location: { type: String, trim: true, maxlength: 200, default: "" },
+    purpose: { type: String, trim: true, default: "" },
+    // Shown as "Visit Outcome".
+    leadFeedback: { type: String, trim: true, default: "" },
+    leadFeedbackOther: { type: String, trim: true, maxlength: 5000, default: "" },
+    salesComment: { type: String, trim: true, default: "" },
+    salesCommentOther: { type: String, trim: true, maxlength: 5000, default: "" },
+    salesNotes: { type: String, trim: true, maxlength: 5000, default: "" },
+    customValues: { type: mongoose.Schema.Types.Mixed, default: {} },
 
-    visitType: {
-      type: String,
-      enum: [
-        "field-visit",
-        "office-visit",
-        "customer-location",
-        "other",
-      ],
-      default: "field-visit",
-    },
-
-    /* =========================================================
-       FEEDBACK FROM LEAD / CONTACTED PERSON
-    ========================================================= */
-
-    leadFeedback: {
-      type: String,
-      enum: [
-        "using-other-application",
-        "not-interested",
-        "not-now-but-interested",
-        "interested",
-        "not-affordable",
-        "others",
-        "",
-      ],
-      default: "",
-    },
-
-    leadFeedbackOther: {
-      type: String,
-      default: "",
-      trim: true,
-    },
-
-    /* =========================================================
-       SALES PERSON COMMENT
-    ========================================================= */
-
-    salesComment: {
-      type: String,
-      enum: [
-        "interested",
-        "needs-follow-up",
-        "needs-to-revisit",
-        "next-time",
-        "others",
-        "",
-      ],
-      default: "",
-    },
-
-    salesCommentOther: {
-      type: String,
-      default: "",
-      trim: true,
-    },
-
-    salesNotes: {
-      type: String,
-      default: "",
-      trim: true,
-    },
-
-    /* =========================================================
-       FOLLOW-UP
-    ========================================================= */
-
-    nextFollowUpDate: {
-      type: Date,
+    createdBy: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
       default: null,
     },
 
-    /* =========================================================
-       AUDIT
-    ========================================================= */
-
-    createdBy: {
+    updatedBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       default: null,
@@ -136,12 +69,12 @@ const visitSchema = new mongoose.Schema(
   }
 );
 
-/* =========================================================
-   INDEXES
-========================================================= */
-
 visitSchema.index({ lead: 1, visitDate: -1 });
 visitSchema.index({ visitedBy: 1, visitDate: -1 });
-visitSchema.index({ status: 1, visitDate: 1 });
 
-module.exports = mongoose.model("Visit", visitSchema);
+const Visit = mongoose.model("Visit", visitSchema);
+
+// The fields the API returns.
+Visit.SELECT_FIELDS = "lead visitDate visitedBy timeIn timeOut visitType contactPerson contactNumber location purpose leadFeedback leadFeedbackOther salesComment salesCommentOther salesNotes customValues createdBy updatedBy createdAt updatedAt";
+
+module.exports = Visit;

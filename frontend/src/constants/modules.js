@@ -17,7 +17,14 @@
 export const PERMISSIONS = { VIEW: 'view', EDIT: 'edit' };
 
 // icon strings are Heroicons-style single-path `d` values used by the Sidebar.
-const ICON = {
+export const ICON = {
+  // Sales pages (one icon each)
+  lead: "M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z",
+  visit: "M15 12a3 3 0 11-6 0 3 3 0 016 0zM2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z",
+  registration: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+  demo: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z",
+  dataUpdate: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15",
+  feedback: "M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
   dashboard: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6",
   profile: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z",
   calendar: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
@@ -55,24 +62,19 @@ export const MODULES = [
   { key: 'timesheets', label: 'Timesheets', path: '/timesheets', icon: ICON.clock, editable: true, group: 'Self-service' },
   { key: 'knowledge_center', label: 'Knowledge Center', path: '/knowledge-center', icon: ICON.book, editable: false, group: 'Self-service' },
   { key: 'team', label: 'My Team', path: '/team', icon: ICON.people, editable: false, group: 'Self-service' },
+  // view = see own claims; edit = submit / withdraw claims. HR & Admin review at /admin/expense-claims.
+  { key: 'expense_claims', label: 'Expense Claims', path: '/expense-claims', icon: ICON.finance, editable: true, group: 'Self-service' },
 
   // Sales / CRM
-<<<<<<< HEAD
   // Sales
   { key: 'crm', label: 'CRM', path: '/crm', icon: ICON.crm, editable: true, group: 'Sales' },
-  // { key: 'field_sales', label: 'Field Sales', path: '/field-sales/leads', icon: ICON.field, editable: true, group: 'Sales' },
-
-  { key: 'lead', label: 'Leads', path: '/sale/lead', icon: ICON.field, editable: true, group: 'Sales' },
-  { key: 'visits', label: 'Visits', path: '/sale/visit', icon: ICON.field, editable: true, group: 'Sales' },
-  { key: 'registration', label: 'Registration', path: '/sale/registration', icon: ICON.book, editable: true, group: 'Sales' },
-  { key: 'demos', label: 'Demos', path: '/sale/demos', icon: ICON.book, editable: true, group: 'Sales' },
-  { key: 'data_updation', label: 'Data Updation', path: '/sale/dataupdation', icon: ICON.book, editable: true, group: 'Sales' },
-  { key: 'feedback', label: 'Feedback', path: '/sale/feedback', icon: ICON.book, editable: true, group: 'Sales' },
-=======
-  { key: 'crm',              label: 'CRM',                path: '/crm',                  icon: ICON.crm,       editable: true,  group: 'Sales' },
-  { key: 'field_sales',      label: 'Field Sales',        path: '/field-sales/leads',    icon: ICON.field,     editable: true,  group: 'Sales' },
-  { key: 'query_management', label: 'Query Management',   path: '/queries',              icon: ICON.approvals, editable: true,  group: 'Sales' },
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
+  { key: 'query_management', label: 'Query Management', path: '/queries', icon: ICON.approvals, editable: true, group: 'Sales' },
+  { key: 'lead', label: 'Leads', path: '/sale/lead', icon: ICON.lead, editable: true, group: 'Sales' },
+  { key: 'visits', label: 'Visits', path: '/sale/visit', icon: ICON.visit, editable: true, group: 'Sales' },
+  { key: 'registration', label: 'Registration', path: '/sale/registration', icon: ICON.registration, editable: true, group: 'Sales' },
+  { key: 'demos', label: 'Demos', path: '/sale/demos', icon: ICON.demo, editable: true, group: 'Sales' },
+  { key: 'data_updation', label: 'Data Updation', path: '/sale/dataupdation', icon: ICON.dataUpdate, editable: true, group: 'Sales' },
+  { key: 'feedback', label: 'Feedback', path: '/sale/feedback', icon: ICON.feedback, editable: true, group: 'Sales' },
 
   // HR-management modules
   { key: 'hr_employees', label: 'Employees (HR)', path: '/hr/employees', icon: ICON.people, editable: true, group: 'HR Management' },
@@ -85,6 +87,8 @@ export const MODULES = [
   { key: 'recruitment', label: 'Recruitment', path: '/admin/recruitment', icon: ICON.recruit, editable: true, group: 'Admin' },
   { key: 'finance', label: 'Finance', path: '/admin/finance', icon: ICON.finance, editable: true, group: 'Admin' },
   { key: 'reports', label: 'Reports', path: '/admin/reports', icon: ICON.report, editable: false, group: 'Admin' },
+  // Global Analytics: a tab on the Admin / HR dashboard, never a sidebar link (nav: false).
+  { key: 'analytics', label: 'Analytics', path: '/dashboard?tab=analytics', icon: ICON.report, editable: false, group: 'Admin', nav: false },
   { key: 'announcements', label: 'Announcements', path: '/admin/announcements', icon: ICON.book, editable: true, group: 'Admin' },
   { key: 'holidays', label: 'Holidays', path: '/admin/holidays', icon: ICON.calendar, editable: true, group: 'Admin' },
 
@@ -103,11 +107,6 @@ export const MODULE_BY_KEY = MODULES.reduce((acc, m) => { acc[m.key] = m; return
 export const MODULE_KEY_BY_PATH = MODULES.reduce((acc, m) => { acc[m.path] = m.key; return acc; }, {});
 
 /**
- * Role defaults — used ONLY when an employee has no explicit moduleAccess,
- * so existing users keep exactly what they have today. Mirrors the current
- * ROLE_NAV in Sidebar.jsx.
- */
-/**
  * Self-service baseline every non-admin always keeps, regardless of explicit
  * grants — so granting a management module never cuts someone off from their
  * own attendance/leaves/payslips/etc. The picker shows these as always-on.
@@ -115,33 +114,23 @@ export const MODULE_KEY_BY_PATH = MODULES.reduce((acc, m) => { acc[m.path] = m.k
 export const BASELINE_MODULES = ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center'];
 export const BASELINE_EDITABLE = ['profile', 'attendance', 'leaves', 'tasks', 'timesheets'];
 
+/*
+ * Role defaults — used ONLY when an employee has no explicit moduleAccess.
+ * Must match backend/constants/modules.js exactly (the server enforces those).
+ *
+ * Sales pages (Leads, Visits, Demos, Data Updation, Registration, Feedback):
+ * view = open the page; edit = add / change / delete its entries.
+ */
+export const SALES_PAGE_MODULES = ['lead', 'visits', 'demos', 'data_updation', 'registration', 'feedback'];
+
 export const ROLE_DEFAULT_MODULES = {
-<<<<<<< HEAD
   employee: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
-  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback',],
+  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'crm', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback', 'analytics'],
   'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task'],
-  sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'visits', 'lead', 'registration'],
-  field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
-  hr: ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets'],
-  'inside-sales': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',
-    // Inside Sales
-    'lead',
-    'visits',
-    'feedback',
-  ],
-  'product-executive': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',
-    // Product Executive
-    'demos',
-    'data_updation',
-    'feedback',
-    'registration',
-  ],
-=======
-  employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
-  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
-  field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
-  hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm'],
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
+  sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management', 'visits', 'lead', 'registration'],
+  hr: ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm', 'visits', 'demos', 'data_updation', 'feedback', 'registration', 'analytics'],
+  'inside-sales': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'lead', 'visits', 'feedback'],
+  'product-executive': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'demos', 'data_updation', 'feedback', 'registration'],
 };
 
 export const ROLE_DEFAULT_ACCESS = {
@@ -151,30 +140,52 @@ export const ROLE_DEFAULT_ACCESS = {
     { module: 'department', permission: 'edit' },
     { module: 'project', permission: 'edit' },
     { module: 'task', permission: 'edit' },
+    { module: 'crm', permission: 'edit' },
+    { module: 'lead', permission: 'edit' },
+    { module: 'visits', permission: 'edit' },
+    { module: 'demos', permission: 'edit' },
+    { module: 'data_updation', permission: 'edit' },
+    { module: 'registration', permission: 'edit' },
+    { module: 'feedback', permission: 'edit' },
   ],
-
   'team-lead': [
     { module: 'overview', permission: 'view' },
     { module: 'department', permission: 'view' },
     { module: 'project', permission: 'view' },
     { module: 'task', permission: 'edit' },
   ],
-
   sales: [
     { module: 'crm', permission: 'edit' },
+    { module: 'query_management', permission: 'edit' },
+    { module: 'lead', permission: 'edit' },
+    { module: 'visits', permission: 'edit' },
+    { module: 'registration', permission: 'edit' },
   ],
-
-  field_sales: [
+  'inside-sales': [
     { module: 'crm', permission: 'edit' },
-    { module: 'field_sales', permission: 'edit' },
+    { module: 'lead', permission: 'edit' },
+    { module: 'visits', permission: 'edit' },
+    { module: 'feedback', permission: 'edit' },
   ],
-
+  'product-executive': [
+    { module: 'crm', permission: 'edit' },
+    { module: 'demos', permission: 'edit' },
+    { module: 'data_updation', permission: 'edit' },
+    { module: 'feedback', permission: 'edit' },
+    { module: 'registration', permission: 'edit' },
+  ],
   hr: [
     { module: 'hr_employees', permission: 'edit' },
     { module: 'hr_attendance', permission: 'edit' },
     { module: 'hr_leaves', permission: 'edit' },
     { module: 'hr_tasks', permission: 'edit' },
     { module: 'hr_payslips', permission: 'edit' },
+    { module: 'crm', permission: 'edit' },
+    { module: 'visits', permission: 'edit' },
+    { module: 'demos', permission: 'edit' },
+    { module: 'data_updation', permission: 'edit' },
+    { module: 'feedback', permission: 'edit' },
+    { module: 'registration', permission: 'edit' },
   ],
 };
 
@@ -301,3 +312,8 @@ export function canAccessEdit(user, moduleKey) {
 
   return entry?.permission === PERMISSIONS.EDIT;
 }
+
+export const canEditModule = canAccessEdit;
+
+/** Edit permission on any of these modules (e.g. leads: 'crm' or 'lead'). */
+export const canAccessEditAny = (user, keys) => keys.some((key) => canAccessEdit(user, key));

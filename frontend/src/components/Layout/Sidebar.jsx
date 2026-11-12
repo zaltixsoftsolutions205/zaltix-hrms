@@ -3,7 +3,7 @@ import { NavLink, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../../contexts/AuthContext';
 import { getInitials } from '../../utils/helpers';
-import { MODULES, resolveModuleKeys, canEditModule } from '../../constants/modules';
+import { MODULES, ICON, resolveModuleKeys, canAccessView } from '../../constants/modules';
 
 /* ── SVG icon helper ── */
 const Svg = ({ d, size = 15, className = '' }) => (
@@ -26,11 +26,6 @@ const ADMIN_NAV = [
     path: '/admin/crm',
     label: 'CRM',
     icon: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7",
-  },
-  {
-    path: '/admin/field-sales',
-    label: 'Field Sales',
-    icon: "M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0zM15 11a3 3 0 11-6 0 3 3 0 016 0z",
   },
   {
     path: '/queries',
@@ -68,34 +63,29 @@ const ADMIN_NAV = [
     icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253",
   },
   {
-    path: '/sale/lead',
-    label: 'Leads',
-    icon: '...'
-  },
-  {
     path: '/sale/visit',
     label: 'Visits',
-    icon: '...'
+    icon: ICON.visit
   },
   {
     path: '/sale/registration',
     label: 'Registration',
-    icon: '...'
+    icon: ICON.registration
   },
   {
     path: '/sale/demos',
     label: 'Demos',
-    icon: '...'
+    icon: ICON.demo
   },
   {
     path: '/sale/dataupdation',
     label: 'Data Updation',
-    icon: '...'
+    icon: ICON.dataUpdate
   },
   {
     path: '/sale/feedback',
     label: 'Feedback',
-    icon: '...'
+    icon: ICON.feedback
   },
 
   {
@@ -143,14 +133,13 @@ const ROLE_NAV = {
     { path: '/payslips', label: 'Payslips', icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
     { path: '/admin/employee-management/workspace', label: 'tasks', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
     { path: '/knowledge-center', label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
-<<<<<<< HEAD
     { path: '/team', label: 'My Team', icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
     { path: '/crm', label: 'CRM — Leads', icon: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" },
-    { path: '/sale/lead', label: 'Leads', icon: '...' },
-    { path: '/sale/visit', label: 'Visits', icon: '...' },
-    { path: '/sale/registration', label: 'Registration', icon: '...' },
+    { path: '/sale/lead', label: 'Leads', icon: ICON.lead },
+    { path: '/sale/visit', label: 'Visits', icon: ICON.visit },
+    { path: '/sale/registration', label: 'Registration', icon: ICON.registration },
   ],
-  hr: [
+  hrBase: [
     { path: '/dashboard', label: 'Dashboard', icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
     { path: '/hr/employees', label: 'Employees', icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
     { path: '/hr/attendance', label: 'Attendance', icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
@@ -173,9 +162,9 @@ const ROLE_NAV = {
     { path: '/payslips', label: 'Payslips', icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
     { path: '/admin/employee-management/workspace', label: 'tasks', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
     // { path: '/team', label: 'My Team', icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
-    { path: '/sale/lead', label: 'Leads', icon: '...' },
-    { path: '/sale/visit', label: 'Visits', icon: '...' },
-    { path: '/sale/feedback', label: 'Feedback', icon: '...' },
+    { path: '/sale/lead', label: 'Leads', icon: ICON.lead },
+    { path: '/sale/visit', label: 'Visits', icon: ICON.visit },
+    { path: '/sale/feedback', label: 'Feedback', icon: ICON.feedback },
     { path: '/knowledge-center', label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
   ],
   'product-executive': [
@@ -185,10 +174,10 @@ const ROLE_NAV = {
     { path: '/leaves', label: 'Leave Requests', icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
     { path: '/payslips', label: 'Payslips', icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
     { path: '/admin/employee-management/workspace', label: 'tasks', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
-    { path: '/sale/demos', label: 'Demos', icon: '...' },
-    { path: '/sale/dataupdation', label: 'Data Updation', icon: '...' },
-    { path: '/sale/feedback', label: 'Feedback', icon: '...' },
-    { path: '/sale/registration', label: 'Registration', icon: '...' },
+    { path: '/sale/demos', label: 'Demos', icon: ICON.demo },
+    { path: '/sale/dataupdation', label: 'Data Updation', icon: ICON.dataUpdate },
+    { path: '/sale/feedback', label: 'Feedback', icon: ICON.feedback },
+    { path: '/sale/registration', label: 'Registration', icon: ICON.registration },
     { path: '/knowledge-center', label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
     { path: '/team', label: 'My Team', icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },],
 
@@ -200,28 +189,16 @@ const ROLE_NAV = {
     { path: '/payslips', label: 'Payslips', icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
     { path: '/admin/employee-management/workspace', label: 'tasks', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
     // Manager CRM
-    { path: '/sale/leads', label: 'Leads', icon: '...' },
-    { path: '/sale/visits', label: 'Visits', icon: '...' },
-    { path: '/sale/registration', label: 'Registration', icon: '...' },
-    { path: '/sale/demos', label: 'Demos', icon: '...' },
-    { path: '/sale/data-updation', label: 'Data Updation', icon: '...' },
-    { path: '/sale/feedback', label: 'Feedback', icon: '...' },
-    { path: '/knowledge-center', label: 'Knowledge Center', icon: '...' }
-=======
+    { path: '/sale/leads', label: 'Leads', icon: ICON.lead },
+    { path: '/sale/visits', label: 'Visits', icon: ICON.visit },
+    { path: '/sale/registration', label: 'Registration', icon: ICON.registration },
+    { path: '/sale/demos', label: 'Demos', icon: ICON.demo },
+    { path: '/sale/data-updation', label: 'Data Updation', icon: ICON.dataUpdate },
+    { path: '/sale/feedback', label: 'Feedback', icon: ICON.feedback },
+    { path: '/knowledge-center', label: 'Knowledge Center', icon: ICON.book },
     { path: '/team',       label: 'My Team',        icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
     { path: '/crm',        label: 'CRM — Leads',    icon: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" },
     { path: '/queries',    label: 'Query Management', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4" },
-  ],
-  field_sales: [
-    { path: '/dashboard',         label: 'Dashboard',      icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
-    { path: '/field-sales/leads',  label: 'My Pipeline',    icon: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" },
-    { path: '/crm?tab=products',   label: 'Products',       icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" },
-    { path: '/attendance',        label: 'Attendance',     icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
-    { path: '/leaves',            label: 'Leave Requests', icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
-    { path: '/payslips',          label: 'Payslips',       icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
-    { path: '/tasks',             label: 'My Tasks',       icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
-    { path: '/knowledge-center',  label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
-    { path: '/profile',           label: 'My Profile',     icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
   ],
   hr: [
     { path: '/dashboard',          label: 'Dashboard',       icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
@@ -238,9 +215,11 @@ const ROLE_NAV = {
     { path: '/profile',            label: 'My Profile',      icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
     { path: '/leaves',             label: 'My Leave',        icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
     { path: '/attendance',         label: 'My Attendance',   icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
   ],
 };
+
+ROLE_NAV.hr = [...new Map([...ROLE_NAV.hrBase, ...ROLE_NAV.hr].map(item => [item.path, item])).values()];
+delete ROLE_NAV.hrBase;
 
 /* ──────────────────────────────────────────────────
    NavItem component
@@ -291,7 +270,7 @@ const Sidebar = ({ isOpen, onClose }) => {
           ? 'inside-sales'
           : user?.role === 'product-executive'
             ? 'product-executive'
-            : isSalesDept
+            : user?.role === 'sales' || isSalesDept
               ? 'sales'
               : 'employee';
   let navItems = navKey === 'admin' ? ADMIN_NAV : (ROLE_NAV[navKey] || []);
@@ -317,7 +296,7 @@ const Sidebar = ({ isOpen, onClose }) => {
   const hasExplicitAccess = !isAdmin && Array.isArray(user?.moduleAccess) && user.moduleAccess.length > 0;
   if (hasExplicitAccess) {
     const granted = resolveModuleKeys(user); // baseline + grants
-    finalItems = MODULES.filter(m => !WORKSPACE_MODULE_KEYS.has(m.key)).filter(m => granted.has(m.key))
+    finalItems = MODULES.filter(m => !WORKSPACE_MODULE_KEYS.has(m.key) && m.nav !== false).filter(m => granted.has(m.key))
       .map(m => ({ path: m.path, label: m.label, icon: m.icon, end: m.path === '/timesheets' || m.path === '/timesheets/approvals', }));
     // Keep the user's own timesheet entry (and approvals if they lead a team).
     const isTechLead = user?.department?.headOf && String(user.department.headOf) === String(user?._id || user?.id);
@@ -326,20 +305,15 @@ const Sidebar = ({ isOpen, onClose }) => {
     }
   }
 
-  /* Expense Claims is available to anyone who can EDIT field sales — it rides
-     on that permission rather than being its own module. Insert it right after
-     the Field Sales / My Pipeline link if it isn't already present. */
-  if (!isAdmin && canEditModule(user, 'field_sales')) {
+  /* Expense Claims has its own 'expense_claims' module. Users with explicit
+     grants already get it from MODULES above; this also covers role defaults. */
+  if (!isAdmin && canAccessView(user, 'expense_claims')) {
     const claimsItem = {
-      path: '/field-sales/expense-claims',
+      path: '/expense-claims',
       label: 'Expense Claims',
       icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m-3-4a2 2 0 100 4h5V9h-5zm.5 2h.01",
     };
-    if (!finalItems.some(i => i.path === claimsItem.path)) {
-      const anchor = finalItems.findIndex(i => i.path === '/field-sales/leads');
-      if (anchor >= 0) finalItems = [...finalItems.slice(0, anchor + 1), claimsItem, ...finalItems.slice(anchor + 1)];
-      else finalItems = [...finalItems, claimsItem];
-    }
+    if (!finalItems.some(i => i.path === claimsItem.path)) finalItems = [...finalItems, claimsItem];
   }
 
   const handleLogout = () => { logout(); navigate('/login'); };
@@ -350,18 +324,19 @@ const Sidebar = ({ isOpen, onClose }) => {
       <AnimatePresence>
         {isOpen && (
           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/40 z-30 lg:hidden" onClick={onClose} />
+            className="fixed inset-0 bg-black/40 z-[60] lg:hidden" onClick={onClose} />
         )}
       </AnimatePresence>
 
-      <aside className={`fixed top-0 left-0 h-full w-[220px] bg-white border-r border-gray-100 z-40 flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:z-auto ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      {/* Mobile drawer above all page content (sticky table headers z-40, dropdown bars z-50). Desktop: static, no z-index. */}
+      <aside className={`fixed top-0 left-0 h-full w-[220px] bg-white border-r border-gray-100 z-[70] flex flex-col transition-transform duration-300 ease-in-out lg:translate-x-0 lg:static lg:z-auto ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}>
 
         {/* ── Logo / Brand ── */}
         <div className="h-[60px] px-4 flex items-center gap-3 border-b border-gray-100 flex-shrink-0">
           <img src="/logo.png" alt="Zaltix" className="h-8 w-auto object-contain" />
           <div className="min-w-0">
             <p className="text-[13px] font-bold text-gray-900 truncate leading-none">
-              {navKey === 'admin' ? 'CEO Portal' : navKey === 'hr' ? 'HR Manager' : navKey === 'sales' ? 'Sales CRM' : navKey === 'field_sales' ? 'Field Sales' : 'Employee Portal'}
+              {navKey === 'admin' ? 'CEO Portal' : navKey === 'hr' ? 'HR Manager' : navKey === 'sales' ? 'Sales CRM' : 'Employee Portal'}
             </p>
             <p className="text-[10px] text-gray-400 mt-0.5 font-medium truncate">{user?.department?.name || user?.role}</p>
           </div>

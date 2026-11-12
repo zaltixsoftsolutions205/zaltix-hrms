@@ -12,11 +12,115 @@ router.use(moduleAccess('crm', 'view'));
 const crmEdit = moduleAccess('crm', 'edit');
 
 // Static routes before :id
+/**
+ * @swagger
+ * /api/clients/stats:
+ *   get:
+ *     summary: Get client stats
+ *     tags:
+ *       - Clients
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ *       401:
+ *         description: Not authorized
+ */
 router.get('/stats', getClientStats);
 
+/**
+ * @swagger
+ * /api/clients:
+ *   get:
+ *     summary: Get clients
+ *     tags:
+ *       - Clients
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ *       401:
+ *         description: Not authorized
+ */
 router.get('/', getClients);
+/**
+ * @swagger
+ * /api/clients/{id}:
+ *   get:
+ *     summary: Get client
+ *     tags:
+ *       - Clients
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       401:
+ *         description: Not authorized
+ *       404:
+ *         description: Not found
+ */
 router.get('/:id', getClient);
+/**
+ * @swagger
+ * /api/clients/{id}:
+ *   put:
+ *     summary: Update client
+ *     tags:
+ *       - Clients
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Success
+ *       401:
+ *         description: Not authorized
+ *       404:
+ *         description: Not found
+ */
 router.put('/:id', crmEdit, updateClient);
+/**
+ * @swagger
+ * /api/clients/{id}:
+ *   delete:
+ *     summary: Delete client
+ *     tags:
+ *       - Clients
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       401:
+ *         description: Not authorized
+ *       404:
+ *         description: Not found
+ */
 router.delete('/:id', crmEdit, deleteClient);
 
 module.exports = router;

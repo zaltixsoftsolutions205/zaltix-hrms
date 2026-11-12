@@ -15,6 +15,7 @@ const productLocationSchema = new mongoose.Schema({
   name:    { type: String, required: true, trim: true },
   kind:    { type: String, enum: ['location', 'category'], default: 'location' },
   fields:  { type: [String], default: [] }, // category-only: ordered column names
+  globalTableWriteVersion: { type: Number, default: 0, min: 0 },
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 

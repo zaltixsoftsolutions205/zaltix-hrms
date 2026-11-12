@@ -72,10 +72,8 @@ import RecruitmentProjectPage from './pages/Admin/RecruitmentProjectPage';
 import RecruitmentJobPage from './pages/Admin/RecruitmentJobPage';
 import AutomationPage from './pages/Admin/AutomationPage';
 import AdminEmployeeHub from './pages/Admin/AdminEmployeeHub';
-import FieldLeadsPage from './pages/FieldSales/FieldLeadsPage';
-import ExpenseClaimsPage from './pages/FieldSales/ExpenseClaimsPage';
+import ExpenseClaimsPage from './pages/ExpenseClaims/ExpenseClaimsPage';
 import ExpenseClaimsReview from './pages/Admin/ExpenseClaimsReview';
-import AdminFieldSales from './pages/Admin/AdminFieldSales';
 import AdminKnowledgeCenter from './pages/Admin/KnowledgeCenter';
 import HRKnowledgeCenter from './pages/HR/HRKnowledgeCenter';
 import KnowledgeCenter from './pages/KnowledgeCenter/KnowledgeCenter';
@@ -87,6 +85,7 @@ import DepartmentDetails from "./pages/Department/DepartmentDetails";
 // sale and crm pages 
 import Lead from './pages/CRM/lead';
 import Visits from './pages/CRM/visits';
+import LeadDetailPage from './pages/CRM/LeadDetailPage';
 import Feedback from './pages/CRM/feedback';
 import Registration from './pages/CRM/Registration';
 import DataUpdation from './pages/CRM/DataUpdation';
@@ -140,16 +139,14 @@ const AppRoutes = () => {
         <Route path="/team" element={<TeamPage />} />
         <Route path="/knowledge-center" element={<KnowledgeCenter />} />
         <Route path="/crm" element={<ProtectedRoute module="crm"><CRMPage/></ProtectedRoute>} />
-        <Route path="/field-sales/leads" element={<ProtectedRoute module="field_sales"><FieldLeadsPage /></ProtectedRoute>} />
-        {/* Expense claims: only field-sales editors may submit. */}
-        <Route path="/field-sales/expense-claims" element={<ProtectedRoute module="field_sales" requireEdit><ExpenseClaimsPage /></ProtectedRoute>} />
-        <Route path="/expense-claims" element={<ProtectedRoute module="field_sales" requireEdit><ExpenseClaimsPage /></ProtectedRoute>} />
-        <Route path="/crm/products/:productId" element={<ProtectedRoute module="crm"><ProductDetailPage /></ProtectedRoute>} />
-<<<<<<< HEAD
+        {/* Expense claims: view = see own claims, edit = submit / withdraw. */}
+        <Route path="/expense-claims" element={<ProtectedRoute module="expense_claims"><ExpenseClaimsPage /></ProtectedRoute>} />
+        {/* Old link kept so existing notifications still open the page. */}
+        <Route path="/field-sales/expense-claims" element={<Navigate to="/expense-claims" replace />} />
+        <Route path="/crm/leads/:leadId" element={<ProtectedRoute module="crm"><LeadDetailPage /></ProtectedRoute>} />
+        <Route path="/crm/products/:productId" element={<ProtectedRoute module="crm"><ProtectedRoute roles={['admin', 'hr', 'manager']}><ProductDetailPage /></ProtectedRoute></ProtectedRoute>} />
         <Route path="/projects/:id" element={<ProtectedRoute roles={['admin', 'manager', 'team-lead', 'hr']}><ProjectDetails /></ProtectedRoute>} />
-=======
         <Route path="/queries" element={<ProtectedRoute module="query_management"><QueryManagement /></ProtectedRoute>} />
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
         {/* HR Routes */}
         <Route path="/hr/employees" element={<ProtectedRoute module="hr_employees"><HREmployees /></ProtectedRoute>} />
@@ -183,7 +180,6 @@ const AppRoutes = () => {
         <Route path="/admin/employee-management/leave-policies" element={<ProtectedRoute roles={['admin']}><AdminPolicies /></ProtectedRoute>} />
         <Route path="/admin/reports" element={<ProtectedRoute module="reports"><AdminReports /></ProtectedRoute>} />
         <Route path="/admin/crm" element={<ProtectedRoute roles={['admin']}><AdminCRM /></ProtectedRoute>} />
-        <Route path="/admin/field-sales" element={<ProtectedRoute roles={['admin']}><AdminFieldSales /></ProtectedRoute>} />
         <Route path="/admin/expense-claims" element={<ProtectedRoute roles={['admin', 'hr']}><ExpenseClaimsReview /></ProtectedRoute>} />
         <Route path="/admin/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />
         <Route path="/finance" element={<ProtectedRoute module="finance"><FinancePage /></ProtectedRoute>} />

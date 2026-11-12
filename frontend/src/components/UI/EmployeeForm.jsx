@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import api from "../../utils/api";
 import ModuleAccessPicker from "./ModuleAccessPicker";
 import { DepartmentSelect, ProjectSelect, } from "./Assignmentselects";
+import ProductMandalAssignment from "./ProductMandalAssignment";
 
 const PRESET_ROLES = [
     "employee",
@@ -15,6 +16,12 @@ const PRESET_ROLES = [
     "technical_associate",
     "bda",
 ];
+
+/*
+ * Roles whose CRM data is scoped by product → Mandal assignments.
+ * Mirrors ASSIGNABLE_ROLES in backend/services/employeeAssignmentService.js.
+ */
+const ASSIGNMENT_ROLES = ["sales", "inside-sales", "product-executive"];
 
 const INITIAL_FORM = {
     employeeId: "",
@@ -30,6 +37,7 @@ const INITIAL_FORM = {
     basicSalary: "",
     employeeType: "experienced",
     moduleAccess: [],
+    productLocationAssignments: [],
 };
 
 function Field({
@@ -85,6 +93,8 @@ export default function EmployeeForm({
     const isEdit = mode === "edit";
 
     const [form, setForm] = useState(INITIAL_FORM);
+
+    const hasAssignmentSection = ASSIGNMENT_ROLES.includes(form.role);
 
     /*
      * =========================================================
@@ -164,6 +174,16 @@ export default function EmployeeForm({
             employeeType: employee.employeeType || "experienced",
 
             moduleAccess: Array.isArray(employee.moduleAccess) ? employee.moduleAccess.map((item) => ({ module: item.module, permission: item.permission, })) : [],
+
+            /*
+             * Support populated/unpopulated product + Mandal IDs.
+             */
+            productLocationAssignments: Array.isArray(employee.productLocationAssignments)
+                ? employee.productLocationAssignments.map((item) => ({
+                    product: String(item.product?._id || item.product),
+                    mandals: (item.mandals || []).map((m) => String(m?._id || m)),
+                }))
+                : [],
         });
     }, [employee]);
     /*
@@ -357,6 +377,11 @@ export default function EmployeeForm({
              */
             projectId: form.role === "team-lead" ? form.projectId || null : null,
             moduleAccess: form.moduleAccess,
+            /*
+             * Only sales / inside-sales / product-executive keep product
+             * scope; any other role clears it (the backend enforces this too).
+             */
+            productLocationAssignments: hasAssignmentSection ? form.productLocationAssignments : [],
         };
 
         /*
@@ -468,6 +493,24 @@ export default function EmployeeForm({
 
                     </div>
                 )}
+
+            {/* =====================================================
+          PRODUCT & MANDAL ASSIGNMENT
+          Selections are kept in state while the role is switched,
+          but only submitted for the assignment roles.
+      ===================================================== */}
+
+            {hasAssignmentSection && (
+                <ProductMandalAssignment
+                    value={form.productLocationAssignments}
+                    onChange={(assignments) =>
+                        updateField(
+                            "productLocationAssignments",
+                            assignments
+                        )
+                    }
+                />
+            )}
 
             {/* =====================================================
           JOINING DATE / SALARY

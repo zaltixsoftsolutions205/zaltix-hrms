@@ -53,6 +53,21 @@ const userSchema = new mongoose.Schema(
       ],
       default: [],
     },
+    // CRM data scope for sales / inside-sales / product-executive. Only leaf
+    // ProductLocation nodes ("Mandals") are stored, grouped under the product
+    // they belong to; ticking a parent in the UI resolves to its leaf IDs, so
+    // Mandals added later are NOT picked up automatically. Validated by
+    // services/employeeAssignmentService before every save.
+    productLocationAssignments: {
+      type: [
+        {
+          _id: false,
+          product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+          mandals: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ProductLocation' }],
+        },
+      ],
+      default: [],
+    },
   },
   { timestamps: true }
 );

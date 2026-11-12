@@ -80,18 +80,6 @@ export default function ModuleAccessPicker({ value = [], onChange }) {
 
                     {baseline ? (
                       <span className="text-[10px] text-violet-400 flex-shrink-0">Always on</span>
-<<<<<<< HEAD
-                    ) : granted && m.editable ? (
-                      <div className="flex rounded-lg overflow-hidden border border-violet-200 flex-shrink-0">
-                        {[PERMISSIONS.VIEW, PERMISSIONS.EDIT].map(p => (
-                          <button key={p} type="button"
-                            onClick={() => setGrant(m.key, true, p)}
-                            className={`text-[10px] px-2 py-0.5 font-semibold capitalize transition-colors ${permOf(m.key) === p ? 'bg-violet-600 text-white' : 'bg-white text-violet-500 hover:bg-violet-50'
-                              }`}>
-                            {p}
-                          </button>
-                        ))}
-=======
                     ) : m.editable ? (
                       <div className="flex items-center gap-3 flex-shrink-0">
                         <label className="flex items-center gap-1 cursor-pointer">
@@ -112,7 +100,6 @@ export default function ModuleAccessPicker({ value = [], onChange }) {
                           />
                           <span className="text-[10px] font-semibold text-violet-600">Edit</span>
                         </label>
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
                       </div>
                     ) : (
                       <label className="flex items-center gap-1 cursor-pointer flex-shrink-0">

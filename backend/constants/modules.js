@@ -1,7 +1,6 @@
 const PERMISSIONS = { VIEW: 'view', EDIT: 'edit' };
 
 const MODULE_KEYS = [
-<<<<<<< HEAD
   'dashboard',
   'profile',
   'attendance',
@@ -11,9 +10,12 @@ const MODULE_KEYS = [
   'timesheets',
   'knowledge_center',
   'team',
+  // view = see own claims; edit = submit / withdraw claims
+  'expense_claims',
 
   // Sales
   'crm',
+  'query_management',
   // Sales workflow modules
   'lead',
   'visits',
@@ -32,6 +34,8 @@ const MODULE_KEYS = [
   'recruitment',
   'finance',
   'reports',
+  // Global Analytics Dashboard (admin / hr / manager only, see services/analytics/scope.js)
+  'analytics',
   'announcements',
   'holidays',
 
@@ -40,12 +44,6 @@ const MODULE_KEYS = [
   'department',
   'project',
   'task',
-=======
-  'dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks',
-  'timesheets', 'knowledge_center', 'team', 'crm', 'field_sales', 'query_management',
-  'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips',
-  'recruitment', 'finance', 'reports', 'announcements', 'holidays',
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 ];
 
 const BASELINE_MODULES = [
@@ -68,15 +66,15 @@ const BASELINE_EDITABLE = [
 ];
 
 const ROLE_DEFAULT_MODULES = {
-<<<<<<< HEAD
   employee: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',],
-  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback',],
+  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'crm', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback', 'analytics',],
   'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task',],
-  sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'visits', 'lead', 'registration',],
-  hr: ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets',],
+  sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management', 'visits', 'lead', 'registration',],
+  hr: ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm', 'visits', 'demos', 'data_updation', 'feedback', 'registration', 'analytics'],
   'inside-sales': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center',
     'team',
-    // Inside Sales
+    // Inside Sales — 'crm' is what lead tables are guarded by
+    'crm',
     'lead',
     'visits',
     'feedback',
@@ -91,60 +89,66 @@ const ROLE_DEFAULT_MODULES = {
     'timesheets',
     'knowledge_center',
     'team',
-    // Product Executive
+    // Product Executive — 'crm' is what lead tables are guarded by
+    'crm',
     'demos',
     'data_updation',
     'feedback',
     'registration',
   ],
 };
-/**
- * Role-level default permissions.
- *
- * IMPORTANT:
- * These are used only when moduleAccess is empty.
+
+/*
+ * Sales pages (Leads, Visits, Demos, Data Updation, Registration, Feedback):
+ * view = open the page; edit = add / change / delete its entries.
  */
+const SALES_PAGE_MODULES = ['lead', 'visits', 'demos', 'data_updation', 'registration', 'feedback'];
+const editOf = (...keys) => keys.map((module) => ({ module, permission: 'edit' }));
+
+/** Role-level edit permissions used when moduleAccess is empty. */
 const ROLE_DEFAULT_ACCESS = {
   employee: [],
-
   manager: [
     { module: 'overview', permission: 'edit' },
     { module: 'department', permission: 'edit' },
     { module: 'project', permission: 'edit' },
     { module: 'task', permission: 'edit' },
+    // Managers see every lead and manage the product tree (crmScopeService)
+    { module: 'crm', permission: 'edit' },
+    ...editOf(...SALES_PAGE_MODULES),
   ],
-
   'team-lead': [
     { module: 'overview', permission: 'view' },
     { module: 'department', permission: 'view' },
     { module: 'project', permission: 'view' },
     { module: 'task', permission: 'edit' },
   ],
-
   sales: [
     { module: 'crm', permission: 'edit' },
+    { module: 'query_management', permission: 'edit' },
+    ...editOf('lead', 'visits', 'registration'),
   ],
-
-  field_sales: [
+  // Full create/edit/delete inside their own territory (crmScopeService
+  // limits which leads); product tree management stays admin/hr/manager.
+  'inside-sales': [
     { module: 'crm', permission: 'edit' },
-    { module: 'field_sales', permission: 'edit' },
+    ...editOf('lead', 'visits', 'feedback'),
   ],
-
+  'product-executive': [
+    { module: 'crm', permission: 'edit' },
+    ...editOf('demos', 'data_updation', 'feedback', 'registration'),
+  ],
   hr: [
     { module: 'hr_employees', permission: 'edit' },
     { module: 'hr_attendance', permission: 'edit' },
     { module: 'hr_leaves', permission: 'edit' },
     { module: 'hr_tasks', permission: 'edit' },
     { module: 'hr_payslips', permission: 'edit' },
+    // HR sees every lead and manages the product tree (crmScopeService)
+    { module: 'crm', permission: 'edit' },
+    ...editOf('visits', 'demos', 'data_updation', 'feedback', 'registration'),
   ],
-=======
-  employee:    ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
-  sales:       ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management'],
-  field_sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'crm', 'field_sales'],
-  hr:          ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm'],
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 };
-
 
 function resolveModuleKeys(user) {
   if (!user) return new Set();
@@ -221,6 +225,7 @@ module.exports = {
   MODULE_KEYS,
   ROLE_DEFAULT_MODULES,
   ROLE_DEFAULT_ACCESS,
+  SALES_PAGE_MODULES,
   resolveModuleKeys,
   canAccessModule,
   canEditModule,

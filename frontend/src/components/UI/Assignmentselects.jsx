@@ -347,7 +347,7 @@ function ProjectSelect({
 
 // Fixed role ordering for "department-head" mode. Unknown/custom roles sort
 // after every named role, per spec section 18.
-const HEAD_ROLE_ORDER = ["manager", "team-lead", "hr", "sales", "field_sales", "employee"];
+const HEAD_ROLE_ORDER = ["manager", "team-lead", "hr", "sales", "employee"];
 
 function headRoleRank(role) {
     const idx = HEAD_ROLE_ORDER.indexOf(roleOf(role));
@@ -744,4 +744,4 @@ function EmployeeMultiSelect({
     );
 }
 
-export { DepartmentSelect, ProjectSelect, EmployeeSelect, EmployeeMultiSelect };
+export { DepartmentSelect, ProjectSelect, EmployeeSelect, EmployeeMultiSelect, BaseSearchableSelect as SearchableSelect };

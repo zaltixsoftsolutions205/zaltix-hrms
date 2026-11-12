@@ -665,11 +665,22 @@ const AttendancePage = ({ employeeId = null }) => {
                             <td>{record.workHours ? `${record.workHours}h` : '—'}</td>
                             <td><Badge status={record.status} /></td>
                             <td>
-                              {(record.isLate || record.isEarlyLeave || (record.checkIn && !record.checkOut) || (record.checkOut && record.checkOut > '19:00') || record.regularizationStatus) ? (
-                                <RegularizeInline record={record} onDone={fetchAttendance} />
+                              {(
+                                record.isLate ||
+                                record.isEarlyLeave ||
+                                (record.checkIn && !record.checkOut) ||
+                                (!record.checkIn && !record.checkOut && record.status === 'absent') ||
+                                (record.checkOut && record.checkOut > '19:00') ||
+                                record.regularizationStatus
+                              ) ? (
+                                <RegularizeInline
+                                  record={record}
+                                  onDone={fetchAttendance}
+                                />
                               ) : (
                                 <span className="text-violet-300 text-xs">—</span>
                               )}
+
                             </td>
                           </tr>
                         ))}

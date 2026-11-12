@@ -1,12 +1,6 @@
-import React from 'react';
-import LeadsTab from '../../components/Crm/Leadstab';
+import ActivityPage from '../../components/Activities/ActivityPage';
 
-function DataUpdation() {
-  return (
-    <div>
-      <LeadsTab pipelineStage="data-update" />
-    </div>
-  );
+// CRM › Data Update: leads in the Data Update stage and their data update (see components/Activities).
+export default function DataUpdation() {
+  return <ActivityPage type="data-update" />;
 }
-
-export default DataUpdation;

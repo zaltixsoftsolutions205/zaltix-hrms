@@ -33,8 +33,8 @@ export default function EmployeeTable({
     DocumentReviewPanel,
     AttachDocsPanel,
 }) {
-    const ROLE_COLORS = { employee: 'bg-violet-100 text-violet-700', sales: 'bg-amber-100 text-amber-700', field_sales: 'bg-amber-100 text-amber-700', hr: 'bg-violet-100 text-violet-700', admin: 'bg-gray-100 text-gray-900', technical_associate: 'bg-blue-100 text-blue-700', bda: 'bg-green-100 text-green-700' };
-    const ROLE_LABELS = { employee: 'Employee', sales: 'Sales', field_sales: 'Field Sales', hr: 'HR', admin: 'Admin', technical_associate: 'Technical Associate', bda: 'BDA' };
+    const ROLE_COLORS = { employee: 'bg-violet-100 text-violet-700', sales: 'bg-amber-100 text-amber-700', hr: 'bg-violet-100 text-violet-700', admin: 'bg-gray-100 text-gray-900', technical_associate: 'bg-blue-100 text-blue-700', bda: 'bg-green-100 text-green-700' };
+    const ROLE_LABELS = { employee: 'Employee', sales: 'Sales', hr: 'HR', admin: 'Admin', technical_associate: 'Technical Associate', bda: 'BDA' };
     const TYPE_COLORS = { fresher: 'bg-violet-100 text-violet-700', experienced: 'bg-violet-100 text-violet-700' };
     const roleLabel = (role) => ROLE_LABELS[role] || role;
     const Chip = ({ label, colorCls }) => (

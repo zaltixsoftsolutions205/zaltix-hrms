@@ -117,7 +117,6 @@ const SORT_OPTIONS = [
 const ROLE_OPTIONS = [
   { value: 'employee', label: 'Employee' },
   { value: 'sales', label: 'Sales' },
-  { value: 'field_sales', label: 'Field Sales' },
   { value: 'hr', label: 'HR' },
   { value: 'technical_associate', label: 'Technical Associate' },
   { value: 'bda', label: 'BDA' },

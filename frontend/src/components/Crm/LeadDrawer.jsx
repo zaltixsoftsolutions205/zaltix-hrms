@@ -299,7 +299,7 @@ const LeadDrawer = ({ mode = 'edit', leadId, isOpen, onClose, customFields, onSa
                     <p className="text-xs text-violet-500 mt-0.5">
                       {v.visitDate ? formatDate(v.visitDate) : '—'}
                     </p>
-                    <p className="text-xs text-violet-500 mt-0.5">Assigned: {v.assignedTo?.name || '—'}</p>
+                    <p className="text-xs text-violet-500 mt-0.5">Visited by: {v.visitedBy?.name || '—'}</p>
                     <p className="text-xs text-violet-400 mt-0.5">Created by: {v.createdBy?.name || '—'}</p>
                   </div>
                 ))}

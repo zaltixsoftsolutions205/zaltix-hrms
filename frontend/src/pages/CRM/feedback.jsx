@@ -1,12 +1,6 @@
-import React from 'react';
-import LeadsTab from '../../components/Crm/Leadstab';
+import ActivityPage from '../../components/Activities/ActivityPage';
 
-function Feedback() {
-  return (
-    <div>
-      <LeadsTab pipelineStage="feedback" />
-    </div>
-  );
+// CRM › Feedback: leads in the Feedback stage and their feedback (see components/Activities).
+export default function Feedback() {
+  return <ActivityPage type="feedback" />;
 }
-
-export default Feedback;

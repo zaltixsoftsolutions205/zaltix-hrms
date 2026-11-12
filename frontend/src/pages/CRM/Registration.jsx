@@ -1,12 +1,6 @@
-import React from 'react';
-import LeadsTab from '../../components/Crm/Leadstab';
+import ActivityPage from '../../components/Activities/ActivityPage';
 
-function Registration() {
-  return (
-    <div>
-      <LeadsTab pipelineStage="registration" />
-    </div>
-  );
+// CRM › Registration: leads in the Registration stage and their registration (see components/Activities).
+export default function Registration() {
+  return <ActivityPage type="registration" />;
 }
-
-export default Registration;

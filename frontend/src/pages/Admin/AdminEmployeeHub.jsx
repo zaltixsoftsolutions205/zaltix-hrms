@@ -3,24 +3,10 @@
  * CEO Employee Management hub — embeds actual HR/Admin pages.
  * Hub grid → click card → full HR page rendered inline.
  */
-<<<<<<< HEAD
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
-=======
-import { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../utils/api';
-
-/* ── Real HR / Admin pages ── */
-import HREmployees     from '../HR/HREmployees';
-import AdminDepartments from './AdminDepartments';
-import HRAttendance    from '../HR/HRAttendance';
-import HRLeaves        from '../HR/HRLeaves';
-import AdminPolicies   from './AdminPolicies';
-import HolidaysPage    from './HolidaysPage';
-import AnnouncementsPage from './AnnouncementsPage';
-
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 /* ── tiny icon ── */
 const Icon = ({ d, size = 15, className = '', sw = 1.75 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -108,21 +94,12 @@ const SECTIONS = [
 
 /* ── accent color map ── */
 const ACCENT = {
-<<<<<<< HEAD
-  violet: { icon: 'bg-violet-50  text-violet-600  border-violet-100' },
-  blue: { icon: 'bg-blue-50    text-blue-600    border-blue-100' },
-  emerald: { icon: 'bg-emerald-50 text-emerald-600 border-emerald-100' },
-  amber: { icon: 'bg-amber-50   text-amber-600   border-amber-100' },
-  indigo: { icon: 'bg-indigo-50  text-indigo-600  border-indigo-100' },
-  rose: { icon: 'bg-rose-50    text-rose-600    border-rose-100' },
-=======
   violet:  { icon: 'bg-violet-100  text-violet-600',  cta: 'text-violet-600',  hover: 'hover:border-violet-300',  glow: 'group-hover:bg-violet-50/60'  },
   blue:    { icon: 'bg-blue-100    text-blue-600',    cta: 'text-blue-600',    hover: 'hover:border-blue-300',    glow: 'group-hover:bg-blue-50/60'    },
   emerald: { icon: 'bg-emerald-100 text-emerald-600', cta: 'text-emerald-600', hover: 'hover:border-emerald-300', glow: 'group-hover:bg-emerald-50/60' },
   amber:   { icon: 'bg-amber-100   text-amber-600',   cta: 'text-amber-600',   hover: 'hover:border-amber-300',   glow: 'group-hover:bg-amber-50/60'   },
   indigo:  { icon: 'bg-indigo-100  text-indigo-600',  cta: 'text-indigo-600',  hover: 'hover:border-indigo-300',  glow: 'group-hover:bg-indigo-50/60'  },
   rose:    { icon: 'bg-rose-100    text-rose-500',    cta: 'text-rose-500',    hover: 'hover:border-rose-300',    glow: 'group-hover:bg-rose-50/60'    },
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 };
 
 /* ── Hub card ── */
@@ -169,10 +146,7 @@ const SectionCard = ({ section, onClick, wide = false }) => {
    MAIN: AdminEmployeeHub
 ════════════════════════════════════════════════════════════════ */
 const AdminEmployeeHub = () => {
-<<<<<<< HEAD
   const navigate = useNavigate();
-=======
-  const [active, setActive] = useState(null); // null = hub grid
   const [stats, setStats] = useState(null);
   const [deptCount, setDeptCount] = useState(null);
 
@@ -185,7 +159,6 @@ const AdminEmployeeHub = () => {
   const attendanceRate = stats?.totalEmployees > 0
     ? Math.round((stats.presentToday / stats.totalEmployees) * 100)
     : null;
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
 
   const handleSectionClick = (key) => {
     switch (key) {
@@ -227,38 +200,6 @@ const AdminEmployeeHub = () => {
   };
 
   return (
-<<<<<<< HEAD
-    <div className="max-w-6xl mx-auto px-4 space-y-6">
-      {/* Page header */}
-      <div>
-        <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">
-          Employee Management
-        </h2>
-
-        <p className="text-sm text-gray-400 mt-0.5">
-          Select a section to manage
-        </p>
-      </div>
-
-      {/* Cards grid */}
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
-        {SECTIONS.map((sec, i) => (
-          <motion.div
-            key={sec.key}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{
-              delay: i * 0.04,
-              duration: 0.2
-            }}
-          >
-            <SectionCard
-              section={sec}
-              onClick={() => handleSectionClick(sec.key)}
-            />
-          </motion.div>
-        ))}
-=======
     <div className="max-w-7xl mx-auto px-4 space-y-5 animate-fade-in">
 
       {/* ═══ HERO BANNER ═══ */}
@@ -329,11 +270,10 @@ const AdminEmployeeHub = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04, duration: 0.2 }}
               className={wide ? 'sm:col-span-2 lg:col-span-3' : ''}>
-              <SectionCard section={sec} onClick={() => setActive(sec.key)} wide={wide} />
+              <SectionCard section={sec} onClick={() => handleSectionClick(sec.key)} wide={wide} />
             </motion.div>
           );
         })}
->>>>>>> dadaa0fa5a861c2e90636fae4c4da1b4b13b770e
       </div>
 
     </div>

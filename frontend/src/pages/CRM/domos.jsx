@@ -1,11 +1,6 @@
-import React from 'react'
+import ActivityPage from '../../components/Activities/ActivityPage';
 
-function domos() {
-  return (
-    <div>
-      <h1>domos</h1>
-    </div>
-  )
+// CRM › Demos: leads in the Demos stage and their demos (see components/Activities).
+export default function Demos() {
+  return <ActivityPage type="demo" />;
 }
-
-export default domos

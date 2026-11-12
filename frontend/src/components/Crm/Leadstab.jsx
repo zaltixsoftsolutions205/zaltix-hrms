@@ -2,12 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import toast from 'react-hot-toast';
 import { KpiCard } from '../UI/Card';
 import IntelligenceAlerts from '../UI/IntelligenceAlerts';
-import LeadTable from './Leadtable';
+// import LeadTable from './Leadtable';
 import LeadDrawer from './LeadDrawer';
 import CustomFieldCreateModal from './CustomFields/CustomFieldCreateModal';
 import { getLeads } from '../../services/Leadservice';
 import { getLeadCustomFields, getLeadCustomFieldValues } from '../../services/Leadcustomfieldservice';
 import { getAssignableUsers } from '../../services/Userservice';
+import GlobalTable from '../GlobalTable/GlobalTable';
 
 const SI = ({ d, size = 14, color }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round" className={color || ''}>
@@ -65,7 +66,7 @@ const LeadsTab = ({ pipelineStage }) => {
     }
   };
 
-  useEffect(() => { loadAll(); }, [statusFilter , pipelineStage]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => { loadAll(); }, [statusFilter, pipelineStage]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const refreshFieldsOnly = async () => {
     const fields = await getLeadCustomFields();
@@ -144,24 +145,14 @@ const LeadsTab = ({ pipelineStage }) => {
         </div>
       </div>
 
-      <LeadTable
+      <GlobalTable
         leads={leads}
-        customFields={customFields}
-        valuesByLead={valuesByLead}
         userLookup={userLookup}
         loading={loading}
-        showInlineRow={showInlineRow}
         onOpenLead={(lead) => setOpenLeadId(lead._id)}
-        onOpenAddField={() => setShowFieldModal(true)}
-        onStartInlineCreate={() => setShowInlineRow(true)}
         onOpenCreateDrawer={() => setShowCreateDrawer(true)}
-        onInlineCreated={() => { setShowInlineRow(false); loadAll(); }}
-        onInlineCancel={() => setShowInlineRow(false)}
-        onFieldsChanged={refreshFieldsOnly}
-        onValueChanged={handleValueChanged}
         onLeadUpdated={handleLeadUpdated}
         onLeadDeleted={handleLeadDeleted}
-        onEditField={handleEditField}
       />
 
       <LeadDrawer

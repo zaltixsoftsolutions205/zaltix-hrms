@@ -18,7 +18,7 @@ const ktTopicSchema = new mongoose.Schema({
   attachments: [attachmentSchema],
   assignedRoles: [{
     type: String,
-    enum: ['employee', 'sales', 'field_sales', 'hr', 'admin'],
+    enum: ['employee', 'sales', 'hr', 'admin'],
   }],
   isRequired:          { type: Boolean, default: true },
   isActive:            { type: Boolean, default: true },

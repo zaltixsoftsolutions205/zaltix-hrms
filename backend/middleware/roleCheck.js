@@ -5,7 +5,6 @@ const {
   canEditModule,
 } = require("../constants/modules");
 
-
 /*
 |--------------------------------------------------------------------------
 | ROLE HIERARCHY
@@ -21,7 +20,6 @@ const ROLE_LEVEL = {
   manager: 3,
   admin: 4,
 };
-
 
 /*
 |--------------------------------------------------------------------------
@@ -46,7 +44,6 @@ const roleCheck = (...roles) => {
     next();
   };
 };
-
 
 /*
 |--------------------------------------------------------------------------
@@ -84,7 +81,9 @@ const roleOrEmployee = (roles, employeeIds) => {
 |--------------------------------------------------------------------------
 */
 
+// moduleKey: one key, or a list (any of them is enough).
 const moduleAccess = (moduleKey, mode = "view") => {
+  const keys = [].concat(moduleKey);
   return (req, res, next) => {
 
     if (!req.user) {
@@ -93,7 +92,7 @@ const moduleAccess = (moduleKey, mode = "view") => {
       });
     }
 
-    const ok = mode === "edit"? canEditModule(req.user, moduleKey) : canAccessModule(req.user, moduleKey);
+    const ok = keys.some((key) => (mode === "edit" ? canEditModule(req.user, key) : canAccessModule(req.user, key)));
 
     if (!ok) {
       return res.status(403).json({
