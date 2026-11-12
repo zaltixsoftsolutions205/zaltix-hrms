@@ -12,7 +12,7 @@ const path = require('path');
 const fs = require('fs');
 
 exports.createEmployee = async (req, res) => {
-  const { name, email, role, departmentId, designation, phone, joiningDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess, internship, productLocationAssignments } = req.body;
+  const { name, email, role, departmentId, designation, phone, joiningDate, exitDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess, internship, productLocationAssignments } = req.body;
   try {
     if (!employeeId || !employeeId.trim()) return res.status(400).json({ message: 'Employee ID is required' });
 
@@ -260,7 +260,7 @@ exports.getAssignmentOptions = async (req, res) => {
 
 // HR / Admin: Update employee
 exports.updateEmployee = async (req, res) => {
-  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role' ,'employeeType'];
+  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'exitDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role' ,'employeeType'];
   const { email, sendNewCredentials } = req.body;
   try {
     const employee = await User.findById(req.params.id);

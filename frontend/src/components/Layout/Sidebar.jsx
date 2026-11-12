@@ -89,9 +89,15 @@ const ADMIN_NAV = [
   },
 
   {
-    path: '/timesheets/approvals',
+    path: '/timesheets',
     label: 'Timesheets',
     icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    end: true,
+  },
+  {
+    path: '/admin/projects',
+    label: 'Projects',
+    icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
   },
 ];
 
@@ -101,6 +107,13 @@ const TIMESHEET_NAV = {
   label: 'Timesheet',
   icon: "M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
   end: true, // exact match only, so /timesheets/approvals doesn't also highlight this
+};
+// Project management — reachable by HR (always) and technical leads (head of
+// their own department), matching who can create a project per the backend.
+const PROJECTS_NAV = {
+  path: '/admin/projects',
+  label: 'Projects',
+  icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4",
 };
 const TIMESHEET_APPROVALS_NAV = {
   path: '/timesheets/approvals',
@@ -144,6 +157,7 @@ const ROLE_NAV = {
     { path: '/hr/employees', label: 'Employees', icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },
     { path: '/hr/attendance', label: 'Attendance', icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
     { path: '/hr/leaves', label: 'Leave Approvals', icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4" },
+    { path: '/admin/expense-claims', label: 'Expense Claims',  icon: "M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-2m-3-4a2 2 0 100 4h5V9h-5zm.5 2h.01" },
     { path: '/admin/employee-management/workspace', label: 'Work & KPI', icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
     { path: '/hr/payslips', label: 'Payslips', icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
     { path: '/hr/knowledge-center', label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
@@ -180,6 +194,18 @@ const ROLE_NAV = {
     { path: '/sale/registration', label: 'Registration', icon: ICON.registration },
     { path: '/knowledge-center', label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
     { path: '/team', label: 'My Team', icon: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" },],
+
+  field_sales: [
+    { path: '/dashboard',         label: 'Dashboard',      icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
+    { path: '/field-sales/leads',  label: 'My Pipeline',    icon: "M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" },
+    { path: '/crm?tab=products',   label: 'Products',       icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" },
+    { path: '/attendance',        label: 'Attendance',     icon: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" },
+    { path: '/leaves',            label: 'Leave Requests', icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
+    { path: '/payslips',          label: 'Payslips',       icon: "M3 10h18M7 15h1m4 0h1m-7 4h12a3 3 0 003-3V8a3 3 0 00-3-3H6a3 3 0 00-3 3v8a3 3 0 003 3z" },
+    { path: '/tasks',             label: 'My Tasks',       icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" },
+    { path: '/knowledge-center',  label: 'Knowledge Center', icon: "M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" },
+    { path: '/profile',           label: 'My Profile',     icon: "M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" },
+  ],
 
   manager: [
     { path: '/dashboard', label: 'Dashboard', icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
@@ -275,14 +301,15 @@ const Sidebar = ({ isOpen, onClose }) => {
               : 'employee';
   let navItems = navKey === 'admin' ? ADMIN_NAV : (ROLE_NAV[navKey] || []);
   /* Timesheets: everyone logs their own time. Admin already has an entry in
-     ADMIN_NAV, so only add for non-admin roles. Approvers also see the
-     approvals view — HR (routed all marketing/sales timesheets) and technical
-     leads (the head of their own department). */
+     ADMIN_NAV (pointing at the main Timesheet page), so only add for non-admin
+     roles. The legacy approvals view is still reachable for HR and technical
+     leads (the head of their own department) even though new submissions no
+     longer route through it. */
   if (navKey !== 'admin') {
     const isTechLead = user?.department?.headOf && String(user.department.headOf) === String(user?._id || user?.id);
     console.log(isTechLead);
     const timesheetItems = [TIMESHEET_NAV];
-    if (isHR || isTechLead) timesheetItems.push(TIMESHEET_APPROVALS_NAV);
+    if (isHR || isTechLead) timesheetItems.push(TIMESHEET_APPROVALS_NAV, PROJECTS_NAV);
     navItems = [...navItems, ...timesheetItems];
   }
 
@@ -298,10 +325,17 @@ const Sidebar = ({ isOpen, onClose }) => {
     const granted = resolveModuleKeys(user); // baseline + grants
     finalItems = MODULES.filter(m => !WORKSPACE_MODULE_KEYS.has(m.key) && m.nav !== false).filter(m => granted.has(m.key))
       .map(m => ({ path: m.path, label: m.label, icon: m.icon, end: m.path === '/timesheets' || m.path === '/timesheets/approvals', }));
-    // Keep the user's own timesheet entry (and approvals if they lead a team).
-    const isTechLead = user?.department?.headOf && String(user.department.headOf) === String(user?._id || user?.id);
-    if (isTechLead && !finalItems.some(i => i.path === TIMESHEET_APPROVALS_NAV.path)) {
-      finalItems = [...finalItems, TIMESHEET_APPROVALS_NAV];
+    // Keep the user's own timesheet entry (and approvals/projects if they lead a team).
+    const isTechLead =
+      user?.department?.headOf &&
+      String(user.department.headOf) === String(user?._id || user?.id);
+    if (isTechLead) {
+      if (!finalItems.some(i => i.path === TIMESHEET_APPROVALS_NAV.path)) {
+        finalItems = [...finalItems, TIMESHEET_APPROVALS_NAV];
+      }
+      if (!finalItems.some(i => i.path === PROJECTS_NAV.path)) {
+        finalItems = [...finalItems, PROJECTS_NAV];
+      }
     }
   }
 

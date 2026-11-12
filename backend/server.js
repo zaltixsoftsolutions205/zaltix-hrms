@@ -194,6 +194,7 @@ app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/payslips', require('./routes/payslips'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/timesheets', require('./routes/timesheets'));
+app.use('/api/timesheet-projects', require('./routes/timesheetProjects'));
 app.use('/api/leads', require('./routes/leads'));
 app.use('/api/visits', require('./routes/visits'));
 app.use('/api/activities', require('./routes/activities'));

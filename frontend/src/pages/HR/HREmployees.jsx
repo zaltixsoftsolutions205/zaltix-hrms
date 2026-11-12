@@ -995,6 +995,24 @@ function AttachDocsPanel({
   onDone
 }) {
 
+  const [files, setFiles] =
+    useState({
+      joiningLetter: null,
+      idCard: null
+    });
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const refs = {
+    joiningLetter:
+      useRef(null),
+
+    idCard:
+      useRef(null)
+  };
+
+
   const handleSubmit = async () => {
 
     if (
