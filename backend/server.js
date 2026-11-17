@@ -221,8 +221,8 @@ app.use('/api/projects', require('./routes/projectRoutes'));
 // app.use('/api/tasks', require('./routes/projectTaskRoutes'));
 
 
-app.use('/api/lead-custom-fields', require('./routes/leadCustomFieldRoutes'));
-app.use('/api/leads/:leadId/custom-fields', require('./routes/leadCustomFieldValueRoutes'));
+app.use('/api/lead-custom-fields', require('./routes/Leadcustomfieldroutes'));
+app.use('/api/leads/:leadId/custom-fields', require('./routes/Leadcustomfieldvalueroutes'));
 //global table routes
 app.use('/api/global-tables', require('./routes/globalTableRoutes'));
 app.use('/api/global-table-fields', require('./routes/globalTableFieldRoutes'));
