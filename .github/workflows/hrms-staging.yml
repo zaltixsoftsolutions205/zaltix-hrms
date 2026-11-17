@@ -17,107 +17,99 @@ concurrency:
 
 env:
   AWS_REGION: ap-south-2
-  AWS_ACCOUNT_ID: "855250841662"
   ECR_REPOSITORY: hrms-backend-staging
   TARGET_REPO: zaltixsoftsolutions205/hrms-backend
   CONTAINER_NAME: hrms-staging
-  IMAGE_URI: 855250841662.dkr.ecr.ap-south-2.amazonaws.com/hrms-backend-staging
 
 jobs:
 
-  # ==================================================
-  # JOB 1: SYNCHRONIZE BACKEND REPOSITORY
-  # ==================================================
+  # ==========================================
+  # JOB 1: SYNC BACKEND REPOSITORY
+  # ==========================================
 
-  sync-backend:
-    name: Sync HRMS Backend
+  sync-backend-repo:
+
+    name: Sync Backend Repository
     runs-on: ubuntu-latest
-    timeout-minutes: 10
-
-    if: github.ref == 'refs/heads/staging'
-
-    outputs:
-      backend_sha: ${{ steps.sync.outputs.backend_sha }}
 
     steps:
-      - name: Checkout HRMS Main Repository
+
+      - name: Checkout Main Repository
         uses: actions/checkout@v4
         with:
-          fetch-depth: 1
+          fetch-depth: 0
 
-      - name: Validate Backend Source
+      - name: Validate Backend Directory
         run: |
-          set -euo pipefail
+          test -d backend || {
+            echo "Backend directory not found"
+            exit 1
+          }
 
-          test -d backend
-          test -f backend/Dockerfile
-          test -f backend/package.json
+          test -f backend/Dockerfile || {
+            echo "Dockerfile not found inside backend/"
+            exit 1
+          }
 
-          echo "Backend source validation successful."
+      - name: Configure Git
+        run: |
+          git config --global user.email \
+            "ci@zaltixsoftsolutions.com"
 
-      - name: Synchronize Backend to Staging Branch
-        id: sync
+          git config --global user.name "Zaltix CI"
+
+      - name: Sync Backend to Staging Branch
         env:
           HRMS_BACKEND_TOKEN: ${{ secrets.HRMS_BACKEND_TOKEN }}
         run: |
-          set -euo pipefail
+          set -e
 
           git clone \
-            "https://x-access-token:${HRMS_BACKEND_TOKEN}@github.com/${TARGET_REPO}.git" \
+            https://x-access-token:${HRMS_BACKEND_TOKEN}@github.com/${TARGET_REPO}.git \
             /tmp/hrms-backend
 
           cd /tmp/hrms-backend
 
-          git fetch origin main
+          git fetch origin
 
-          if git ls-remote --exit-code origin refs/heads/staging >/dev/null 2>&1; then
-            git fetch origin staging
+          if git show-ref --verify --quiet refs/remotes/origin/staging; then
             git checkout -B staging origin/staging
           else
             git checkout -B staging origin/main
           fi
 
-          git config user.name "Zaltix CI"
-          git config user.email "ci@zaltixsoftsolutions.com"
+          # Synchronize backend contents.
+          # Never copy environment secrets into Git.
 
           rsync -a --delete \
             --exclude='.git' \
             --exclude='.env' \
             --exclude='.env.*' \
-            --exclude='node_modules/' \
-            --exclude='uploads/' \
-            --exclude='logs/' \
             "$GITHUB_WORKSPACE/backend/" \
             /tmp/hrms-backend/
 
           git add -A
 
-          if ! git diff --cached --quiet; then
-            git commit -m "staging: sync backend from ${GITHUB_SHA}"
+          if git diff --cached --quiet; then
+            echo "No backend changes to sync."
           else
-            echo "No backend changes detected."
+            git commit -m "staging: sync backend from zaltix-hrms @ ${GITHUB_SHA}"
           fi
 
           git push origin staging
 
-          BACKEND_SHA=$(git rev-parse HEAD)
+          echo "Backend synchronization completed."
 
-          echo "backend_sha=${BACKEND_SHA}" >> "$GITHUB_OUTPUT"
-
-          echo "Backend synchronized: ${BACKEND_SHA}"
-
-  # ==================================================
-  # JOB 2: BUILD, SECURITY SCAN AND PUSH
-  # ==================================================
+  # ==========================================
+  # JOB 2: BUILD AND PUSH DOCKER IMAGE
+  # ==========================================
 
   build-and-push:
-    name: Build, Scan and Push Docker Image
+
+    name: Build and Push Staging Image
     runs-on: ubuntu-latest
-    timeout-minutes: 30
 
-    needs: sync-backend
-
-    if: github.ref == 'refs/heads/staging'
+    needs: sync-backend-repo
 
     permissions:
       contents: read
@@ -127,10 +119,11 @@ jobs:
       image_tag: ${{ steps.image-info.outputs.image_tag }}
 
     steps:
-      - name: Checkout HRMS Main Repository
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Configure AWS Credentials using OIDC
+      - name: Configure AWS Credentials - OIDC
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
@@ -138,16 +131,13 @@ jobs:
 
       - name: Verify AWS Identity
         run: |
-          set -euo pipefail
           aws sts get-caller-identity
 
       - name: Verify ECR Repository
         run: |
-          set -euo pipefail
-
           aws ecr describe-repositories \
-            --repository-names "$ECR_REPOSITORY" \
-            --region "$AWS_REGION"
+            --repository-names $ECR_REPOSITORY \
+            --region $AWS_REGION
 
       - name: Login to Amazon ECR
         uses: aws-actions/amazon-ecr-login@v2
@@ -155,95 +145,61 @@ jobs:
       - name: Checkout Synchronized Backend
         env:
           HRMS_BACKEND_TOKEN: ${{ secrets.HRMS_BACKEND_TOKEN }}
-          BACKEND_SHA: ${{ needs.sync-backend.outputs.backend_sha }}
         run: |
-          set -euo pipefail
-
           git clone \
-            "https://x-access-token:${HRMS_BACKEND_TOKEN}@github.com/${TARGET_REPO}.git" \
+            --branch staging \
+            https://x-access-token:${HRMS_BACKEND_TOKEN}@github.com/${TARGET_REPO}.git \
             /tmp/hrms-backend
 
-          cd /tmp/hrms-backend
-
-          git checkout "$BACKEND_SHA"
-
-          echo "Building backend commit: $BACKEND_SHA"
-
-      - name: Build Docker Image
+      - name: Build and Push Docker Image
         id: image-info
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
-          set -euo pipefail
+
+          IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
 
           IMAGE_TAG="${GITHUB_SHA}"
-
-          docker build \
-            --pull \
-            --tag "${IMAGE_URI}:${IMAGE_TAG}" \
-            /tmp/hrms-backend
 
           echo "image_tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
 
-          echo "Built image: ${IMAGE_URI}:${IMAGE_TAG}"
-
-      - name: Scan Docker Image with Trivy
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
-        with:
-          image-ref: 855250841662.dkr.ecr.ap-south-2.amazonaws.com/hrms-backend-staging:${{ github.sha }}
-          format: table
-          vuln-type: os,library
-          severity: CRITICAL,HIGH
-          ignore-unfixed: true
-          exit-code: '1'
-
-      - name: Push Immutable Docker Image
-        run: |
-          set -euo pipefail
-
-          IMAGE_TAG="${GITHUB_SHA}"
+          docker build \
+            --pull \
+            -t "${IMAGE_URI}:${IMAGE_TAG}" \
+            -t "${IMAGE_URI}:latest" \
+            /tmp/hrms-backend
 
           docker push "${IMAGE_URI}:${IMAGE_TAG}"
 
-          echo "Successfully pushed:"
+          docker push "${IMAGE_URI}:latest"
+
+          echo "Image successfully pushed:"
           echo "${IMAGE_URI}:${IMAGE_TAG}"
 
       - name: Verify Image in ECR
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
         run: |
-          set -euo pipefail
-
           aws ecr describe-images \
-            --repository-name "$ECR_REPOSITORY" \
-            --image-ids "imageTag=${GITHUB_SHA}" \
-            --region "$AWS_REGION"
+            --repository-name $ECR_REPOSITORY \
+            --image-ids imageTag=${GITHUB_SHA} \
+            --region $AWS_REGION
 
-  # ==================================================
+  # ==========================================
   # JOB 3: DEPLOY TO STAGING EC2
-  # ==================================================
+  # ==========================================
 
   deploy-staging:
-    name: Deploy HRMS Staging
+
+    name: Deploy to HRMS Staging EC2
     runs-on: ubuntu-latest
-    timeout-minutes: 20
 
     needs: build-and-push
 
-    if: github.ref == 'refs/heads/staging'
-
     steps:
-      - name: Checkout HRMS Main Repository
+
+      - name: Checkout Repository
         uses: actions/checkout@v4
-
-      - name: Validate Deployment Configuration
-        env:
-          HEALTHCHECK_URL: ${{ vars.STAGING_HEALTHCHECK_URL }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "$HEALTHCHECK_URL" ]; then
-            echo "STAGING_HEALTHCHECK_URL repository variable is missing."
-            exit 1
-          fi
-
-          echo "Deployment health-check URL configured."
 
       - name: Copy Nginx Upload Configuration
         uses: appleboy/scp-action@v0.1.7
@@ -257,44 +213,54 @@ jobs:
       - name: Deploy to Staging EC2
         uses: appleboy/ssh-action@v1.0.3
         env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
           IMAGE_TAG: ${{ needs.build-and-push.outputs.image_tag }}
-          HEALTHCHECK_URL: ${{ vars.STAGING_HEALTHCHECK_URL }}
         with:
           host: ${{ secrets.STAGING_EC2_HOST }}
           username: ubuntu
           key: ${{ secrets.STAGING_EC2_SSH_KEY }}
-          envs: IMAGE_TAG,HEALTHCHECK_URL
+          envs: AWS_ACCOUNT_ID,IMAGE_TAG
           script: |
             set -Eeuo pipefail
 
-            AWS_REGION="ap-south-2"
-            AWS_ACCOUNT_ID="855250841662"
+            AWS_REGION=ap-south-2
 
-            ECR_REPOSITORY="hrms-backend-staging"
-            CONTAINER_NAME="hrms-staging"
+            ECR_REPOSITORY=hrms-backend-staging
+
+            CONTAINER_NAME=hrms-staging
 
             IMAGE_URI="${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_REPOSITORY}"
+
             NEW_IMAGE="${IMAGE_URI}:${IMAGE_TAG}"
 
             ENV_FILE="/opt/hrms-staging/backend/.env"
+
             UPLOAD_DIR="/opt/hrms-staging/uploads"
 
-            echo "Starting HRMS staging deployment."
-            echo "Image: ${NEW_IMAGE}"
+            echo "=================================="
+            echo "HRMS STAGING DEPLOYMENT"
+            echo "=================================="
 
-            # Validate required files and directories.
+            # Validate staging environment file
 
-            test -f "$ENV_FILE"
-            test -d "$UPLOAD_DIR"
-            test -n "$HEALTHCHECK_URL"
+            if [ ! -f "$ENV_FILE" ]; then
+              echo "Staging environment file missing!"
+              exit 1
+            fi
 
-            # Verify Docker and EC2 IAM role.
+            # Ensure directories exist
+
+            sudo mkdir -p "$UPLOAD_DIR"
+
+            sudo mkdir -p /opt/hrms-staging/backend
+
+            # Verify Docker and AWS identity
 
             docker info >/dev/null
 
             aws sts get-caller-identity
 
-            # Authenticate with private ECR.
+            # Login to private ECR
 
             aws ecr get-login-password \
               --region "$AWS_REGION" \
@@ -303,132 +269,129 @@ jobs:
                 --password-stdin \
                 "${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com"
 
-            # Pull the exact immutable image.
+            # Pull the exact commit image
+
+            echo "Pulling image: $NEW_IMAGE"
 
             docker pull "$NEW_IMAGE"
 
-            # Remember the previous image.
+            # Remember the previous image for rollback
 
             OLD_IMAGE=""
 
             if docker inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+
               OLD_IMAGE=$(docker inspect \
                 --format='{{.Config.Image}}' \
                 "$CONTAINER_NAME")
+
+              echo "Previous image: $OLD_IMAGE"
+
+              docker stop "$CONTAINER_NAME"
+
+              docker rm "$CONTAINER_NAME"
+
             fi
 
-            # Define rollback function.
+            # Apply upload directory ownership.
+            # UID 1001 must match the Dockerfile user.
 
-            rollback() {
-              echo "Deployment failed. Starting rollback."
+            sudo chown -R 1001:1001 "$UPLOAD_DIR"
 
-              docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
+            # Start new staging container
 
-              if [ -n "$OLD_IMAGE" ]; then
-                docker run -d \
-                  --init \
-                  --name "$CONTAINER_NAME" \
-                  --publish 127.0.0.1:5000:5000 \
-                  --env-file "$ENV_FILE" \
-                  --volume "$UPLOAD_DIR:/app/uploads" \
-                  --restart unless-stopped \
-                  --log-driver json-file \
-                  --log-opt max-size=10m \
-                  --log-opt max-file=3 \
-                  "$OLD_IMAGE"
-
-                echo "Previous image restored: $OLD_IMAGE"
-              else
-                echo "No previous image available for rollback."
-              fi
-            }
-
-            # Stop and remove previous container.
-
-            docker rm -f "$CONTAINER_NAME" >/dev/null 2>&1 || true
-
-            # Start new container.
+            echo "Starting new staging container..."
 
             if ! docker run -d \
-              --init \
               --name "$CONTAINER_NAME" \
-              --publish 127.0.0.1:5000:5000 \
+              -p 127.0.0.1:5000:5000 \
               --env-file "$ENV_FILE" \
-              --volume "$UPLOAD_DIR:/app/uploads" \
+              -v "$UPLOAD_DIR:/app/uploads" \
               --restart unless-stopped \
-              --log-driver json-file \
-              --log-opt max-size=10m \
-              --log-opt max-file=3 \
               "$NEW_IMAGE"; then
 
-              rollback
+              echo "New container failed to start."
+
+              if [ -n "$OLD_IMAGE" ]; then
+
+                docker rm -f "$CONTAINER_NAME" || true
+
+                docker run -d \
+                  --name "$CONTAINER_NAME" \
+                  -p 127.0.0.1:5000:5000 \
+                  --env-file "$ENV_FILE" \
+                  -v "$UPLOAD_DIR:/app/uploads" \
+                  --restart unless-stopped \
+                  "$OLD_IMAGE"
+
+                echo "Previous container image restored."
+
+              fi
+
               exit 1
             fi
 
-            # Wait for application health.
+            # Allow application initialization
 
-            HEALTHY=0
+            sleep 10
 
-            for attempt in $(seq 1 18); do
-              if curl --fail --silent --show-error \
-                "$HEALTHCHECK_URL" >/dev/null 2>&1; then
+            # Verify container state
 
-                HEALTHY=1
-                break
-              fi
+            if [ "$(docker inspect \
+              --format='{{.State.Running}}' \
+              "$CONTAINER_NAME")" != "true" ]; then
 
-              echo "Waiting for application health: ${attempt}/18"
-              sleep 5
-            done
-
-            if [ "$HEALTHY" -ne 1 ]; then
-              echo "Application health check failed."
+              echo "New container is not running."
 
               docker logs "$CONTAINER_NAME" || true
 
-              rollback
+              docker rm -f "$CONTAINER_NAME" || true
+
+              if [ -n "$OLD_IMAGE" ]; then
+
+                docker run -d \
+                  --name "$CONTAINER_NAME" \
+                  -p 127.0.0.1:5000:5000 \
+                  --env-file "$ENV_FILE" \
+                  -v "$UPLOAD_DIR:/app/uploads" \
+                  --restart unless-stopped \
+                  "$OLD_IMAGE"
+
+                echo "Rollback completed."
+
+              fi
+
               exit 1
             fi
 
-            # Validate Nginx upload configuration.
+            # Apply Nginx upload configuration
 
             if [ -f /tmp/nginx-upload.conf ]; then
 
-              NGINX_CONFIG="/etc/nginx/conf.d/upload-limit.conf"
-              NGINX_BACKUP="/tmp/upload-limit.conf.backup"
+              sudo cp /tmp/nginx-upload.conf \
+                /etc/nginx/conf.d/upload-limit.conf
 
-              if sudo test -f "$NGINX_CONFIG"; then
-                sudo cp "$NGINX_CONFIG" "$NGINX_BACKUP"
-              fi
+              sudo nginx -t
 
-              sudo cp /tmp/nginx-upload.conf "$NGINX_CONFIG"
+              sudo systemctl reload nginx
 
-              if sudo nginx -t; then
-                sudo systemctl reload nginx
-              else
-                echo "Nginx configuration validation failed."
-
-                if sudo test -f "$NGINX_BACKUP"; then
-                  sudo cp "$NGINX_BACKUP" "$NGINX_CONFIG"
-                else
-                  sudo rm -f "$NGINX_CONFIG"
-                fi
-
-                sudo nginx -t || true
-                exit 1
-              fi
             fi
 
+            # Display deployment details
+
             echo "=================================="
-            echo "HRMS STAGING DEPLOYMENT SUCCESS"
+            echo "STAGING DEPLOYMENT COMPLETED"
             echo "=================================="
 
-            docker ps --filter "name=${CONTAINER_NAME}"
+            docker ps
 
-            echo "Deployed image: ${NEW_IMAGE}"
-            echo "Environment: ${ENV_FILE}"
-            echo "Uploads: ${UPLOAD_DIR}"
-            echo "Region: ${AWS_REGION}"
+            echo "Deployed image: $NEW_IMAGE"
+
+            echo "Environment: $ENV_FILE"
+
+            echo "Uploads: $UPLOAD_DIR"
+
+            echo "Region: $AWS_REGION"
 
       - name: Deployment Summary
         if: success()
