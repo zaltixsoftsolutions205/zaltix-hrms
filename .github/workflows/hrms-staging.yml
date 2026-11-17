@@ -186,7 +186,7 @@ jobs:
           echo "Built image: ${IMAGE_URI}:${IMAGE_TAG}"
 
       - name: Scan Docker Image with Trivy
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
         with:
           image-ref: 855250841662.dkr.ecr.ap-south-2.amazonaws.com/hrms-backend-staging:${{ github.sha }}
           format: table
