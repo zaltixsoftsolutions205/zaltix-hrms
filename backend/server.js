@@ -31,6 +31,7 @@ const allowedOrigins = [
   process.env.FRONTEND_URL_ALT,
   'https://www.zaltixsoftsolutions.com',
   'https://hrms.zaltixsoftsolutions.com',
+  'https://hrms-staging.zaltixsoftsolutions.com',
   'http://localhost:5173',
   'http://localhost:5174',
   'http://127.0.0.1:5173',
