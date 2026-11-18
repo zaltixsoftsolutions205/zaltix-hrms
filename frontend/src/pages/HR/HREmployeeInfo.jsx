@@ -18,28 +18,28 @@ import TabContent from "../EmplopeeInfo/TabContent.jsx";
 // });
 
 // Mock employee record used across all child components.
-const employee = {
-  name: "Aditi Sharma",
-  id: "EMP-10245",
-  email: "aditi.sharma@company.com",
-  phone: "+91 98214 55120",
-  location: "Bengaluru, IN",
-  department: "Design",
-  reportsTo: "Rohan Mehta",
-  joined: "12 Aug 2021",
-  experience: "5 yrs 2 mo",
-  role: "Senior Product Designer",
-  status: "Active",
-};
+// const employee = {
+//   name: "Aditi Sharma",
+//   id: "EMP-10245",
+//   email: "aditi.sharma@company.com",
+//   phone: "+91 98214 55120",
+//   location: "Bengaluru, IN",
+//   department: "Design",
+//   reportsTo: "Rohan Mehta",
+//   joined: "12 Aug 2021",
+//   experience: "5 yrs 2 mo",
+//   role: "Senior Product Designer",
+//   status: "Active",
+// };
 
 
-// Quick-glance KPI values shown in the stat cards.
-const stats = {
-  performance: 88,
-  netSalary: "₹1,18,450",
-  activeProjects: 3,
-  attendance: 96,
-};
+// // Quick-glance KPI values shown in the stat cards.
+// const stats = {
+//   performance: 88,
+//   netSalary: "₹1,18,450",
+//   activeProjects: 3,
+//   attendance: 96,
+// };
 
 // Root page component — composes the 4 dashboard sections.
 function EmployeeDashboard() {

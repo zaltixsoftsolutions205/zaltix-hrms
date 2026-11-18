@@ -125,7 +125,7 @@ exports.reviewClaim = async (req, res) => {
       message: `Your ${claim.category} claim for ${inr(claim.amount)} was ${status}` +
         (claim.reviewNote ? `: ${claim.reviewNote}` : '.'),
       type: 'general',
-      link: '/field-sales/expense-claims',
+      link: '/expense-claims',
     });
 
     const populated = await ExpenseClaim.findById(claim._id)

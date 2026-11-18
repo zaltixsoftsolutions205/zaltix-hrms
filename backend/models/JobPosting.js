@@ -9,7 +9,7 @@ const jobPostingSchema = new mongoose.Schema({
   requirements: { type: String, default: '' },
   openings:     { type: Number, default: 1, min: 1 },
   status:       { type: String, enum: ['open', 'on-hold', 'closed'], default: 'open' },
-  project:      { type: mongoose.Schema.Types.ObjectId, ref: 'RecruitProject', default: null },
+  project:      { type: mongoose.Schema.Types.ObjectId, ref: 'Project', default: null },
   createdBy:    { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
 }, { timestamps: true });
 

@@ -4,18 +4,9 @@
  * Hub grid → click card → full HR page rendered inline.
  */
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import api from '../../utils/api';
-
-/* ── Real HR / Admin pages ── */
-import HREmployees     from '../HR/HREmployees';
-import AdminDepartments from './AdminDepartments';
-import HRAttendance    from '../HR/HRAttendance';
-import HRLeaves        from '../HR/HRLeaves';
-import AdminPolicies   from './AdminPolicies';
-import HolidaysPage    from './HolidaysPage';
-import AnnouncementsPage from './AnnouncementsPage';
-
 /* ── tiny icon ── */
 const Icon = ({ d, size = 15, className = '', sw = 1.75 }) => (
   <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -24,16 +15,19 @@ const Icon = ({ d, size = 15, className = '', sw = 1.75 }) => (
   </svg>
 );
 
+
+
 /* ── icon paths ── */
 const IC = {
-  employees:   "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
+  employees: "M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z",
   departments: "M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4",
-  attendance:  "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-  leaves:      "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
-  policies:    "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4",
-  holidays:    "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-  announce:    "M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z",
-  chevron:     "M9 5l7 7-7 7",
+  attendance: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  leaves: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z",
+  policies: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7l2 2 4-4",
+  holidays: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+  announce: "M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v14c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z",
+  chevron: "M9 5l7 7-7 7",
+  workspace: "M4 6h16v12H4zM8 10h2m2 0h4M8 14h8",
 };
 
 /* ════════════════════════════════════════════════════════════════
@@ -47,13 +41,13 @@ const SECTIONS = [
     icon: IC.employees,
     accent: 'violet',
   },
-  {
-    key: 'departments',
-    label: 'Departments',
-    desc: 'Manage organisational departments and their leads',
-    icon: IC.departments,
-    accent: 'blue',
-  },
+  // {
+  //   key: 'departments',
+  //   label: 'Departments',
+  //   desc: 'Manage organisational departments and their leads',
+  //   icon: IC.departments,
+  //   accent: 'blue',
+  // },
   {
     key: 'attendance',
     label: 'Attendance',
@@ -87,6 +81,13 @@ const SECTIONS = [
     label: 'Announcements',
     desc: 'Post and manage company-wide notices to all staff',
     icon: IC.announce,
+    accent: 'violet',
+  },
+  {
+    key: 'workspace',
+    label: 'Workspace',
+    desc: 'Manage projects, tasks, progress and team work',
+    icon: IC.workspace,
     accent: 'violet',
   },
 ];
@@ -141,8 +142,11 @@ const SectionCard = ({ section, onClick, wide = false }) => {
 /* ════════════════════════════════════════════════════════════════
    MAIN: AdminEmployeeHub
 ════════════════════════════════════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════
+   MAIN: AdminEmployeeHub
+════════════════════════════════════════════════════════════════ */
 const AdminEmployeeHub = () => {
-  const [active, setActive] = useState(null); // null = hub grid
+  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
   const [deptCount, setDeptCount] = useState(null);
 
@@ -156,58 +160,45 @@ const AdminEmployeeHub = () => {
     ? Math.round((stats.presentToday / stats.totalEmployees) * 100)
     : null;
 
-  const renderSection = () => {
-    switch (active) {
-      case 'employees':     return <HREmployees />;
-      case 'departments':   return <AdminDepartments />;
-      case 'attendance':    return <HRAttendance />;
-      case 'leaves':        return <HRLeaves />;
-      case 'leave-policies':return <AdminPolicies />;
-      case 'holidays':      return <HolidaysPage />;
-      case 'announcements': return <AnnouncementsPage />;
-      default:              return null;
+  const handleSectionClick = (key) => {
+    switch (key) {
+      case 'employees':
+        navigate('/admin/employee-management/employees');
+        break;
+
+      // case 'departments':
+      //   navigate('/admin/employee-management/departments');
+      //   break;
+
+      case 'attendance':
+        navigate('/admin/employee-management/attendance');
+        break;
+
+      case 'leaves':
+        navigate('/admin/employee-management/leaves');
+        break;
+
+      case 'leave-policies':
+        navigate('/admin/employee-management/leave-policies');
+        break;
+
+      case 'holidays':
+        navigate('/admin/employee-management/holidays');
+        break;
+
+      case 'announcements':
+        navigate('/admin/employee-management/announcements');
+        break;
+
+      case 'workspace':
+        navigate('/admin/employee-management/workspace');
+        break;
+
+      default:
+        break;
     }
   };
 
-  const currentSection = SECTIONS.find(s => s.key === active);
-
-  /* ───────────────── DETAIL VIEW ───────────────── */
-  if (active) {
-    const ac = ACCENT[currentSection?.accent] || ACCENT.violet;
-    return (
-      <div className="space-y-4">
-
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-2 flex-wrap px-1">
-          <button
-            onClick={() => setActive(null)}
-            className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 hover:text-violet-600 transition-colors px-2.5 py-1.5 rounded-xl hover:bg-violet-50 -ml-2.5">
-            <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round">
-              <path d="M19 12H5M12 5l-7 7 7 7" />
-            </svg>
-            Employee Management
-          </button>
-          <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} className="text-gray-200 flex-shrink-0">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="text-xs font-bold text-gray-700">{currentSection?.label}</span>
-        </div>
-
-        {/* Section content — actual HR page */}
-        <AnimatePresence mode="wait">
-          <motion.div key={active}
-            initial={{ opacity: 0, y: 6 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.15 }}>
-            {renderSection()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-    );
-  }
-
-  /* ───────────────── HUB GRID VIEW ───────────────── */
   return (
     <div className="max-w-7xl mx-auto px-4 space-y-5 animate-fade-in">
 
@@ -279,11 +270,12 @@ const AdminEmployeeHub = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.04, duration: 0.2 }}
               className={wide ? 'sm:col-span-2 lg:col-span-3' : ''}>
-              <SectionCard section={sec} onClick={() => setActive(sec.key)} wide={wide} />
+              <SectionCard section={sec} onClick={() => handleSectionClick(sec.key)} wide={wide} />
             </motion.div>
           );
         })}
       </div>
+
     </div>
   );
 };

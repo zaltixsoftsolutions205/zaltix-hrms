@@ -1,9 +1,15 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Archive, ArchiveRestore, ArrowRightLeft, Pencil, Search, Table2, Trash2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import toast from 'react-hot-toast';
 import api from '../../utils/api';
+import GlobalTable from '../../components/GlobalTable/GlobalTable';
+import { getAssignableUsers } from '../../services/Userservice';
+import CrmTree from '../../components/Crm/CrmTree';
+import TableMoveDialog from '../../components/Crm/TableMoveDialog';
+import { ACTIVITY_ORDER } from '../../components/Activities/activityTypes';
 
 /* ── Multi-value tag input ── */
 function TagInput({ values, onChange, placeholder, type = 'text' }) {
@@ -86,18 +92,41 @@ export default function ProductDetailPage() {
   const [viewingLocation, setViewingLocation] = useState(null);
   // Viewing a Category node's rows (schools-type products only).
   const [viewingCategory, setViewingCategory] = useState(null); // the category node object, or null
+  const [viewingTable, setViewingTable] = useState(null);
+  const [tables, setTables] = useState([]);
+  const [archivedTables, setArchivedTables] = useState([]); // deactivated tables of this Mandal
+  const [showArchived, setShowArchived] = useState(false);
+  const [movingTable, setMovingTable] = useState(null);
+  const [tablesLoading, setTablesLoading] = useState(false);
+  const [tableFormOpen, setTableFormOpen] = useState(false);
+  const [editingTable, setEditingTable] = useState(null);
+  const [addTableName, setAddTableName] = useState('');
+  const [tableFormError, setTableFormError] = useState('');
+  const [savingTable, setSavingTable] = useState(false);
+  const [tableRecords, setTableRecords] = useState([]);
+  const [tableRecordsLoading, setTableRecordsLoading] = useState(false);
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePagination, setTablePagination] = useState(null);
+  // Table search: tableSearchInput is what is typed; tableSearch is sent to the server (debounced).
+  const [tableSearchInput, setTableSearchInput] = useState('');
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableUsers, setTableUsers] = useState([]);
+  const tableRecordsRequestId = useRef(0);
 
   const [addingLocation, setAddingLocation] = useState(false);
   const [addLocationName, setAddLocationName] = useState('');
   const [savingLocation, setSavingLocation] = useState(false);
-  const [addingCategory, setAddingCategory] = useState(false);
-  const [addCategoryName, setAddCategoryName] = useState('');
-  const [savingCategory, setSavingCategory] = useState(false);
   const [renamingLocation, setRenamingLocation] = useState(null); // node being renamed
   const [renameValue, setRenameValue] = useState('');
   const [renaming, setRenaming] = useState(false);
 
+  // Whole location/table tree for the left-hand navigator (one request).
+  const [tree, setTree] = useState({ locations: [], tables: [] });
+  const [treeLoading, setTreeLoading] = useState(true);
+  const [treeError, setTreeError] = useState('');
+
   const isSchoolsProduct = product?.productType === 'schools';
+  const tableUserLookup = Object.fromEntries(tableUsers.map(user => [user._id, user]));
 
   // ── Customers within the currently-viewed location ──────────────────────
   const [prospects, setProspects] = useState([]);
@@ -131,6 +160,49 @@ export default function ProductDetailPage() {
     finally { setLocLoading(false); }
   }, [productId, currentParent]);
 
+  const fetchTables = useCallback(async () => {
+    if (!currentParent || currentParent.kind === 'category') { setTables([]); setArchivedTables([]); return; }
+    setTablesLoading(true);
+    try {
+      const params = { product: productId, location: currentParent._id, limit: 100 };
+      const [active, archived] = await Promise.all([
+        api.get('/global-tables', { params: { ...params, isActive: true } }),
+        api.get('/global-tables', { params: { ...params, isActive: false } }),
+      ]);
+      setTables(active.data.tables || []);
+      setArchivedTables(archived.data.tables || []);
+    } catch (err) {
+      toast.error(err.response?.data?.message || 'Failed to load Global Tables');
+    } finally { setTablesLoading(false); }
+  }, [productId, currentParent]);
+
+  const fetchTableRecords = useCallback(async () => {
+    if (!viewingTable) return;
+    const requestId = ++tableRecordsRequestId.current;
+    const selectedTableId = viewingTable._id;
+    setTableRecordsLoading(true);
+    try {
+      const params = { page: tablePage, limit: 100, ...(tableSearch ? { search: tableSearch } : {}) };
+      const { data } = await api.get(`/global-tables/${selectedTableId}/records`, { params });
+      if (requestId !== tableRecordsRequestId.current) return;
+      setTableRecords((data.records || []).map(item => item.record));
+      setTablePagination(data.pagination);
+    } catch (err) {
+      if (requestId !== tableRecordsRequestId.current) return;
+      toast.error(err.response?.data?.message || 'Failed to load table records');
+    } finally {
+      if (requestId === tableRecordsRequestId.current) setTableRecordsLoading(false);
+    }
+  }, [viewingTable, tablePage, tableSearch]);
+
+  // Send the search 300 ms after typing stops, and start again from page 1.
+  useEffect(() => {
+    const text = tableSearchInput.trim();
+    if (text === tableSearch) return undefined;
+    const timer = setTimeout(() => { setTablePage(1); setTableSearch(text); }, 300);
+    return () => clearTimeout(timer);
+  }, [tableSearchInput, tableSearch]);
+
   const fetchProspects = useCallback(async () => {
     if (!viewingLocation) return;
     setProspectsLoading(true);
@@ -143,15 +215,35 @@ export default function ProductDetailPage() {
     finally { setProspectsLoading(false); }
   }, [productId, viewingLocation]);
 
-  useEffect(() => { fetchProduct(); }, [fetchProduct]);
-  useEffect(() => { if (!viewingLocation && !viewingCategory) fetchChildren(); }, [fetchChildren, viewingLocation, viewingCategory]);
-  useEffect(() => { fetchProspects(); }, [fetchProspects]);
+  const loadTree = useCallback(async () => {
+    setTreeError('');
+    try {
+      const { data } = await api.get('/leads/territory', { params: { product: productId } });
+      setTree({ locations: data.locations || [], tables: data.tables || [] });
+    } catch (err) {
+      setTreeError(err.response?.data?.message || 'Failed to load the location tree');
+    } finally {
+      setTreeLoading(false);
+    }
+  }, [productId]);
 
-  const enterLocation = (node) => { setPath(p => [...p, node]); setViewingLocation(null); setViewingCategory(null); };
-  const goToBreadcrumb = (idx) => { setPath(p => p.slice(0, idx + 1)); setViewingLocation(null); setViewingCategory(null); };
-  const goToRoot = () => { setPath([]); setViewingLocation(null); setViewingCategory(null); };
-  const viewCustomersHere = (nodeIdOrUnspecified) => { setViewingLocation(nodeIdOrUnspecified); setViewingCategory(null); setStatusFilter(''); setSearch(''); };
-  const backToLocations = () => { setViewingLocation(null); setViewingCategory(null); setStatusFilter(''); setSearch(''); };
+  useEffect(() => { fetchProduct(); }, [fetchProduct]);
+  useEffect(() => { loadTree(); }, [loadTree]);
+  useEffect(() => { if (!viewingLocation && !viewingCategory && !viewingTable) fetchChildren(); }, [fetchChildren, viewingLocation, viewingCategory, viewingTable]);
+  useEffect(() => { if (!viewingLocation && !viewingCategory && !viewingTable) fetchTables(); }, [fetchTables, viewingLocation, viewingCategory, viewingTable]);
+  useEffect(() => { fetchProspects(); }, [fetchProspects]);
+  useEffect(() => { fetchTableRecords(); }, [fetchTableRecords]);
+  useEffect(() => { getAssignableUsers().then(setTableUsers).catch(() => setTableUsers([])); }, []);
+
+  const invalidateTableRecords = () => {
+    tableRecordsRequestId.current += 1;
+    setTableRecordsLoading(false);
+  };
+  const enterLocation = (node) => { invalidateTableRecords(); setPath(p => [...p, node]); setViewingLocation(null); setViewingCategory(null); setViewingTable(null); };
+  const goToBreadcrumb = (idx) => { invalidateTableRecords(); setPath(p => p.slice(0, idx + 1)); setViewingLocation(null); setViewingCategory(null); setViewingTable(null); };
+  const goToRoot = () => { invalidateTableRecords(); setPath([]); setViewingLocation(null); setViewingCategory(null); setViewingTable(null); };
+  const viewCustomersHere = (nodeIdOrUnspecified) => { invalidateTableRecords(); setViewingLocation(nodeIdOrUnspecified); setViewingCategory(null); setViewingTable(null); setStatusFilter(''); setSearch(''); };
+  const backToLocations = () => { invalidateTableRecords(); setViewingLocation(null); setViewingCategory(null); setViewingTable(null); setStatusFilter(''); setSearch(''); };
 
   const openAdd = () => {
     setEditProspect(null);
@@ -222,26 +314,107 @@ export default function ProductDetailPage() {
       setAddingLocation(false);
       setAddLocationName('');
       fetchChildren();
+      loadTree();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     finally { setSavingLocation(false); }
   };
 
-  const handleAddCategory = async (e) => {
+  const handleSaveTable = async (e) => {
     e.preventDefault();
-    const name = addCategoryName.trim();
-    if (!name) return toast.error('Enter a category name');
-    // Categories can only be created inside a location — enforced by the
-    // Add Category button only appearing once you've drilled into one.
-    setSavingCategory(true);
+    const name = addTableName.trim();
+    if (name.length < 2) {
+      setTableFormError('Table name must be at least 2 characters');
+      return;
+    }
+    if (!currentParent) return toast.error('Choose a location first');
+    setSavingTable(true);
+    setTableFormError('');
     try {
-      await api.post(`/products/${productId}/locations`, { name, parent: currentParent?._id || null, kind: 'category' });
-      toast.success('Category added');
-      setAddingCategory(false);
-      setAddCategoryName('');
-      fetchChildren();
-    } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
-    finally { setSavingCategory(false); }
+      if (editingTable) {
+        await api.put(`/products/${productId}/locations/${currentParent._id}/tables/${editingTable._id}`, { name });
+        setViewingTable(current => current?._id === editingTable._id ? { ...current, name } : current);
+        toast.success('Table renamed');
+      } else {
+        await api.post(`/products/${productId}/locations/${currentParent._id}/tables`, { name });
+        toast.success('Global Table added');
+      }
+      setTableFormOpen(false);
+      setEditingTable(null);
+      setAddTableName('');
+      fetchTables();
+      loadTree();
+    } catch (err) {
+      const message = err.response?.data?.message || 'Failed to save table';
+      setTableFormError(message);
+      toast.error(message);
+    }
+    finally { setSavingTable(false); }
   };
+
+  const openTable = (table) => {
+    invalidateTableRecords();
+    setViewingTable(table);
+    setTablePage(1);
+    setTableRecords([]);
+    setTablePagination(null);
+    setTableSearchInput('');
+    setTableSearch('');
+  };
+
+  const renameTable = (table) => {
+    setEditingTable(table);
+    setAddTableName(table.name);
+    setTableFormError('');
+    setTableFormOpen(true);
+  };
+
+  const deactivateTable = async (table) => {
+    if (!window.confirm(`Deactivate "${table.name}"? Its fields and records will be preserved.`)) return;
+    try {
+      await api.delete(`/products/${productId}/locations/${currentParent._id}/tables/${table._id}`);
+      toast.success('Table deactivated');
+      invalidateTableRecords();
+      setViewingTable(current => current?._id === table._id ? null : current);
+      fetchTables();
+      loadTree();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to deactivate table'); }
+  };
+
+  const restoreTable = async (table) => {
+    try {
+      await api.patch(`/products/${productId}/locations/${currentParent._id}/tables/${table._id}/reactivate`);
+      toast.success(`"${table.name}" restored`);
+      fetchTables();
+      loadTree();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to restore table'); }
+  };
+
+  // Only an empty table can be deleted (the API refuses while it still has rows).
+  const deleteTableForever = async (table) => {
+    if (!window.confirm(`Permanently delete "${table.name}"? Its columns are deleted too. This cannot be undone.`)) return;
+    try {
+      await api.delete(`/products/${productId}/locations/${currentParent._id}/tables/${table._id}/permanent`);
+      toast.success(`"${table.name}" deleted`);
+      setViewingTable(current => current?._id === table._id ? null : current);
+      fetchTables();
+      loadTree();
+    } catch (err) { toast.error(err.response?.data?.message || 'Failed to delete table'); }
+  };
+
+  // Mandals of this product (leaf locations) the open table could move to.
+  const moveTargets = (() => {
+    const byId = new Map(tree.locations.map(l => [String(l._id), l]));
+    const parents = new Set(tree.locations.filter(l => l.parent).map(l => String(l.parent)));
+    const label = (node) => {
+      const names = [];
+      for (let n = node, guard = 0; n && guard < 100; n = n.parent ? byId.get(String(n.parent)) : null, guard += 1) names.unshift(n.name);
+      return names.join(' › ');
+    };
+    return tree.locations
+      .filter(l => !parents.has(String(l._id)) && String(l._id) !== String(currentParent?._id))
+      .map(l => ({ _id: String(l._id), label: label(l) }))
+      .sort((a, b) => a.label.localeCompare(b.label));
+  })();
 
   const handleRenameLocation = async (e) => {
     e.preventDefault();
@@ -254,6 +427,7 @@ export default function ProductDetailPage() {
       setRenamingLocation(null);
       setRenameValue('');
       fetchChildren();
+      loadTree();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     finally { setRenaming(false); }
   };
@@ -264,7 +438,24 @@ export default function ProductDetailPage() {
       await api.delete(`/products/${productId}/locations/${node._id}`);
       toast.success('Deleted');
       fetchChildren();
+      loadTree();
     } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
+  };
+
+  // Left tree -> the same drill-down state the cards and breadcrumb use.
+  const treeSelection = viewingTable
+    ? { kind: 'table', id: viewingTable._id }
+    : currentParent ? { kind: 'node', id: currentParent._id } : null;
+
+  const handleTreeSelect = (selection, { path: nodePath = [], table } = {}) => {
+    invalidateTableRecords();
+    setViewingLocation(null);
+    setViewingCategory(null);
+    setStatusFilter('');
+    setSearch('');
+    setPath(nodePath.map(node => ({ ...node, kind: 'location' })));
+    if (selection.kind === 'table' && table) openTable(table);
+    else setViewingTable(null);
   };
 
   const handleConvertToLead = async (id) => {
@@ -437,32 +628,60 @@ export default function ProductDetailPage() {
                 <button onClick={openAdd} className="btn-primary btn-sm">+ Add Customer</button>
               </>
             )}
-            {!viewingLocation && (
+            {/* Tables live only on Mandals: a node with tables takes no sub-locations,
+                and a node with sub-locations takes no tables (enforced by the API too). */}
+            {!viewingLocation && !viewingCategory && !viewingTable && !(currentParent && tables.length > 0) && (
               <button onClick={() => { setAddingLocation(true); setAddLocationName(''); }} className="btn-secondary btn-sm">
                 + Add Location
               </button>
             )}
-            {!viewingLocation && isSchoolsProduct && currentParent && (
-              <button onClick={() => { setAddingCategory(true); setAddCategoryName(''); }} className="btn-secondary btn-sm">
-                + Add Category
+            {!viewingLocation && !viewingCategory && !viewingTable && currentParent?.kind === 'location'
+              && !children.some(node => node.kind === 'location') && (
+              <button onClick={() => { setEditingTable(null); setAddTableName(''); setTableFormError(''); setTableFormOpen(true); }} className="btn-secondary btn-sm">
+                + Add Table
               </button>
             )}
+            {viewingTable && <button onClick={backToLocations} className="btn-secondary btn-sm">← Back to {currentParent?.name || 'location'}</button>}
           </div>
         </div>
       </div>
 
+      <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)] items-start">
+        <aside className="hidden lg:block glass-card p-3 sticky top-4 max-h-[calc(100vh-7rem)] overflow-y-auto" aria-label="Location tree">
+          <button
+            type="button"
+            onClick={goToRoot}
+            className={`w-full text-left text-xs font-bold px-2 py-1.5 mb-1 rounded-lg ${!currentParent && !viewingTable ? 'bg-violet-600 text-white' : 'text-violet-900 hover:bg-violet-50'}`}
+          >
+            All Locations
+          </button>
+          <CrmTree
+            products={[product]}
+            locations={tree.locations}
+            tables={tree.tables}
+            singleProductId={product._id}
+            selection={treeSelection}
+            onSelect={handleTreeSelect}
+            loading={treeLoading}
+            error={treeError}
+            onRetry={loadTree}
+            emptyMessage="No locations yet."
+          />
+        </aside>
+
+        <div className="min-w-0 space-y-4">
       {/* Breadcrumb */}
-      {(path.length > 0 || viewingLocation || viewingCategory) && (
+      {(path.length > 0 || viewingLocation || viewingCategory || viewingTable) && (
         <div className="flex items-center gap-1.5 flex-wrap text-sm">
-          <button onClick={(viewingLocation || viewingCategory) ? backToLocations : goToRoot} className="text-violet-500 hover:text-violet-700 font-semibold">
+          <button onClick={(viewingLocation || viewingCategory || viewingTable) ? backToLocations : goToRoot} className="text-violet-500 hover:text-violet-700 font-semibold">
             All Locations
           </button>
           {path.map((node, i) => (
             <span key={node._id} className="flex items-center gap-1.5">
               <span className="text-gray-300">/</span>
               <button
-                onClick={() => ((viewingLocation || viewingCategory) && i === path.length - 1) ? backToLocations() : goToBreadcrumb(i)}
-                className={`font-semibold ${i === path.length - 1 && !viewingLocation && !viewingCategory ? 'text-gray-900' : 'text-violet-500 hover:text-violet-700'}`}>
+                onClick={() => ((viewingLocation || viewingCategory || viewingTable) && i === path.length - 1) ? backToLocations() : goToBreadcrumb(i)}
+                className={`font-semibold ${i === path.length - 1 && !viewingLocation && !viewingCategory && !viewingTable ? 'text-gray-900' : 'text-violet-500 hover:text-violet-700'}`}>
                 {node.name}
               </button>
             </span>
@@ -475,6 +694,9 @@ export default function ProductDetailPage() {
           )}
           {viewingCategory && (
             <span className="flex items-center gap-1.5"><span className="text-gray-300">/</span><span className="font-semibold text-gray-900">{viewingCategory.name}</span></span>
+          )}
+          {viewingTable && (
+            <span className="flex items-center gap-1.5"><span className="text-gray-300">/</span><span className="font-semibold text-gray-900">{viewingTable.name}</span></span>
           )}
         </div>
       )}
@@ -501,20 +723,25 @@ export default function ProductDetailPage() {
         )}
       </AnimatePresence>
 
-      {/* Add category form */}
+      {/* Add Global Table form */}
       <AnimatePresence>
-        {addingCategory && (
+        {tableFormOpen && (
           <motion.div initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="glass-card p-4">
-            <h3 className="font-bold text-gray-900 mb-3">Add Category inside "{currentParent?.name}"</h3>
-            <form onSubmit={handleAddCategory} className="flex flex-col sm:flex-row gap-3 sm:items-end">
+            <h3 className="font-bold text-gray-900 mb-3">
+              {editingTable ? `Rename table in "${currentParent?.name}"` : `Add Global Table inside "${currentParent?.name}"`}
+            </h3>
+            <form onSubmit={handleSaveTable} className="flex flex-col sm:flex-row gap-3 sm:items-end">
               <div className="flex-1">
-                <label className="label-text">Category name</label>
-                <input className="input-field" placeholder="e.g. CBSE Below 500" value={addCategoryName} autoFocus
-                  onChange={e => setAddCategoryName(e.target.value)} />
+                <label className="label-text">Table name</label>
+                <input className="input-field" placeholder="e.g. Schools" value={addTableName} autoFocus aria-invalid={Boolean(tableFormError)}
+                  onChange={e => setAddTableName(e.target.value)} />
+                {tableFormError && <p role="alert" className="mt-1 text-xs text-red-600">{tableFormError}</p>}
               </div>
               <div className="flex gap-2">
-                <button type="button" onClick={() => { setAddingCategory(false); setAddCategoryName(''); }} className="btn-secondary btn-sm">Cancel</button>
-                <button type="submit" disabled={savingCategory} className="btn-primary btn-sm">{savingCategory ? 'Saving...' : 'Save'}</button>
+                <button type="button" onClick={() => { setTableFormOpen(false); setEditingTable(null); setAddTableName(''); setTableFormError(''); }} className="btn-secondary btn-sm">Cancel</button>
+                <button type="submit" disabled={savingTable} className="btn-primary btn-sm">
+                  {savingTable ? 'Saving...' : editingTable ? 'Save Changes' : 'Save Table'}
+                </button>
               </div>
             </form>
           </motion.div>
@@ -541,14 +768,142 @@ export default function ProductDetailPage() {
       </AnimatePresence>
 
       {/* Location Cards */}
-      {!viewingLocation && !viewingCategory && (
+      {path.length > 0 && !viewingLocation && !viewingCategory && !viewingTable && currentParent?.kind === 'location' && (
+        <section className="space-y-3" aria-label="Global Tables">
+          <div className="flex items-center justify-between gap-3">
+            <h3 className="text-sm font-semibold text-gray-800">Global Tables</h3>
+            <span className="text-xs text-gray-400">{tables.length} table{tables.length !== 1 ? 's' : ''}</span>
+          </div>
+          {tablesLoading ? (
+            <p className="py-6 text-center text-sm text-gray-400">Loading tables...</p>
+          ) : tables.length === 0 ? (
+            <div className="border border-dashed border-gray-200 rounded-lg p-6 text-center">
+              <p className="text-sm text-gray-500">No Global Tables at this location</p>
+              <p className="text-xs text-gray-400 mt-1">Create a table to manage Leads and custom fields here.</p>
+            </div>
+          ) : (
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {tables.map(table => (
+                <motion.article key={table._id} initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
+                  className="glass-card p-4 cursor-pointer hover:shadow-md transition-all group bg-amber-50/40 border border-amber-100">
+                  <div className="flex items-center gap-2 min-w-0 mb-2">
+                    <Table2 size={16} className="text-amber-600 flex-shrink-0" />
+                    <button type="button" onClick={() => openTable(table)} className="min-w-0 text-left flex-1">
+                      <span className="block font-bold text-gray-900 truncate">{table.name}</span>
+                    </button>
+                    <button type="button" title="Rename table" aria-label={`Rename ${table.name}`} onClick={() => renameTable(table)} className="w-7 h-7 flex-shrink-0 inline-flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-800 transition-colors"><Pencil size={14} /></button>
+                    <button type="button" title="Move to another Mandal" aria-label={`Move ${table.name}`} onClick={() => setMovingTable(table)} className="w-7 h-7 flex-shrink-0 inline-flex items-center justify-center rounded-lg hover:bg-amber-100 text-amber-600 hover:text-amber-800 transition-colors"><ArrowRightLeft size={14} /></button>
+                    <button type="button" title="Deactivate table" aria-label={`Deactivate ${table.name}`} onClick={() => deactivateTable(table)} className="w-7 h-7 flex-shrink-0 inline-flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-500 transition-colors"><Archive size={14} /></button>
+                    <button type="button" title="Delete permanently (only when it has no rows)" aria-label={`Delete ${table.name}`} onClick={() => deleteTableForever(table)} className="w-7 h-7 flex-shrink-0 inline-flex items-center justify-center rounded-lg hover:bg-red-50 text-gray-300 hover:text-red-600 transition-colors"><Trash2 size={14} /></button>
+                  </div>
+                  <div className="pt-3 border-t border-amber-100">
+                    <p className="text-sm font-medium text-amber-700">Records and custom fields</p>
+                    <button type="button" onClick={() => openTable(table)} className="mt-3 text-[11px] font-semibold text-amber-700 group-hover:underline">Open Table →</button>
+                  </div>
+                </motion.article>
+              ))}
+            </div>
+          )}
+
+          {archivedTables.length > 0 && (
+            <div className="border border-gray-200 rounded-lg">
+              <button type="button" onClick={() => setShowArchived(v => !v)} aria-expanded={showArchived}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs font-semibold text-gray-600 hover:bg-gray-50">
+                <span className="flex items-center gap-1.5"><Archive size={13} /> Archived tables ({archivedTables.length})</span>
+                <span>{showArchived ? 'Hide' : 'Show'}</span>
+              </button>
+              {showArchived && (
+                <ul className="divide-y divide-gray-100 border-t border-gray-100">
+                  {archivedTables.map(table => (
+                    <li key={table._id} className="flex items-center gap-2 px-3 py-2">
+                      <Table2 size={14} className="text-gray-400 flex-shrink-0" />
+                      <span className="flex-1 min-w-0 truncate text-sm text-gray-600">{table.name}</span>
+                      <button type="button" onClick={() => restoreTable(table)} className="inline-flex items-center gap-1 text-[11px] font-semibold text-violet-700 hover:bg-violet-50 rounded-lg px-2 py-1">
+                        <ArchiveRestore size={13} /> Restore
+                      </button>
+                      <button type="button" onClick={() => deleteTableForever(table)} title="Only possible when it has no rows" className="inline-flex items-center gap-1 text-[11px] font-semibold text-red-600 hover:bg-red-50 rounded-lg px-2 py-1">
+                        <Trash2 size={13} /> Delete
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+        </section>
+      )}
+
+      {movingTable && currentParent && (
+        <TableMoveDialog
+          productId={productId}
+          fromLocationId={currentParent._id}
+          table={movingTable}
+          mandals={moveTargets}
+          onClose={() => setMovingTable(null)}
+          onMoved={() => {
+            setMovingTable(null);
+            fetchTables();
+            loadTree();
+          }}
+        />
+      )}
+
+      {viewingTable && (
+        <section className="space-y-3" aria-label={`${viewingTable.name} table`}>
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-gray-500">
+            <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+              <label className="relative w-full sm:w-72">
+                <span className="sr-only">Search leads in this table</span>
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                <input
+                  type="search"
+                  value={tableSearchInput}
+                  onChange={(e) => setTableSearchInput(e.target.value)}
+                  placeholder="Search lead name or assigned to..."
+                  className="input-field !pl-8 !py-1.5 !text-sm w-full"
+                />
+              </label>
+              {tablePagination && (
+                <span>
+                  {tablePagination.total} record{tablePagination.total !== 1 ? 's' : ''}
+                  {tableSearch ? ` matching "${tableSearch}"` : ''}
+                </span>
+              )}
+            </div>
+            {tablePagination && (
+              <div className="flex items-center gap-2">
+                <button type="button" className="btn-secondary btn-sm" disabled={!tablePagination.hasPreviousPage || tableRecordsLoading} onClick={() => setTablePage(page => Math.max(1, page - 1))}>Previous</button>
+                <span>Page {tablePagination.page} of {Math.max(tablePagination.totalPages, 1)}</span>
+                <button type="button" className="btn-secondary btn-sm" disabled={!tablePagination.hasNextPage || tableRecordsLoading} onClick={() => setTablePage(page => page + 1)}>Next</button>
+              </div>
+            )}
+          </div>
+          <GlobalTable
+            key={viewingTable._id}
+            tableId={viewingTable._id}
+            leads={tableRecords}
+            userLookup={tableUserLookup}
+            loading={tableRecordsLoading}
+            onLeadUpdated={lead => setTableRecords(rows => rows.map(row => row._id === lead._id ? { ...row, ...lead } : row))}
+            onLeadDeleted={leadId => { setTableRecords(rows => rows.filter(row => row._id !== leadId)); fetchTableRecords(); }}
+            onLeadCreated={fetchTableRecords}
+            onRefreshLeads={fetchTableRecords}
+            drawerActivities={ACTIVITY_ORDER}
+            showViews
+            viewKey="crm.productTable.view"
+            kanbanDrag
+          />
+        </section>
+      )}
+
+      {!viewingLocation && !viewingCategory && !viewingTable && (
         locLoading ? (
           <p className="text-center py-10 text-violet-400 text-sm">Loading locations...</p>
-        ) : children.length === 0 && unspecifiedCount === 0 ? (
+        ) : children.length === 0 && unspecifiedCount === 0 && tables.length === 0 ? (
           <div className="glass-card p-10 text-center">
             <p className="text-gray-500 font-semibold">No locations yet</p>
             <p className="text-sm text-gray-400 mt-1">
-              {isSchoolsProduct ? 'Add a location to get started, then add a category or customers to it.' : 'Add a location to get started, then add customers to it.'}
+              {isSchoolsProduct ? 'Add a location to get started, then add Global Tables or customers to it.' : 'Add a location to get started, then add Global Tables or customers to it.'}
             </p>
           </div>
         ) : (
@@ -646,10 +1001,6 @@ export default function ProductDetailPage() {
                   <button onClick={() => enterLocation(node)}
                     className="text-[11px] font-semibold px-3 py-1.5 rounded-lg bg-violet-100 text-violet-700 hover:bg-violet-200 transition-colors">
                     Open →
-                  </button>
-                  <button onClick={() => viewCustomersHere(node._id)}
-                    className="text-[10px] font-semibold text-gray-500 hover:text-gray-700 hover:underline flex-shrink-0">
-                    View Customers →
                   </button>
                 </div>
               </motion.div>
@@ -938,6 +1289,8 @@ export default function ProductDetailPage() {
           onCategoryUpdated={(updated) => setViewingCategory(v => v ? { ...v, ...updated } : v)}
         />
       )}
+        </div>
+      </div>
     </div>
   );
 }

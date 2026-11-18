@@ -12,6 +12,7 @@ const productSchema = new mongoose.Schema({
   // location tree, each holding rows with a custom, per-category field set
   // (see ProductLocation.kind and ProductCategoryRow).
   productType: { type: String, enum: ['generic', 'schools'], default: 'generic' },
+  globalTableWriteVersion: { type: Number, default: 0, min: 0 },
   createdBy:   { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 }, { timestamps: true });
 

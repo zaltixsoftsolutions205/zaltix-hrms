@@ -5,16 +5,27 @@ const Document = require('../models/Document');
 const { sendMail } = require('../config/mail');
 const { offerLetterTemplate, credentialsTemplate } = require('../utils/emailTemplates');
 const { getRequiredDocs } = require('./documentController');
-const { sanitizeModuleAccess } = require('../constants/modules');
+const { sanitizeModuleAccess, canAccessModule } = require('../constants/modules');
+const { isAssignableRole, resolveAssignments, getAssignmentOptions } = require('../services/employeeAssignmentService');
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
-// HR / Admin: Create employee
 exports.createEmployee = async (req, res) => {
-  const { name, email, role, departmentId, designation, phone, joiningDate, exitDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess } = req.body;
+  const { name, email, role, departmentId, designation, phone, joiningDate, exitDate, basicSalary, allowances, deductions, address, employeeId, employeeType, moduleAccess, internship, productLocationAssignments } = req.body;
   try {
     if (!employeeId || !employeeId.trim()) return res.status(400).json({ message: 'Employee ID is required' });
+
+    // Product/Mandal scope only applies to the assignable roles; validate it
+    // before anything is written so a bad assignment never creates a user.
+    let assignments = [];
+    if (isAssignableRole(role)) {
+      try {
+        assignments = await resolveAssignments(productLocationAssignments);
+      } catch (err) {
+        return res.status(err.statusCode || 500).json({ message: err.message });
+      }
+    }
 
     const idExists = await User.findOne({ employeeId: employeeId.trim() });
     if (idExists) return res.status(400).json({ message: 'Employee ID already exists' });
@@ -28,7 +39,6 @@ exports.createEmployee = async (req, res) => {
       name, email, password: tempPassword, role: role || 'employee',
       department: departmentId || null, designation, phone,
       joiningDate: joiningDate ? new Date(joiningDate) : null,
-      exitDate: exitDate ? new Date(exitDate) : null,
       basicSalary: basicSalary || 0,
       allowances: allowances || [],
       deductions: deductions || [],
@@ -36,11 +46,23 @@ exports.createEmployee = async (req, res) => {
       isFirstLogin: true,
       employeeType: employeeType || null,
       moduleAccess: sanitizeModuleAccess(moduleAccess) || [],
+      productLocationAssignments: assignments,
+      ...(employeeType === 'intern' && internship && {
+        internship: {
+          startDate: internship.startDate ? new Date(internship.startDate) : undefined,
+          endDate: internship.endDate ? new Date(internship.endDate) : undefined,
+          durationMonths: internship.durationMonths || undefined,
+          candidateType: ['fresher', 'experienced'].includes(internship.candidateType) ? internship.candidateType : 'fresher',
+          status: internship.status || 'active',
+        },
+      }),
     });
 
-    // Seed required document slots for new employees with onboarding type
-    if (employeeType && ['fresher', 'experienced'].includes(employeeType)) {
-      const requiredDocs = getRequiredDocs(employeeType);
+    // Seed onboarding docs: for fresher/experienced employees, or for
+    // interns using their selected candidateType checklist.
+    const docTrack = employeeType === 'intern' ? internship?.candidateType : employeeType;
+    if (docTrack && ['fresher', 'experienced'].includes(docTrack)) {
+      const requiredDocs = getRequiredDocs(docTrack);
       await Document.insertMany(
         requiredDocs.map(docType => ({ employee: employee._id, docType, status: 'pending_upload' }))
       );
@@ -149,29 +171,66 @@ exports.getTeamMembers = async (req, res) => {
   }
 };
 
-// HR / Admin: Get all employees
+// Roles that see the full employee record in GET /employees, plus anyone
+// granted the hr_employees module (they manage employees, and the edit form
+// needs moduleAccess to avoid saving it back empty). Everyone else
+// gets a basic directory so assignee / responsible-person dropdowns across
+// the CRM keep working without exposing emails, module access or CRM scope.
+const FULL_LIST_ROLES = ['admin', 'hr', 'manager', 'team-lead'];
+const FULL_LIST_FIELDS = 'name employeeId email role designation department isActive employeeType profilePicture moduleAccess productLocationAssignments';
+const BASIC_LIST_FIELDS = 'name employeeId role designation department isActive profilePicture';
+
+// Get all employees — full records for FULL_LIST_ROLES, basic directory otherwise
 exports.getAllEmployees = async (req, res) => {
   try {
-    const filter = { role: { $ne: 'admin' } };
-    const employees = await User.find(filter).populate('department').sort({ employeeId: 1 });
+    const { department, isActive, search,} = req.query;
+    const fullAccess = FULL_LIST_ROLES.includes(req.user?.role) || canAccessModule(req.user, 'hr_employees');
+
+    const filter = { role: { $ne: 'admin' },};
+
+    // Filter by department
+    if (department) {
+      filter.department = department;
+    }
+
+    // Filter by active/inactive status
+    if (isActive !== undefined) {
+      filter.isActive = isActive === 'true';
+    }
+    // Search employees. Email is only searchable by roles that can see it,
+    // otherwise a basic-list caller could probe addresses via the filter.
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { employeeId: { $regex: search, $options: 'i' } },
+        ...(fullAccess ? [{ email: { $regex: search, $options: 'i' } }] : []),
+      ];
+    }
+
+    const employees = await User.find(filter)
+      .populate('department', 'name code')
+      .select(fullAccess ? FULL_LIST_FIELDS : BASIC_LIST_FIELDS)
+      .sort({ name: 1 });
+
     res.json(employees);
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Get All Employees:', err);
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
   }
 };
 
-// Lean employee list for the payslip generator. Returns only the fields the
-// payslip form needs to prefill, so this can be gated by hr_payslips instead
-// of the broader hr_employees module (viewing/generating payslips must not
-// require employee-management access).
+// HR / Admin: Lean employee list for payslip generation.
 exports.getEmployeesForPayslips = async (req, res) => {
   try {
-    const employees = await User.find(
-      { role: { $ne: 'admin' } },
-      'name employeeId role designation location panNumber basicSalary da hra otherAllowance'
-    )
+    const employees = await User.find({ role: { $ne: 'admin' } })
+      .select('name employeeId role department designation basicSalary allowances deductions panNumber')
       .populate('department', 'name')
-      .sort({ employeeId: 1 });
+      .sort({ name: 1 })
+      .lean();
+
     res.json(employees);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -189,9 +248,19 @@ exports.getEmployee = async (req, res) => {
   }
 };
 
+// HR / Admin: Active products and their location nodes for the
+// Product & Mandal assignment picker in the employee form.
+exports.getAssignmentOptions = async (req, res) => {
+  try {
+    res.json(await getAssignmentOptions());
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
 // HR / Admin: Update employee
 exports.updateEmployee = async (req, res) => {
-  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'exitDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role'];
+  const allowed = ['name', 'designation', 'phone', 'department', 'joiningDate', 'exitDate', 'basicSalary', 'allowances', 'deductions', 'address', 'role' ,'employeeType'];
   const { email, sendNewCredentials } = req.body;
   try {
     const employee = await User.findById(req.params.id);
@@ -199,20 +268,25 @@ exports.updateEmployee = async (req, res) => {
 
     allowed.forEach(field => {
       if (req.body[field] !== undefined) {
-        if (field === 'department') {
-          employee.department = req.body[field] || null;
-        } else if (field === 'joiningDate' || field === 'exitDate') {
-          // Empty string clears the date (e.g. un-exiting a rejoined employee).
-          employee[field] = req.body[field] ? new Date(req.body[field]) : null;
-        } else {
-          employee[field] = req.body[field];
-        }
+        employee[field] = field === 'department' ? req.body[field] || null : req.body[field];
       }
     });
 
     if (req.body.moduleAccess !== undefined) {
       const sanitized = sanitizeModuleAccess(req.body.moduleAccess);
       if (sanitized) employee.moduleAccess = sanitized;
+    }
+
+    // `employee.role` already holds the submitted role at this point. Moving
+    // to a role without product scope clears any stored assignments.
+    if (!isAssignableRole(employee.role)) {
+      employee.productLocationAssignments = [];
+    } else if (req.body.productLocationAssignments !== undefined) {
+      try {
+        employee.productLocationAssignments = await resolveAssignments(req.body.productLocationAssignments);
+      } catch (err) {
+        return res.status(err.statusCode || 500).json({ message: err.message });
+      }
     }
 
     let emailChanged = false;
@@ -294,7 +368,7 @@ exports.setEmployeeStatus = async (req, res) => {
         message: 'Your account has been reactivated. You can now log in.',
         type: 'general',
         link: '/dashboard',
-      }).catch(() => {});
+      }).catch(() => { });
     }
 
     const updated = await User.findById(employee._id).populate('department');
@@ -325,7 +399,7 @@ exports.deleteEmployee = async (req, res) => {
 
 // Employee: Update own profile (limited fields)
 exports.updateOwnProfile = async (req, res) => {
-  const allowed = ['phone', 'address', 'emergencyContact', 'accountNumber', 'ifscCode', 'uanNumber', 'panNumber'];
+  const allowed = ['phone', 'address', 'emergencyContact', 'accountNumber', 'ifscCode', 'uanNumber'];
   try {
     const employee = await User.findById(req.user._id);
     allowed.forEach(field => { if (req.body[field] !== undefined) employee[field] = req.body[field]; });
@@ -434,6 +508,42 @@ exports.attachEmployeeDocs = async (req, res) => {
     const updated = await User.findById(employee._id).populate('department');
     res.json({ message: 'Documents attached successfully', employee: updated });
   } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+};
+
+// HR / Admin: Update internship status (accept / reject / extend)
+exports.updateInternshipStatus = async (req, res) => {
+  try {
+    const employee = await User.findById(req.params.id);
+    if (!employee) return res.status(404).json({ message: 'Employee not found' });
+    if (employee.employeeType !== 'intern') return res.status(400).json({ message: 'Employee is not an intern' });
+
+    const { status, reason, newEndDate, convertToFullTime, employeeId } = req.body;
+
+    const current = employee.internship?.toObject?.() ?? employee.internship ?? {};
+    const next = { ...current };
+
+    if (status) next.status = status;
+    if (newEndDate) next.endDate = new Date(newEndDate);
+    if (reason) next.rejectionReason = reason;
+
+    if (convertToFullTime) {
+      if (employeeId && employeeId.trim() && employeeId.trim() !== employee.employeeId) {
+        const idExists = await User.findOne({ employeeId: employeeId.trim(), _id: { $ne: employee._id } });
+        if (idExists) return res.status(400).json({ message: 'Employee ID already in use' });
+        employee.employeeId = employeeId.trim();
+      }
+      employee.employeeType = 'experienced';
+      next.status = 'accepted';
+    }
+
+    employee.internship = next;
+    await employee.save();
+    const updated = await User.findById(employee._id).populate('department');
+    res.json(updated);
+  } catch (err) {
+    if (err.code === 11000) return res.status(400).json({ message: 'Employee ID already in use' });
     res.status(500).json({ message: err.message });
   }
 };

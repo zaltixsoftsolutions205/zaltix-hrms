@@ -55,7 +55,7 @@ export default function ProductsTab() {
         toast.success('Updated');
       } else {
         const { data } = await api.post('/products', form);
-        setProducts(prev => [{ ...data, prospectCount: 0, interestedCount: 0, convertedCount: 0 }, ...prev]);
+        setProducts(prev => [{ ...data, prospectCount: 0, interestedCount: 0, convertedCount: 0, leadCount: 0, wonCount: 0, lostCount: 0 }, ...prev]);
         toast.success('Product created');
       }
       setShowForm(false);
@@ -187,16 +187,16 @@ export default function ProductsTab() {
 
               <div className="grid grid-cols-3 gap-2 pt-3 border-t border-gray-100">
                 <div className="text-center">
-                  <p className="text-base font-bold text-gray-900">{p.prospectCount ?? 0}</p>
-                  <p className="text-[10px] text-gray-500">Prospects</p>
+                  <p className="text-base font-bold text-violet-700">{p.leadCount ?? 0}</p>
+                  <p className="text-[10px] text-gray-500">All Leads</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-base font-bold text-amber-600">{p.interestedCount ?? 0}</p>
-                  <p className="text-[10px] text-gray-500">Interested</p>
+                  <p className="text-base font-bold text-emerald-600">{p.wonCount ?? 0}</p>
+                  <p className="text-[10px] text-gray-500">Won</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-base font-bold text-violet-600">{p.convertedCount ?? 0}</p>
-                  <p className="text-[10px] text-gray-500">In Leads</p>
+                  <p className="text-base font-bold text-red-500">{p.lostCount ?? 0}</p>
+                  <p className="text-[10px] text-gray-500">Lost</p>
                 </div>
               </div>
 

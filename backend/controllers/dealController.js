@@ -17,11 +17,13 @@ exports.createDeal = async (req, res) => {
     const existingDeal = await Deal.findOne({ lead: leadId });
     if (existingDeal) return res.status(400).json({ message: 'A deal already exists for this lead' });
 
-    const assignedUser = await User.findById(lead.assignedTo).select('department');
+    // A deal needs an owner: the lead's assignee, or whoever creates the deal if the lead has none.
+    const dealOwner = lead.assignedTo || req.user._id;
+    const assignedUser = await User.findById(dealOwner).select('department');
 
     const deal = await Deal.create({
       lead: lead._id,
-      assignedTo: lead.assignedTo,
+      assignedTo: dealOwner,
       department: assignedUser?.department || null,
       name: lead.name,
       serviceType,

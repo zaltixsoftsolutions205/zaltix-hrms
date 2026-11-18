@@ -20,7 +20,14 @@ const userSchema = new mongoose.Schema(
     isFirstLogin: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     profilePicture: { type: String, default: '' },
-    employeeType: { type: String, default: null },
+    employeeType: { type: String, enum: ["fresher", "experienced", "intern"], required: true },
+    internship: {
+      startDate: Date,
+      endDate: Date,
+      durationMonths: Number,
+      candidateType: { type: String, enum: ['fresher', 'experienced'], default: 'fresher' },
+      status: { type: String, enum: ["active", "completed", "accepted", "rejected", "extended"], default: "active" },
+    },
     commissionRate: { type: Number, default: 0 },
     salesTarget: { type: Number, default: 0 },
     emergencyContact: { name: String, phone: String, relation: String },
@@ -42,6 +49,21 @@ const userSchema = new mongoose.Schema(
           _id: false,
           module: { type: String, required: true },
           permission: { type: String, enum: ['view', 'edit'], default: 'view' },
+        },
+      ],
+      default: [],
+    },
+    // CRM data scope for sales / inside-sales / product-executive. Only leaf
+    // ProductLocation nodes ("Mandals") are stored, grouped under the product
+    // they belong to; ticking a parent in the UI resolves to its leaf IDs, so
+    // Mandals added later are NOT picked up automatically. Validated by
+    // services/employeeAssignmentService before every save.
+    productLocationAssignments: {
+      type: [
+        {
+          _id: false,
+          product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+          mandals: [{ type: mongoose.Schema.Types.ObjectId, ref: 'ProductLocation' }],
         },
       ],
       default: [],

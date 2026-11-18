@@ -75,6 +75,34 @@ router.get('/reports/pdf', roleCheck('hr', 'admin'), downloadReportPDF);
 // Legacy review flow — unchanged, left intact. Authorization enforced
 // per-record inside the controller (a technical lead is a regular employee by role).
 router.get('/approvals', getApprovals);
+/**
+ * @swagger
+ * /api/timesheets/{id}/review:
+ *   put:
+ *     summary: Review timesheet
+ *     tags:
+ *       - Timesheets
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *     responses:
+ *       200:
+ *         description: Success
+ *       401:
+ *         description: Not authorized
+ *       404:
+ *         description: Not found
+ */
 router.put('/:id/review', reviewTimesheet);
 
 module.exports = router;

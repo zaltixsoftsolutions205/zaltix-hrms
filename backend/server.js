@@ -9,6 +9,9 @@ const connectDB = require('./config/db');
 const { Server } = require('socket.io');
 const Message = require('./models/Message');
 
+const swaggerUi = require('swagger-ui-express');
+const swaggerSpec = require('./config/swagger');
+
 // Ensure upload directories exist on startup
 ['uploads', 'uploads/payslips', 'uploads/profiles', 'uploads/documents', 'uploads/receipts'].forEach(dir => {
   const dirPath = path.join(__dirname, dir);
@@ -17,6 +20,12 @@ const Message = require('./models/Message');
 
 const app = express();
 const server = http.createServer(app);
+
+
+// =======================
+// 📄 SWAGGER API DOCS
+// =======================
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // =======================
 // 🔌 CONNECT DATABASE
@@ -78,13 +87,12 @@ io.use((socket, next) => {
 
 // Role → group room mapping
 const roleToRooms = {
-  admin:               ['all', 'admin'],
-  hr:                  ['all', 'hr'],
-  sales:               ['all', 'sales'],
-  field_sales:         ['all', 'sales'],
+  admin: ['all', 'admin'],
+  hr: ['all', 'hr'],
+  sales: ['all', 'sales'],
   technical_associate: ['all'],
-  bda:                 ['all'],
-  employee:            ['all'],
+  bda: ['all'],
+  employee: ['all'],
 };
 
 io.on('connection', (socket) => {
@@ -149,12 +157,14 @@ io.on('connection', (socket) => {
     }
   });
 
-  socket.on('disconnect', () => {});
+  socket.on('disconnect', () => { });
 });
 
 // =======================
 // 📦 MIDDLEWARE
 // =======================
+// Excel imports send up to 1,000 rows as JSON: a larger limit for Global Tables only.
+app.use('/api/global-tables', express.json({ limit: '5mb' }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -176,6 +186,7 @@ app.use('/uploads', (req, res) => {
 // =======================
 // 🚀 ROUTES
 // =======================
+
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/user', require('./routes/userRoutes'));
 app.use('/api/employees', require('./routes/employees'));
@@ -185,11 +196,10 @@ app.use('/api/payslips', require('./routes/payslips'));
 app.use('/api/tasks', require('./routes/tasks'));
 app.use('/api/timesheets', require('./routes/timesheets'));
 app.use('/api/timesheet-projects', require('./routes/timesheetProjects'));
-// Transition alias: the already-deployed frontend still calls /api/projects for the timesheet
-// project list. Remove once the new frontend (which uses /api/timesheet-projects) is live —
-// and before merging the workspace Project routes, which use /api/projects.
-app.use('/api/projects', require('./routes/timesheetProjects'));
 app.use('/api/leads', require('./routes/leads'));
+app.use('/api/visits', require('./routes/visits'));
+app.use('/api/activities', require('./routes/activities'));
+app.use('/api/analytics', require('./routes/analytics'));
 app.use('/api/queries', require('./routes/queries'));
 app.use('/api/admin', require('./routes/admin'));
 app.use('/api/notifications', require('./routes/notifications'));
@@ -203,11 +213,26 @@ app.use('/api/holidays', require('./routes/holidays'));
 app.use('/api/quotations', require('./routes/quotations'));
 app.use('/api/purchase-orders', require('./routes/purchaseOrders'));
 app.use('/api/recruitment', require('./routes/recruitment'));
-app.use('/api/products',    require('./routes/products'));
-app.use('/api/field-leads', require('./routes/fieldLeads'));
+app.use('/api/products', require('./routes/products'));
 app.use('/api/automation', require('./routes/automation'));
-app.use('/api/kt',         require('./routes/kt'));
-app.use('/api/chat',       require('./routes/chat'));
+app.use('/api/kt', require('./routes/kt'));
+app.use('/api/chat', require('./routes/chat'));
+app.use('/api/departments', require('./routes/departmentRoutes'));
+app.use('/api/projects', require('./routes/projectRoutes'));
+// app.use('/api/tasks', require('./routes/projectTaskRoutes'));
+
+
+app.use('/api/lead-custom-fields', require('./routes/leadCustomFieldRoutes'));
+app.use('/api/leads/:leadId/custom-fields', require('./routes/leadCustomFieldValueRoutes'));
+//global table routes
+app.use('/api/global-tables', require('./routes/globalTableRoutes'));
+app.use('/api/global-table-fields', require('./routes/globalTableFieldRoutes'));
+app.use('/api/global-table-values', require('./routes/globalTableValueRoutes'));
+
+//  workspace server apis
+app.use("/api/workspace", require("./routes/workspaceRoutes"));
+app.use("/api/workflow-stages", require("./routes/workflowStageRoutes"));
+
 
 // =======================
 // ❤️ HEALTH CHECK

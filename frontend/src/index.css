@@ -471,3 +471,22 @@
   background-color: var(--fin-bg);
   color: var(--fin-fg);
 }
+
+/* ── Analytics dashboard grid (react-grid-layout) ── */
+.analytics-grid .react-grid-item.react-grid-placeholder {
+  background: #c4b5fd;
+  opacity: 0.35;
+  border-radius: 0.75rem;
+}
+.analytics-grid .react-grid-item > .react-resizable-handle {
+  z-index: 5;
+}
+.analytics-grid .react-grid-item > .react-resizable-handle::after {
+  border-color: #7c3aed;
+  width: 8px;
+  height: 8px;
+}
+.analytics-grid.is-editing .react-grid-item.react-draggable-dragging {
+  opacity: 0.9;
+  box-shadow: 0 12px 28px rgba(76, 29, 149, 0.18);
+}

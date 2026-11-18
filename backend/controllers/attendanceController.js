@@ -156,81 +156,137 @@ exports.getOfficeInfo = (req, res) => {
 };
 
 // Employee: Get own attendance
-// Employee: Get own attendance
+// Employee: Get own attendance, including absent working days
+
 exports.getMyAttendance = async (req, res) => {
   const { month, year } = req.query;
 
   try {
-    // ===========================
-    // CHANGE 1:
-    // If an employee ID is passed in the URL (/my/:id),
-    // use it. Otherwise use the logged-in user's ID.
-    // This allows the same controller to be used by:
-    // GET /attendance/my
-    // GET /attendance/my/:id
-    // ===========================
     const employeeId = req.params.id || req.user._id;
-
-    let filter = { employee: employeeId };
-
-    let start, end;
-
-    if (month && year) {
-      start = `${year}-${String(month).padStart(2, "0")}-01`;
-      end = moment(start).endOf("month").format("YYYY-MM-DD");
-      filter.date = { $gte: start, $lte: end };
-    } else {
-      const now = istDate();
-      start = now.slice(0, 7) + "-01";
-      end = moment(start).endOf("month").format("YYYY-MM-DD");
-    }
-
-    const records = await Attendance.find(filter).sort({ date: -1 });
-
     const today = istDate();
 
-    // Count absent only up to yesterday — today is still in progress
-    const absentCalcEnd =
-      today < end
-        ? moment(today).subtract(1, "day").format("YYYY-MM-DD")
-        : end;
+    // Default to the current month if month/year aren't supplied.
+    const selectedMonth = Number(month || today.slice(5, 7));
+    const selectedYear = Number(year || today.slice(0, 4));
 
-    // Count working days — Sunday is the only weekly off; Saturday is worked
-    let workingDays = 0;
-    const cur = moment(start);
-    const endM = moment(absentCalcEnd);
-
-    while (cur.isSameOrBefore(endM)) {
-      if (cur.day() !== 0) {
-        workingDays++;
-      }
-      cur.add(1, "day");
+    if (
+      !Number.isInteger(selectedMonth) ||
+      selectedMonth < 1 ||
+      selectedMonth > 12 ||
+      !Number.isInteger(selectedYear) ||
+      selectedYear < 2000 ||
+      selectedYear > 9999
+    ) {
+      return res.status(400).json({
+        message: "Invalid month or year",
+      });
     }
 
-    // Days employee was actually present
-    const attendedDays = records.filter(
-      (r) =>
-        r.date <= absentCalcEnd &&
-        (r.status === "present" || r.status === "half-day")
-    ).length;
+    const start = `${selectedYear}-${String(selectedMonth).padStart(2, "0")}-01`;
+    const end = moment(start).endOf("month").format("YYYY-MM-DD");
+
+    // Existing attendance documents for the selected month.
+    const savedRecords = await Attendance.find({
+      employee: employeeId,
+      date: { $gte: start, $lte: end },
+    }).sort({ date: -1 });
+
+    // Fetch holidays in the selected month.
+    const monthStart = new Date(`${start}T00:00:00.000Z`);
+    const monthEnd = new Date(`${end}T23:59:59.999Z`);
+
+    const holidayRecords = await Holiday.find({
+      date: { $gte: monthStart, $lte: monthEnd },
+    }).select("date name");
+
+    const holidayMap = new Map();
+
+    holidayRecords.forEach((holiday) => {
+      const dateKey = moment(holiday.date).utc().format("YYYY-MM-DD");
+      holidayMap.set(dateKey, holiday.name || "Holiday");
+    });
+
+    const savedDateSet = new Set(
+      savedRecords.map((record) =>
+        moment(record.date).format("YYYY-MM-DD")
+      )
+    );
+
+    // Today's attendance is still in progress.
+    // Never generate absences for today or future dates.
+    const absentEnd = moment.min(
+      moment(end, "YYYY-MM-DD"),
+      moment(today, "YYYY-MM-DD").subtract(1, "day")
+    ).format("YYYY-MM-DD");
+
+    const virtualAbsentRecords = [];
+
+    const cursor = moment(start, "YYYY-MM-DD");
+    const lastDate = moment(absentEnd, "YYYY-MM-DD");
+
+    while (cursor.isSameOrBefore(lastDate, "day")) {
+      const dateKey = cursor.format("YYYY-MM-DD");
+      const isSunday = cursor.day() === 0;
+      const isHoliday = holidayMap.has(dateKey);
+
+      if (
+        !isSunday &&
+        !isHoliday &&
+        !savedDateSet.has(dateKey)
+      ) {
+        virtualAbsentRecords.push({
+          _id: `absent-${dateKey}`,
+          employee: employeeId,
+          date: dateKey,
+          checkIn: null,
+          checkOut: null,
+          workHours: 0,
+          status: "absent",
+          isLate: false,
+          isEarlyLeave: false,
+          regularizationStatus: null,
+          regularizationAttempts: 0,
+          isVirtualAbsent: true,
+        });
+      }
+
+      cursor.add(1, "day");
+    }
+
+    // Merge saved attendance records with generated absent rows.
+    const records = [
+      ...savedRecords.map((record) => record.toObject()),
+      ...virtualAbsentRecords,
+    ].sort((a, b) => {
+      const dateA = moment(a.date).valueOf();
+      const dateB = moment(b.date).valueOf();
+      return dateB - dateA;
+    });
 
     const summary = {
-      present: records.filter((r) => r.status === "present").length,
-      absent: Math.max(0, workingDays - attendedDays),
-      halfDay: records.filter((r) => r.status === "half-day").length,
-      totalWorkHours: records
-        .reduce((sum, r) => sum + (r.workHours || 0), 0)
+      present: savedRecords.filter(
+        (r) => r.status === "present"
+      ).length,
+
+      absent:
+        savedRecords.filter((r) => r.status === "absent").length +
+        virtualAbsentRecords.length,
+
+      halfDay: savedRecords.filter(
+        (r) => r.status === "half-day"
+      ).length,
+
+      totalWorkHours: savedRecords
+        .reduce((sum, r) => sum + (Number(r.workHours) || 0), 0)
         .toFixed(2),
-      lateCount: records.filter((r) => r.isLate).length,
-      earlyLeaveCount: records.filter((r) => r.isEarlyLeave).length,
+
+      lateCount: savedRecords.filter((r) => r.isLate).length,
+
+      earlyLeaveCount: savedRecords.filter(
+        (r) => r.isEarlyLeave
+      ).length,
     };
 
-    // ===========================
-    // CHANGE 2:
-    // Use employeeId instead of req.user._id
-    // so HR can fetch today's attendance
-    // for another employee.
-    // ===========================
     const todayRecord = await Attendance.findOne({
       employee: employeeId,
       date: today,
@@ -242,9 +298,14 @@ exports.getMyAttendance = async (req, res) => {
       todayRecord: todayRecord || null,
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("getMyAttendance error:", err);
+
+    res.status(500).json({
+      message: err.message,
+    });
   }
 };
+
 
 // HR / Admin: Get all attendance
 exports.getAllAttendance = async (req, res) => {
@@ -253,7 +314,6 @@ exports.getAllAttendance = async (req, res) => {
     let empFilter = {};
     if (departmentId) empFilter.department = departmentId;
     if (employeeId) empFilter._id = employeeId;
-
     const employees = await User.find({ ...empFilter, role: { $nin: ['admin'] } }).select('_id name employeeId');
     const empIds = employees.map(e => e._id);
 
@@ -302,23 +362,118 @@ exports.markAttendance = async (req, res) => {
 };
 
 // Employee: Apply for regularization (late / early leave)
+
 exports.applyRegularization = async (req, res) => {
-  const {
-    attendanceId,
-    reason,
-    checkIn,
-    checkOut
-  } = req.body;
+  const { attendanceId, reason, checkIn, checkOut } = req.body;
 
   try {
+    // 1. Validate request details before creating any document
     if (!reason?.trim()) {
-      return res.status(400).json({ message: "Reason is required" });
+      return res.status(400).json({
+        message: "Reason is required",
+      });
     }
 
-    const record = await Attendance.findOne({
-      _id: attendanceId,
-      employee: req.user._id,
-    });
+    if (!checkIn) {
+      return res.status(400).json({
+        message: "Please provide your check-in time",
+      });
+    }
+
+    if (!checkOut) {
+      return res.status(400).json({
+        message: "Please provide your check-out (leaving) time",
+      });
+    }
+
+    // Validate HH:mm time format
+    const timePattern = /^([01]\d|2[0-3]):[0-5]\d$/;
+
+    if (!timePattern.test(checkIn) || !timePattern.test(checkOut)) {
+      return res.status(400).json({
+        message: "Invalid time format. Use HH:mm",
+      });
+    }
+
+    // 2. Handle virtual absent records separately
+    const isVirtualAbsent =
+      typeof attendanceId === "string" &&
+      attendanceId.startsWith("absent-");
+
+    let record;
+
+    if (isVirtualAbsent) {
+      const absentDate = attendanceId.substring("absent-".length);
+
+      // Validate date
+      if (
+        !moment(absentDate, "YYYY-MM-DD", true).isValid() ||
+        moment(absentDate).format("YYYY-MM-DD") !== absentDate
+      ) {
+        return res.status(400).json({
+          message: "Invalid attendance date",
+        });
+      }
+
+      // Past dates only
+      if (absentDate >= istDate()) {
+        return res.status(400).json({
+          message: "Regularization is available only for past dates",
+        });
+      }
+
+      // Exclude Sundays
+      if (moment(absentDate, "YYYY-MM-DD").day() === 0) {
+        return res.status(400).json({
+          message: "Regularization is not available on Sundays",
+        });
+      }
+
+      // Exclude holidays
+      const holiday = await findHolidayForDate(absentDate);
+
+      if (holiday) {
+        return res.status(400).json({
+          message: "Regularization is not available on holidays",
+        });
+      }
+
+      // Find an existing document for this employee and date
+      record = await Attendance.findOne({
+        employee: req.user._id,
+        date: absentDate,
+      });
+
+      // Create a real attendance document if none exists
+      if (!record) {
+        record = await Attendance.create({
+          employee: req.user._id,
+          date: absentDate,
+          checkIn: null,
+          checkOut: null,
+          workHours: 0,
+          status: "absent",
+          isLate: false,
+          isEarlyLeave: false,
+          regularizationAttempts: 0,
+        });
+      }
+    } else {
+      // 3. Handle existing MongoDB attendance records
+      if (
+        typeof attendanceId !== "string" ||
+        !/^[a-f\d]{24}$/i.test(attendanceId)
+      ) {
+        return res.status(400).json({
+          message: "Invalid attendance record ID",
+        });
+      }
+
+      record = await Attendance.findOne({
+        _id: attendanceId,
+        employee: req.user._id,
+      });
+    }
 
     if (!record) {
       return res.status(404).json({
@@ -326,69 +481,72 @@ exports.applyRegularization = async (req, res) => {
       });
     }
 
-    // A checkout more than an hour past office end (e.g. genuinely
-    // forgetting to check out until late at night, or inflating hours) is
-    // just as worth flagging/correcting as arriving late or leaving early.
-    const LATE_CHECKOUT_THRESHOLD = "19:00"; // 1hr past OFFICE_END (18:00)
-    const isLateCheckout = record.checkOut && record.checkOut > LATE_CHECKOUT_THRESHOLD;
+    // 4. Check whether regularization is actually required
+    const LATE_CHECKOUT_THRESHOLD = "19:00";
+
+    const isLateCheckout =
+      record.checkOut &&
+      record.checkOut > LATE_CHECKOUT_THRESHOLD;
 
     if (
       !record.isLate &&
       !record.isEarlyLeave &&
       !isLateCheckout &&
-      record.checkOut
+      record.checkOut &&
+      record.status !== "absent"
     ) {
       return res.status(400).json({
         message: "No regularization required",
       });
     }
 
-    // Block only while a request is pending or already approved. A rejected
-    // request can be corrected and resubmitted.
-    if (record.regularizationStatus === "pending" || record.regularizationStatus === "approved") {
+    // 5. Block pending or already-approved requests
+    if (
+      record.regularizationStatus === "pending" ||
+      record.regularizationStatus === "approved"
+    ) {
       return res.status(400).json({
         message: "Regularization already submitted",
       });
     }
 
-    // Cap resubmissions at 3 attempts total for this record (initial
-    // request + up to 2 corrections after rejection).
-    if (record.regularizationAttempts >= 3) {
+    // 6. Maximum three attempts
+    if ((record.regularizationAttempts || 0) >= 3) {
       return res.status(400).json({
-        message: "You have reached the maximum of 3 regularization attempts for this day. Please contact HR directly.",
+        message:
+          "You have reached the maximum of 3 regularization attempts for this day. Please contact HR directly.",
       });
     }
 
-    // Always require both times on every request, regardless of which one
-    // originally triggered it — otherwise a corrected checkout submitted
-    // without a checkIn (or vice versa) leaves the other half unset, and
-    // approval later computes work hours off a partially-corrected record.
-    if (!checkIn) {
-      return res.status(400).json({ message: "Please provide your check-in time" });
-    }
-    if (!checkOut) {
-      return res.status(400).json({ message: "Please provide your check-out (leaving) time" });
-    }
-
+    // 7. Save the request WITHOUT changing actual attendance times
     record.regularizationStatus = "pending";
     record.regularizationReason = reason.trim();
-    record.regularizationComment = ""; // clear any prior rejection note
-    record.regularizationAttempts = (record.regularizationAttempts || 0) + 1;
+    record.regularizationComment = "";
+    record.regularizationAttempts =
+      (record.regularizationAttempts || 0) + 1;
 
-    // Employee requested timings
-    record.regularizedCheckIn = checkIn || null;
-    record.regularizedCheckOut = checkOut || null;
+    // Store requested times separately until HR approves
+    record.regularizedCheckIn = checkIn;
+    record.regularizedCheckOut = checkOut;
+
+    // Do NOT assign checkIn/checkOut here.
+    // Do NOT change status from absent here.
 
     await record.save();
 
-    res.json(record);
-
+    return res.json({
+      message: "Regularization request submitted successfully",
+      record,
+    });
   } catch (err) {
-    res.status(500).json({
+    console.error("applyRegularization error:", err);
+
+    return res.status(500).json({
       message: err.message,
     });
   }
 };
+
 
 // HR / Admin: Get all regularization requests
 exports.getRegularizations = async (req, res) => {

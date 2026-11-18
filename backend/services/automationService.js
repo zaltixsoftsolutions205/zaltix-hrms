@@ -445,6 +445,9 @@ async function checkCRMAlerts() {
     const fourteenDaysAgo = new Date(now.getTime() - 14 * 86400000);
 
     // Leads with no activity in 7+ days (not converted/lost)
+    // Who hears about a lead: its assignee, or its creator while it is unassigned.
+    const leadOwner = (lead) => lead.assignedTo?._id || lead.createdBy || null;
+
     const staleLeads = await Lead.find({
       status: { $nin: ['converted', 'not-interested'] },
       $or: [
@@ -455,7 +458,9 @@ async function checkCRMAlerts() {
 
     for (const lead of staleLeads) {
       const daysSince = Math.floor((now - lead.updatedAt) / 86400000);
-      await notify(lead.assignedTo._id, {
+      const owner = leadOwner(lead);
+      if (!owner) continue; // nobody to tell yet
+      await notify(owner, {
         title: '📞 Lead Needs Follow-Up',
         message: `Lead "${lead.name}" has had no activity for ${daysSince} days. Schedule a follow-up.`,
         type: 'general',
@@ -472,7 +477,9 @@ async function checkCRMAlerts() {
     }).populate('assignedTo', '_id name');
 
     for (const lead of overdueFollowUps) {
-      await notify(lead.assignedTo._id, {
+      const owner = leadOwner(lead);
+      if (!owner) continue; // nobody to tell yet
+      await notify(owner, {
         title: '🗓️ Follow-Up Overdue',
         message: `Follow-up for "${lead.name}" was due on ${lead.followUpDate.toLocaleDateString('en-IN')}. Take action today.`,
         type: 'general',
@@ -489,7 +496,9 @@ async function checkCRMAlerts() {
     }).populate('assignedTo', '_id name');
 
     for (const lead of agingLeads) {
-      await notify(lead.assignedTo._id, {
+      const owner = leadOwner(lead);
+      if (!owner) continue; // nobody to tell yet
+      await notify(owner, {
         title: '🕰️ Aging Lead Alert',
         message: `"${lead.name}" has been in "New" status for 14+ days. Qualify or mark as not interested.`,
         type: 'general',

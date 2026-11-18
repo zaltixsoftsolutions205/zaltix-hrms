@@ -10,7 +10,7 @@ const CATEGORIES = [
   { value: 'product_training',    label: 'Product Training',    bg: 'bg-amber-100',   text: 'text-amber-700',   dot: 'bg-amber-500'  },
 ];
 
-const ROLES = ['employee', 'sales', 'field_sales', 'hr', 'admin'];
+const ROLES = ['employee', 'sales', 'hr', 'admin'];
 
 const ALL_ROLES_OPTION = { value: '', label: 'All Roles' };
 

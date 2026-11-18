@@ -446,7 +446,7 @@ const HRAttendance = () => {
 
   useEffect(() => {
     api.get('/employees').then(r => setEmployees(r.data)).catch(() => { });
-    api.get('/admin/departments').then(r => setDepartments(r.data)).catch(() => { });
+    api.get('/admin/departments').then(r => setDepartments(r.data.departments || [])).catch(() => { });
     api.get('/attendance/regularizations?status=pending')
       .then(r => setPendingRegCount(r.data.length))
       .catch(() => { });

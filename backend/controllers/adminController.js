@@ -10,54 +10,6 @@ const PurchaseOrder = require('../models/PurchaseOrder');
 const Expense = require('../models/Expense');
 const moment = require('moment');
 
-// Department CRUD
-exports.getDepartments = async (req, res) => {
-  try {
-    const departments = await Department.find().populate('headOf', 'name employeeId').sort({ name: 1 });
-    const withCount = await Promise.all(
-      departments.map(async (dept) => {
-        const count = await User.countDocuments({ department: dept._id, isActive: true });
-        return { ...dept.toObject(), employeeCount: count };
-      })
-    );
-    res.json(withCount);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-exports.createDepartment = async (req, res) => {
-  const { name, description, headOf } = req.body;
-  try {
-    const dept = await Department.create({ name, description, headOf: headOf || null });
-    const populated = await Department.findById(dept._id).populate('headOf', 'name employeeId');
-    res.status(201).json(populated);
-  } catch (err) {
-    if (err.code === 11000) return res.status(400).json({ message: 'Department already exists' });
-    res.status(500).json({ message: err.message });
-  }
-};
-
-exports.updateDepartment = async (req, res) => {
-  try {
-    const dept = await Department.findByIdAndUpdate(req.params.id, req.body, { new: true }).populate('headOf', 'name employeeId');
-    if (!dept) return res.status(404).json({ message: 'Department not found' });
-    res.json(dept);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
-
-exports.deleteDepartment = async (req, res) => {
-  try {
-    const empCount = await User.countDocuments({ department: req.params.id });
-    if (empCount > 0) return res.status(400).json({ message: 'Cannot delete department with active employees' });
-    await Department.findByIdAndDelete(req.params.id);
-    res.json({ message: 'Department deleted' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-};
 
 // Leave Policy CRUD
 exports.getLeavePolicies = async (req, res) => {

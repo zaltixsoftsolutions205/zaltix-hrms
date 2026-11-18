@@ -109,31 +109,18 @@ export default function StatsCards({ employeeId, }) {
   console.log(attendanceData)
   // create netSalary
   const netSalary = payslipData?.reduce((sum, p) => sum + (p.netSalary || 0), 0) || 0;
-
   const attendance = attendanceData?.summary;
-
-  const totalDays =
-    (attendance?.present || 0) +
-    (attendance?.absent || 0) +
-    (attendance?.halfDay || 0);
-
-  const attendancePercentage =
-    totalDays > 0
-      ? (
-        ((attendance.present + attendance.halfDay * 0.5) / totalDays) *
-        100
-      ).toFixed(1)
-      : 0;
+  const totalDays = (attendance?.present || 0) + (attendance?.absent || 0) + (attendance?.halfDay || 0);
+  const attendancePercentage = totalDays > 0 ? (((attendance.present + attendance.halfDay * 0.5) / totalDays) * 100).toFixed(1) : 0;
   const totalLeaves = leaveData?.leaves?.length || 0;
-
   console.log(totalLeaves);
 
   return (
     <section className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
       <StatCard icon={TrendingUp} title="Performance" value={`${performance.totalScore ?? 0}%`} subtitle={`Week: ${performance.week ?? "-"}`} progress={performance?.totalScore ?? 0} progressColor="bg-indigo-600" iconBg="bg-indigo-100" iconColor="text-indigo-600" />
-      <StatCard icon={IndianRupee} title="Net Salary" value={netSalary} subtitle="Salary for this Month" iconBg="bg-green-100" iconColor="text-green-600" />
+      <StatCard icon={IndianRupee} title="Net Salary" value={netSalary} subtitle="Total Net Salary" iconBg="bg-green-100" iconColor="text-green-600" />
       <StatCard icon={Clock3} title="Attendance" value={`${attendancePercentage}%`} subtitle="Current Month" progress={attendancePercentage} progressColor="bg-cyan-500" iconBg="bg-cyan-100" iconColor="text-cyan-600" />
-      <StatCard icon={BriefcaseBusiness} title="Total Leaves" value={totalLeaves} subtitle=" No Of Leave This Mouth" progressColor="bg-orange-500" iconBg="bg-orange-100" iconColor="text-orange-600" />
+      <StatCard icon={BriefcaseBusiness} title="Total Leaves" value={totalLeaves} subtitle=" No Of Leave This Month" progressColor="bg-orange-500" iconBg="bg-orange-100" iconColor="text-orange-600" />
     </section>
   );
 }

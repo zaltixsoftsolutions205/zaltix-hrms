@@ -13,7 +13,6 @@ const roleBadge = {
   admin:       'bg-rose-50 text-rose-600 border border-rose-200',
   hr:          'bg-blue-50 text-blue-600 border border-blue-200',
   sales:       'bg-emerald-50 text-emerald-600 border border-emerald-200',
-  field_sales: 'bg-amber-50 text-amber-600 border border-amber-200',
   employee:    'bg-gray-50 text-gray-500 border border-gray-200',
 };
 

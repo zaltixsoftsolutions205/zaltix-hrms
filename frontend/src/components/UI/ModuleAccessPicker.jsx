@@ -33,6 +33,7 @@ export default function ModuleAccessPicker({ value = [], onChange }) {
   const hasExplicit = access.length > 0;
 
   return (
+
     <div>
       <div className="flex items-center justify-between mb-2">
         <label className="block text-xs font-semibold text-violet-700">Module Access</label>
