@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 
-const { createTask, importTasks, getTasks, getTask, updateTask, deleteTask,getTaskSummary,} = require("../controllers/taskController");
+const { createTask, importTasks, getTasks, getTask, updateTask, deleteTask,getTaskSummary, getMyTasks, updateTaskStatus,} = require("../controllers/taskController");
 const { protect } = require("../middleware/auth");
 const { moduleAccess, canModifyTask, } = require("../middleware/roleCheck");
 const { taskAttachmentUpload } = require("../middleware/taskUpload");
@@ -59,6 +59,12 @@ router.get("/", protect, moduleAccess("tasks", "view"), getTasks);
  *         description: Not authorized
  */
 router.get("/summary", protect, getTaskSummary);
+
+// Own tasks / status update / focus lock. Must stay ABOVE "/:id" or "my" is read as an id (400).
+router.get("/my", protect, getMyTasks);
+// The task model no longer tracks self-task focus timers; keep the endpoint so the dashboards do not 400.
+router.get("/active-self", protect, (req, res) => res.json({ active: null }));
+router.put("/:id/status", protect, updateTaskStatus);
 
 // GET /api/tasks/:id
 /**

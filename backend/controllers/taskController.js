@@ -1366,7 +1366,17 @@ const getMyTasks = async (req, res) => {
       overdue,
     };
 
-    return res.status(200).json({ success: true, summary, count: result.count, total: result.total, page: result.page, pages: result.pages, tasks: result.tasks });
+    // Legacy shape still read by TasksPage / EmployeeDashboard (r.data.kpi)
+    const kpiTotal = statusCounts.reduce((n, s) => n + s.total, 0);
+    const kpi = {
+      total: kpiTotal,
+      completed: summary.completed,
+      inProgress: summary.inProgress,
+      notStarted: summary.notStarted,
+      completionRate: kpiTotal > 0 ? Math.round((summary.completed / kpiTotal) * 100) : 0,
+    };
+
+    return res.status(200).json({ success: true, summary, kpi, count: result.count, total: result.total, page: result.page, pages: result.pages, tasks: result.tasks });
   } catch (error) {
     return sendServerError(res, 'Get My Tasks', error);
   }
