@@ -4,7 +4,7 @@ import {
   Tooltip, ResponsiveContainer, AreaChart, Area, Legend,
 } from 'recharts';
 import api from '../../utils/api';
-import { getOverview, getEmployeeDistribution, getDepartmentDistribution, getJoiningTrend, getSalaryAnalysis, getExperienceAnalysis, getStatusAnalysis, getMissingInformation, getRoleDistribution, getDepartmentHealth, getPerformanceAnalysis, } from '../../utils/employeeAnalytics';
+import { getOverview, getEmployeeDistribution, getDepartmentDistribution, getJoiningTrend, getSalaryAnalysis, getExperienceAnalysis, getStatusAnalysis, getMissingInformation, getRoleDistribution, getDepartmentHealth, getPerformanceAnalysis, } from '../../utils/Employeeanalytics';
 
 /* ── Shared icon primitive — mirrors the Ico component in HREmployees.jsx ── */
 const Ico = ({ d, d2, className = 'w-4 h-4' }) => (

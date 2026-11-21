@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import api from '../utils/api';
-import { normalizeProductList, toProductOptions } from '../components/GlobalTable/productRef';
+import { normalizeProductList, toProductOptions } from '../components/GlobalTable/Productref';
 
 /**
  * Loads the products a lead can reference. Reads the existing Product list route

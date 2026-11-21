@@ -4,7 +4,7 @@ import toast from 'react-hot-toast';
 import { Check, Loader2, X } from 'lucide-react';
 import { createRecord } from '../../store/globalTableSlice';
 import { FieldControl } from './CellEditors';
-import { productId } from './productRef';
+import { productId } from './Productref';
 import {
   buildCreateRequest,
   formColumn,

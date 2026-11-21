@@ -152,7 +152,7 @@ const AdminEmployeeHub = () => {
 
   useEffect(() => {
     api.get('/admin/dashboard-stats').then(r => setStats(r.data)).catch(() => { });
-    api.get('/admin/departments').then(r => setDeptCount((r.data || []).length)).catch(() => { });
+    api.get('/admin/departments', { params: { limit: 1 } }).then(r => setDeptCount(Array.isArray(r.data) ? r.data.length : (r.data?.total ?? 0))).catch(() => { });
   }, []);
 
   // Attendance rate for today, guarded against a zero headcount.

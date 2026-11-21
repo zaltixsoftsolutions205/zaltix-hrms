@@ -29,6 +29,13 @@ const toIdString = (value) => {
     return value.toString();
 };
 
+/** Admin / HR see and manage every project's stages (same rule as workflowStageMiddleware). */
+const isPrivilegedRole = (role) => ["admin", "hr"].includes(String(role || "").trim().toLowerCase());
+
+/** Every department a project belongs to (owning + extra), as strings. */
+const projectDepartmentIdList = (project) =>
+    [...new Set([project.department, ...(project.departments || [])].filter(Boolean).map(toIdString))];
+
 
 /*
  * Get and validate a project.
@@ -38,7 +45,7 @@ const getProject = async (projectId) => {
     if (!mongoose.Types.ObjectId.isValid(projectId)) {
         return { valid: false, status: 400, message: "Invalid project id.", };
     }
-    const project = await Project.findById(projectId).select("name projectCode department manager teamMembers isActive");
+    const project = await Project.findById(projectId).select("name projectCode department departments manager teamMembers isActive");
 
     if (!project) {
         return { valid: false, status: 404, message: "Project not found.", };
@@ -76,7 +83,7 @@ const getNextOrder = async (projectId) => {
  */
 const findDuplicateStage = async ({ projectId, name, excludeId = null, }) => {
     const normalizedName = normalizeStageName(name);
-    const stages = await WorkflowStage.find({ project: projectId, isActive: true, }).select("_id name");
+    const stages = await WorkflowStage.find({ project: projectId, isActive: true, scope: { $ne: "bug" }, }).select("_id name");
     return stages.find((stage) => {
         if (excludeId && stage._id.toString() === excludeId.toString()) {
             return false;
@@ -201,7 +208,8 @@ const createStage = async (req, res) => {
  */
 const getStagesByProject = async (req, res) => {
     try {
-        const projectId = req.query.project || req.query.projectId;
+        // Route is /project/:projectId; the query form is kept for older callers.
+        const projectId = req.params.projectId || req.query.project || req.query.projectId;
         /* --------------------------------------------------------
          * 1. Validate project
          * -------------------------------------------------------- */
@@ -243,13 +251,14 @@ const getStagesByProject = async (req, res) => {
         // Manager
         if (role === "manager") {
             const Department = require("../models/Department");
-            const departmentIds = await Department.find({ headOf: req.user._id, }).distinct("_id");
+            const departmentIds = (await Department.find({ headOf: req.user._id, }).distinct("_id")).map(String);
+            const projectDepts = projectDepartmentIdList(project);
 
-            if (project.department && departmentIds.some((departmentId) => departmentId.toString() === project.department.toString())) {
+            if (projectDepts.some((id) => departmentIds.includes(id))) {
                 canView = true;
             }
 
-            if (req.user.department && project.department && req.user.department.toString() === project.department.toString()) {
+            if (req.user.department && projectDepts.includes(String(req.user.department))) {
                 canView = true;
             }
         }
@@ -261,7 +270,7 @@ const getStagesByProject = async (req, res) => {
         /* --------------------------------------------------------
          * 3. Get stages
          * -------------------------------------------------------- */
-        const stages = await WorkflowStage.find({ project: projectId, isActive: true, }).populate("createdBy", "name email employeeId").populate("updatedBy", "name email employeeId").sort({ order: 1, createdAt: 1, });
+        const stages = await WorkflowStage.find({ project: projectId, isActive: true, scope: { $ne: "bug" }, }).populate("createdBy", "name email employeeId").populate("updatedBy", "name email employeeId").sort({ order: 1, createdAt: 1, });
         return res.status(200).json({ success: true, count: stages.length, project: { _id: project._id, name: project.name, projectCode: project.projectCode, }, stages, });
     } catch (error) {
         console.error("Get Workflow Stages By Project:", error);
@@ -285,7 +294,7 @@ const getStageById = async (req, res) => {
             return res.status(400).json({ success: false, message: "Invalid workflow stage id.", });
         }
 
-        const stage = await WorkflowStage.findById(id).populate("project", "name projectCode department manager teamMembers isActive").populate("createdBy", "name email employeeId").populate("updatedBy", "name email employeeId");
+        const stage = await WorkflowStage.findById(id).populate("project", "name projectCode department departments manager teamMembers isActive").populate("createdBy", "name email employeeId").populate("updatedBy", "name email employeeId");
 
         if (!stage) {
             return res.status(404).json({ success: false, message: "Workflow stage not found.", });
@@ -297,16 +306,23 @@ const getStageById = async (req, res) => {
         /* --------------------------------------------------------
          * Authorization
          * -------------------------------------------------------- */
+        const role = String(req.user.role || "").trim().toLowerCase();
+        const userId = req.user._id.toString();
+        let canView = isPrivilegedRole(role);
+        if (project.manager && project.manager.toString() === userId) {
+            canView = true;
+        }
         if (Array.isArray(project.teamMembers) && project.teamMembers.some((member) => member.toString() === userId)) {
             canView = true;
         }
         if (role === "manager") {
             const Department = require("../models/Department");
-            const departmentIds = await Department.find({ headOf: req.user._id, }).distinct("_id");
-            if (project.department && departmentIds.some((departmentId) => departmentId.toString() === project.department.toString())) {
+            const departmentIds = (await Department.find({ headOf: req.user._id, }).distinct("_id")).map(String);
+            const projectDepts = projectDepartmentIdList(project);
+            if (projectDepts.some((deptId) => departmentIds.includes(deptId))) {
                 canView = true;
             }
-            if (req.user.department && project.department && req.user.department.toString() === project.department.toString()) {
+            if (req.user.department && projectDepts.includes(String(req.user.department))) {
                 canView = true;
             }
         }

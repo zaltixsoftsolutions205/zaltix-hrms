@@ -1,50 +1,40 @@
 const express = require('express');
 const router = express.Router();
 
-const { createDepartment, getDepartments, getDepartment, updateDepartment, deleteDepartment, addDepartmentMember, removeDepartmentMember, importDepartments, exportDepartments, getDepartmentEmployees, addDepartmentEmployee, removeDepartmentEmployee, getDepartmentProjects, getDepartmentLeads, addDepartmentLead, assignDepartmentLead, unassignDepartmentLead, } = require("../controllers/departmentController");
+const { createDepartment, getDepartments, getDepartment, updateDepartment, deleteDepartment, addDepartmentMember, removeDepartmentMember, getDepartmentEmployees, addDepartmentEmployee, removeDepartmentEmployee, getDepartmentProjects, getDepartmentLeads, addDepartmentLead, assignDepartmentLead, unassignDepartmentLead, getDepartmentRoleTree, updateDepartmentRoleTree, getRoleOptions, moveDepartmentEmployee, getDeleteDepartmentPreview, } = require("../controllers/departmentController");
 
 const { protect } = require('../middleware/auth');
 const { roleCheck } = require('../middleware/roleCheck');
 
-const multer = require("multer");
-
-const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 10 * 1024 * 1024, }, });
-
 router.use(protect);
+
+// Department details (employees, roles, projects, lead positions) are only for
+// admin, HR, users with the department / hr_employees module, or the head.
+const mongoose = require('mongoose');
+const Department = require('../models/Department');
+const { canViewDepartmentDetails } = require('../services/departmentAccessService');
+const canViewDepartment = async (req, res, next) => {
+  try {
+    if (!mongoose.isValidObjectId(req.params.id)) return res.status(400).json({ success: false, message: 'Invalid department id.' });
+    const dept = await Department.findById(req.params.id).select('headOf').lean();
+    if (!dept) return res.status(404).json({ success: false, message: 'Department not found.' });
+    if (!canViewDepartmentDetails(req.user, dept)) {
+      return res.status(403).json({ success: false, message: 'You do not have access to this department.' });
+    }
+    return next();
+  } catch (err) {
+    return next(err);
+  }
+};
 
 // Put these BEFORE /:id
 /**
  * @swagger
- * /api/departments/import:
- *   post:
- *     summary: Import departments
- *     tags:
- *       - Departments
- *     description: "Requires role: admin"
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: Success
- *       401:
- *         description: Not authorized
- *       403:
- *         description: Forbidden
- */
-router.post("/import", roleCheck("admin"), upload.single("file"), importDepartments);
-/**
- * @swagger
- * /api/departments/export:
+ * /api/departments/roles/options:
  *   get:
- *     summary: Export departments
+ *     summary: Roles that can be added to a department role tree
  *     tags:
  *       - Departments
- *     description: "Requires role: admin"
  *     security:
  *       - BearerAuth: []
  *     responses:
@@ -52,10 +42,8 @@ router.post("/import", roleCheck("admin"), upload.single("file"), importDepartme
  *         description: Success
  *       401:
  *         description: Not authorized
- *       403:
- *         description: Forbidden
  */
-router.get("/export", roleCheck("admin"), exportDepartments);
+router.get("/roles/options", getRoleOptions);
 // CRUD
 /**
  * @swagger
@@ -120,7 +108,7 @@ router.get('/', getDepartments);
  *       404:
  *         description: Not found
  */
-router.get('/:id', getDepartment);
+router.get('/:id', canViewDepartment, getDepartment);
 /**
  * @swagger
  * /api/departments/{id}:
@@ -180,6 +168,31 @@ router.put('/:id', roleCheck('admin'), updateDepartment);
  *         description: Not found
  */
 router.delete('/:id', roleCheck('admin'), deleteDepartment);
+
+/**
+ * @swagger
+ * /api/departments/{id}/delete-preview:
+ *   get:
+ *     summary: What deleting a department affects (employees, child departments, projects, targets)
+ *     tags:
+ *       - Departments
+ *     description: "Requires role: admin"
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       404:
+ *         description: Not found
+ */
+router.get('/:id/delete-preview', roleCheck('admin'), getDeleteDepartmentPreview);
+
 
 // Members
 /**
@@ -271,7 +284,7 @@ router.delete('/:id/members/:userId', roleCheck('admin'), removeDepartmentMember
  *       404:
  *         description: Not found
  */
-router.get("/:id/employees", protect, getDepartmentEmployees);
+router.get("/:id/employees", protect, canViewDepartment, getDepartmentEmployees);
 /**
  * @swagger
  * /api/departments/{id}/employees:
@@ -336,6 +349,112 @@ router.post("/:id/employees", protect, roleCheck("admin", "manager"), addDepartm
  *         description: Not found
  */
 router.delete("/:id/employees/:employeeId", protect, roleCheck("admin", "manager"), removeDepartmentEmployee);
+/**
+ * @swagger
+ * /api/departments/{id}/employees/{employeeId}/move:
+ *   post:
+ *     summary: Move an employee to another department
+ *     tags:
+ *       - Departments
+ *     description: "Admin, or a manager who heads both departments. The employee's role must be in the target's role tree."
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: employeeId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               toDepartment:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       400:
+ *         description: Role not allowed / invalid move
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not found
+ */
+router.post("/:id/employees/:employeeId/move", protect, roleCheck("admin", "manager"), moveDepartmentEmployee);
+
+// Role & Permission management
+/**
+ * @swagger
+ * /api/departments/{id}/role-tree:
+ *   get:
+ *     summary: Get the department's role tree and member count per role
+ *     tags:
+ *       - Departments
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       404:
+ *         description: Not found
+ *   put:
+ *     summary: Replace the department's role tree
+ *     tags:
+ *       - Departments
+ *     description: "Admin or this department's manager"
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               roleTree:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   properties:
+ *                     role:
+ *                       type: string
+ *                     parentRole:
+ *                       type: string
+ *                     order:
+ *                       type: number
+ *                     projectAccess:
+ *                       type: object
+ *     responses:
+ *       200:
+ *         description: Success
+ *       400:
+ *         description: Invalid tree
+ *       403:
+ *         description: Forbidden
+ *       409:
+ *         description: Members still have a removed role
+ */
+router.get("/:id/role-tree", protect, canViewDepartment, getDepartmentRoleTree);
+router.put("/:id/role-tree", protect, roleCheck("admin", "manager"), updateDepartmentRoleTree);
 
 // Lead Positions (Employee Management tab -> Section B)
 /**
@@ -361,7 +480,7 @@ router.delete("/:id/employees/:employeeId", protect, roleCheck("admin", "manager
  *       404:
  *         description: Not found
  */
-router.get("/:id/leads", protect, getDepartmentLeads);
+router.get("/:id/leads", protect, canViewDepartment, getDepartmentLeads);
 /**
  * @swagger
  * /api/departments/{id}/leads:
@@ -488,7 +607,7 @@ router.delete("/:id/leads/:leadId", protect, roleCheck("admin", "manager"), unas
  *       404:
  *         description: Not found
  */
-router.get("/:id/projects", protect, getDepartmentProjects);
+router.get("/:id/projects", protect, canViewDepartment, getDepartmentProjects);
 
 
 const { shiftProjectDepartment, addProjectTeamMember, removeProjectTeamMember, } = require("../controllers/projectController");

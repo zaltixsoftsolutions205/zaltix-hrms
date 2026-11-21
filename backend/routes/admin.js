@@ -2,7 +2,7 @@ const express = require('express');
 const router = express.Router();
 const {
   getLeavePolicies, createLeavePolicy, updateLeavePolicy,
-  getAttendanceReport, getLeaveReport, getPayrollReport, getCrmReport, getDashboardStats,
+  getAttendanceReport, getLeaveReport, getPayrollReport, getCrmReport, getCrmAnalytics, getDashboardStats,
   getProfitSummary,
 } = require('../controllers/adminController');
 const { createDepartment,getDepartments,getDepartment,updateDepartment,deleteDepartment} = require('../controllers/departmentController');
@@ -263,6 +263,25 @@ router.get('/reports/payroll', getPayrollReport);
  *         description: Forbidden
  */
 router.get('/reports/crm', roleCheck('admin'), getCrmReport);
+/**
+ * @swagger
+ * /api/admin/reports/crm-analytics:
+ *   get:
+ *     summary: CRM analytics (pipeline, won/lost, team performance) for a period
+ *     tags:
+ *       - Admin
+ *     description: "Requires role: admin. period = today | weekly | monthly | yearly (default monthly)"
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ *       400:
+ *         description: Invalid period
+ *       403:
+ *         description: Forbidden
+ */
+router.get('/reports/crm-analytics', roleCheck('admin'), getCrmAnalytics);
 /**
  * @swagger
  * /api/admin/dashboard-stats:

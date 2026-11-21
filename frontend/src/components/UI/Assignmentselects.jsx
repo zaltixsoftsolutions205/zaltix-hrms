@@ -375,11 +375,29 @@ const EMPLOYEE_MODE_DEFAULTS = {
     },
 };
 
+/**
+ * Active employees of one or more departments (one request per department,
+ * merged, de-duplicated, sorted by name).
+ */
+async function fetchEmployeesOfDepartments(departmentIds) {
+    const results = await Promise.all(
+        departmentIds.map((department) => api.get("/employees", { params: { department, isActive: true } }))
+    );
+    const byId = new Map();
+    results.forEach((res) => asArray(res?.data).forEach((emp) => byId.set(String(emp._id), emp)));
+    return [...byId.values()].sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+}
+
+/** `departmentIds` (array) wins over the single `departmentId`. */
+const toDepartmentIds = (departmentIds, departmentId) =>
+    [...new Set((Array.isArray(departmentIds) && departmentIds.length ? departmentIds : departmentId ? [departmentId] : []).filter(Boolean).map(String))];
+
 function EmployeeSelect({
     value,
     onChange,
     mode,
     departmentId,
+    departmentIds,      // optional: several departments (team-lead mode)
     projectId,          // NEW: required for assigned-to mode
     employees = [],     // keep for backward compatibility with other forms
     blocked = false,
@@ -388,8 +406,8 @@ function EmployeeSelect({
 }) {
     const [fetched, setFetched] = useState([]);
     const [loading, setLoading] = useState(false);
-
-    console.log("EmployeeSelect mode:", mode, "departmentId:", departmentId, "blocked:", blocked);
+    const deptIds = toDepartmentIds(departmentIds, departmentId);
+    const deptKey = deptIds.join(",");
     // const { user: currentUser } = useAuth();
 
     /* ============================================================================
@@ -460,7 +478,7 @@ function EmployeeSelect({
     }, [mode, projectId]);
     useEffect(() => {
         if (mode !== "team-lead") return undefined;
-        if (!departmentId) {
+        if (!deptKey) {
             setFetched([]);
             return undefined;
         }
@@ -468,10 +486,8 @@ function EmployeeSelect({
         async function loadTeamLeads() {
             setLoading(true);
             try {
-                const res = await api.get("/employees", { params: { department: departmentId, isActive: true }, });
-                console.log("EMPLOYEE API RESPONSE:", res.data);
+                const list = await fetchEmployeesOfDepartments(deptKey.split(","));
                 if (!cancelled) {
-                    const list = asArray(res?.data);
                     setFetched(list);
                 }
             } catch (err) {
@@ -486,7 +502,7 @@ function EmployeeSelect({
         loadTeamLeads();
 
         return () => { cancelled = true; };
-    }, [mode, departmentId]);
+    }, [mode, deptKey]);
 
     // --- "department-head" mode: fetch ALL active employees, independent of
     // any department selection ---
@@ -528,16 +544,17 @@ function EmployeeSelect({
             });
         }
 
+        const multiDept = mode === "team-lead" && deptKey.includes(",");
         return list.map((emp) => ({
             id: emp._id,
             label: emp.name,
-            sublabel: emp.employeeId,
+            sublabel: multiDept && emp.department?.name ? `${emp.employeeId} · ${emp.department.name}` : emp.employeeId,
         }));
-    }, [sourceList, mode]);
+    }, [sourceList, mode, deptKey]);
 
     const defaults = EMPLOYEE_MODE_DEFAULTS[mode] || EMPLOYEE_MODE_DEFAULTS["department-head"];
 
-    const isBlocked = mode === "team-lead" ? !departmentId : mode === "assigned-to" ? !projectId : false;
+    const isBlocked = mode === "team-lead" ? !deptKey : mode === "assigned-to" ? !projectId : false;
 
     const isLoading = loading;
 
@@ -573,7 +590,8 @@ function EmployeeSelect({
 function EmployeeMultiSelect({
     value = [],
     onChange,
-    departmentId,
+    departmentId: singleDepartmentId,
+    departmentIds,      // optional: several departments
     excludeId = null,
     disabled = false,
     label = "Team Members",
@@ -581,6 +599,9 @@ function EmployeeMultiSelect({
     const [employees, setEmployees] = useState([]);
     const [loading, setLoading] = useState(false);
     const [query, setQuery] = useState("");
+    // `departmentId` below means "any department selected" (truthy key).
+    const departmentId = toDepartmentIds(departmentIds, singleDepartmentId).join(",");
+    const multiDept = departmentId.includes(",");
 
     useEffect(() => {
         if (!departmentId) {
@@ -591,8 +612,8 @@ function EmployeeMultiSelect({
         async function loadEmployees() {
             setLoading(true);
             try {
-                const res = await api.get("/employees", { params: { department: departmentId, isActive: true, }, });
-                if (!cancelled) { setEmployees(asArray(res?.data)); }
+                const list = await fetchEmployeesOfDepartments(departmentId.split(","));
+                if (!cancelled) { setEmployees(list); }
             } catch (err) {
                 if (!cancelled) { toast.error(err.response?.data?.message || "Failed to load employees"); setEmployees([]); }
             } finally {
@@ -602,6 +623,14 @@ function EmployeeMultiSelect({
         loadEmployees();
         return () => { cancelled = true; };
     }, [departmentId]);
+
+    // Drop selections that are no longer in the loaded departments.
+    useEffect(() => {
+        if (loading || !departmentId || !Array.isArray(value) || !value.length) return;
+        const available = new Set(employees.map((e) => String(e._id)));
+        const kept = value.filter((id) => available.has(String(id)));
+        if (employees.length && kept.length !== value.length) onChange(kept);
+    }, [employees]); // eslint-disable-line react-hooks/exhaustive-deps
 
     const filteredEmployees = useMemo(() => {
         const q = query.trim().toLowerCase();
@@ -668,7 +697,7 @@ function EmployeeMultiSelect({
                     !loading &&
                     employees.length === 0 && (
                         <p className="px-1 py-2 text-xs text-gray-300">
-                            No employees found in this department.
+                            {multiDept ? "No employees found in these departments." : "No employees found in this department."}
                         </p>
                     )}
 
@@ -723,6 +752,7 @@ function EmployeeMultiSelect({
                                             {employee.employeeId && (
                                                 <div className="text-[10px] text-gray-400">
                                                     {employee.employeeId}
+                                                    {multiDept && employee.department?.name ? ` · ${employee.department.name}` : ""}
                                                 </div>
                                             )}
                                         </div>

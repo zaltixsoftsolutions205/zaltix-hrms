@@ -93,10 +93,14 @@ export const MODULES = [
   { key: 'holidays', label: 'Holidays', path: '/admin/holidays', icon: ICON.calendar, editable: true, group: 'Admin' },
 
   // WorkSpace Models 
-  { key: 'overview', label: 'Overview', path: '/workspace/overview', icon: ICON.dashboard, editable: true, group: 'Workspace' },
   { key: 'department', label: 'Department', path: '/workspace/department', icon: ICON.people, editable: true, group: 'Workspace' },
   { key: 'project', label: 'Projects', path: '/workspace/project', icon: ICON.book, editable: true, group: 'Workspace' },
-  { key: 'task', label: 'Tasks', path: '/workspace/task', icon: ICON.tasks, editable: true, group: 'Workspace' },
+  // Project sub-modules: per-user override of the department role tree's
+  // default for that part of a project (only on projects the user is on).
+  { key: 'project_module_tree', label: 'Module Tree', path: '/workspace/project', icon: ICON.book, editable: true, group: 'Workspace', parent: 'project', nav: false },
+  { key: 'project_tasks', label: 'Tasks & Plans', path: '/workspace/project', icon: ICON.tasks, editable: true, group: 'Workspace', parent: 'project', nav: false },
+  { key: 'project_bugs', label: 'Bug Sheet', path: '/workspace/project', icon: ICON.tasks, editable: true, group: 'Workspace', parent: 'project', nav: false },
+  { key: 'project_timeline', label: 'Timeline', path: '/workspace/project', icon: ICON.calendar, editable: true, group: 'Workspace', parent: 'project', nav: false },
 
 
 ];
@@ -104,7 +108,8 @@ export const MODULES = [
 export const MODULE_BY_KEY = MODULES.reduce((acc, m) => { acc[m.key] = m; return acc; }, {});
 
 // Path -> module key, for route guarding.
-export const MODULE_KEY_BY_PATH = MODULES.reduce((acc, m) => { acc[m.path] = m.key; return acc; }, {});
+// Sub-modules (m.parent) share their parent's page, so they are skipped here.
+export const MODULE_KEY_BY_PATH = MODULES.reduce((acc, m) => { if (!m.parent) acc[m.path] = m.key; return acc; }, {});
 
 /**
  * Self-service baseline every non-admin always keeps, regardless of explicit
@@ -125,8 +130,8 @@ export const SALES_PAGE_MODULES = ['lead', 'visits', 'demos', 'data_updation', '
 
 export const ROLE_DEFAULT_MODULES = {
   employee: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
-  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'crm', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback', 'analytics'],
-  'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task'],
+  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback', 'analytics'],
+  'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team'],
   sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management', 'visits', 'lead', 'registration'],
   hr: ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm', 'visits', 'demos', 'data_updation', 'feedback', 'registration', 'analytics'],
   'inside-sales': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'lead', 'visits', 'feedback'],
@@ -136,10 +141,6 @@ export const ROLE_DEFAULT_MODULES = {
 export const ROLE_DEFAULT_ACCESS = {
   employee: [],
   manager: [
-    { module: 'overview', permission: 'edit' },
-    { module: 'department', permission: 'edit' },
-    { module: 'project', permission: 'edit' },
-    { module: 'task', permission: 'edit' },
     { module: 'crm', permission: 'edit' },
     { module: 'lead', permission: 'edit' },
     { module: 'visits', permission: 'edit' },
@@ -149,10 +150,6 @@ export const ROLE_DEFAULT_ACCESS = {
     { module: 'feedback', permission: 'edit' },
   ],
   'team-lead': [
-    { module: 'overview', permission: 'view' },
-    { module: 'department', permission: 'view' },
-    { module: 'project', permission: 'view' },
-    { module: 'task', permission: 'edit' },
   ],
   sales: [
     { module: 'crm', permission: 'edit' },

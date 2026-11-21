@@ -13,6 +13,13 @@ const { roleCheck, moduleAccess } = require('../middleware/roleCheck');
 // settings update) keep their explicit roleCheck('admin') guard.
 const financeView = moduleAccess('finance', 'view');
 const financeEdit = moduleAccess('finance', 'edit');
+const { canEditModule } = require('../constants/modules');
+
+// Income / expense entry: HR (as before) or anyone with Finance edit access.
+const hrOrFinanceEdit = (req, res, next) => {
+  if (req.user?.role === 'hr' || canEditModule(req.user, 'finance')) return next();
+  return res.status(403).json({ message: 'You need edit access to Finance to add or change income and expenses.' });
+};
 
 // Multer setup for receipt uploads
 const uploadDir = path.join(__dirname, '../uploads/expenses');
@@ -116,7 +123,7 @@ router.get('/income/:id', financeView, financeController.getIncomeById);
  *       403:
  *         description: Forbidden
  */
-router.post('/income', roleCheck('hr'), financeController.createIncome);
+router.post('/income', hrOrFinanceEdit, financeController.createIncome);
 /**
  * @swagger
  * /api/finance/income/{id}:
@@ -143,7 +150,7 @@ router.post('/income', roleCheck('hr'), financeController.createIncome);
  *       404:
  *         description: Not found
  */
-router.delete('/income/:id', roleCheck('hr'), financeController.deleteIncome);
+router.delete('/income/:id', hrOrFinanceEdit, financeController.deleteIncome);
 /**
  * @swagger
  * /api/finance/income/sync-deals:
@@ -167,7 +174,7 @@ router.delete('/income/:id', roleCheck('hr'), financeController.deleteIncome);
  *       403:
  *         description: Forbidden
  */
-router.post('/income/sync-deals', roleCheck('hr'), financeController.syncDealsToIncome);
+router.post('/income/sync-deals', hrOrFinanceEdit, financeController.syncDealsToIncome);
 
 // ============ EXPENSE ROUTES ============
 /**
@@ -249,7 +256,7 @@ router.get('/expenses/:id', financeView, financeController.getExpenseById);
  *       403:
  *         description: Forbidden
  */
-router.post('/expenses', roleCheck('hr'), (req, res, next) => {
+router.post('/expenses', hrOrFinanceEdit, (req, res, next) => {
   upload.single('receipt')(req, res, (err) => {
     if (err) return res.status(400).json({ message: err.message || 'File upload failed' });
     next();
@@ -286,7 +293,7 @@ router.post('/expenses', roleCheck('hr'), (req, res, next) => {
  *       404:
  *         description: Not found
  */
-router.put('/expenses/:id', roleCheck('hr'), financeController.updateExpense);
+router.put('/expenses/:id', hrOrFinanceEdit, financeController.updateExpense);
 /**
  * @swagger
  * /api/finance/expenses/{id}/approve:
@@ -409,7 +416,7 @@ router.put('/expenses/:id/set-status', roleCheck('admin'), financeController.set
  *       404:
  *         description: Not found
  */
-router.delete('/expenses/:id', roleCheck('hr'), financeController.deleteExpense);
+router.delete('/expenses/:id', hrOrFinanceEdit, financeController.deleteExpense);
 
 // ============ DASHBOARD + REPORT ROUTES ============
 /**

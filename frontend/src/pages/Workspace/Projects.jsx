@@ -245,7 +245,12 @@ const ProjectCard = ({ project, permissions, onOpen, onEdit, onArchiveToggle, on
     <h3 className="text-sm font-bold text-gray-900 leading-snug mb-3 line-clamp-2">{project.name}</h3>
 
     <div className="space-y-1 mb-3 text-xs text-gray-500">
-      <p className="font-medium text-gray-600">{project.department?.name || 'No department'}</p>
+      <p className="font-medium text-gray-600 truncate" title={(project.departments || []).map((d) => d?.name).filter(Boolean).join(', ')}>
+        {project.department?.name || 'No department'}
+        {(project.departments || []).length > 1 && (
+          <span className="text-gray-400 font-normal"> +{project.departments.length - 1} more</span>
+        )}
+      </p>
       <p>Team Lead: <span className="text-gray-700 font-medium">{project.manager?.name || 'Unassigned'}</span></p>
       {project.client && <p>Client: <span className="text-gray-700 font-medium">{project.client}</span></p>}
     </div>
@@ -458,22 +463,39 @@ const ProjectAnalysis = ({ projects }) => {
    PROJECT FORM (Create + Edit share this)
 ════════════════════════════════════════════════════════════════ */
 const emptyForm = {
-  name: '', description: '', client: '', department: '', manager: '', teamMembers: [],
+  name: '', description: '', client: '', department: '', departments: [], manager: '', teamMembers: [],
   startDate: '', endDate: '', priority: 'medium', status: 'planning', budget: '', progress: 0, moduleAccess: [],
   attachments: [],
 };
 
-const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment, onCancel, onSubmit, submitting }) => {
+const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment, canEditMembers = canManageAssignment, onCancel, onSubmit, submitting }) => {
   const [form, setForm] = useState(initial || emptyForm);
   const [errors, setErrors] = useState({});
 
-
-  // useEffect(() => {
-  //   if (form.department) loadEmployees(form.department);
-  // }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // Owning department + the other participating departments. The team lead
+  // and members can come from any of them.
+  const allDepartmentIds = useMemo(
+    () => [...new Set([form.department, ...(form.departments || [])].filter(Boolean).map(String))],
+    [form.department, form.departments]
+  );
 
   const handleDepartmentChange = (departmentId) => {
-    setForm((f) => ({ ...f, department: departmentId, manager: "" })); // clear Team Lead
+    setForm((f) => ({
+      ...f,
+      department: departmentId,
+      departments: (f.departments || []).filter((d) => String(d) !== String(departmentId)),
+      manager: "", // clear Team Lead
+    }));
+  };
+
+  const toggleExtraDepartment = (departmentId) => {
+    setForm((f) => {
+      const current = (f.departments || []).map(String);
+      const next = current.includes(String(departmentId))
+        ? current.filter((d) => d !== String(departmentId))
+        : [...current, String(departmentId)];
+      return { ...f, departments: next };
+    });
   };
 
   const getEffectiveModuleAccess = (employee) => {
@@ -513,6 +535,7 @@ const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment
     if (!validate()) return;
     onSubmit({
       ...form,
+      departments: allDepartmentIds,
       budget: form.budget === '' ? undefined : Number(form.budget),
       progress: Number(form.progress) || 0,
     });
@@ -545,13 +568,14 @@ const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment
       <section className="space-y-3">
         <p className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Organization</p>
         <div>
-          <label className={labelCls}>Department *</label>
+          <label className={labelCls}>Owning Department *</label>
           <DepartmentSelect
             value={form.department}
             onChange={handleDepartmentChange}
             disabled={lockDepartment || !canManageAssignment}
             placeholder="Select department"
           />
+          <p className="text-[11px] text-gray-400 mt-1">Its manager runs this project.</p>
 
           {errors.department && (
             <p className="text-[11px] text-red-500 mt-1">
@@ -559,6 +583,34 @@ const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment
             </p>
           )}
         </div>
+
+        {form.department && (departments || []).length > 1 && (
+          <div>
+            <label className={labelCls}>Other Departments</label>
+            <div className="flex flex-wrap gap-1.5">
+              {(departments || [])
+                .filter((d) => String(d._id) !== String(form.department))
+                .map((d) => {
+                  const on = (form.departments || []).map(String).includes(String(d._id));
+                  return (
+                    <button
+                      key={d._id}
+                      type="button"
+                      disabled={!canManageAssignment}
+                      onClick={() => toggleExtraDepartment(d._id)}
+                      aria-pressed={on}
+                      className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                        on ? 'bg-violet-600 text-white border-violet-600' : 'bg-white text-gray-600 border-gray-200 hover:bg-violet-50'
+                      }`}
+                    >
+                      {d.name}
+                    </button>
+                  );
+                })}
+            </div>
+            <p className="text-[11px] text-gray-400 mt-1">The team lead and members can come from any selected department.</p>
+          </div>
+        )}
 
         <div>
           <label className={labelCls}>Team Lead</label>
@@ -573,7 +625,7 @@ const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment
                 moduleAccess: getEffectiveModuleAccess(employee),
               }));
             }}
-            departmentId={form.department}
+            departmentIds={allDepartmentIds}
             disabled={!form.department || !canManageAssignment}
             placeholder={
               form.department
@@ -582,7 +634,7 @@ const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment
             }
           />
         </div>
-        {form.manager && (
+        {form.manager && canManageAssignment && (
           <div className="border border-violet-100 rounded-xl p-3 bg-violet-50/30">
             <ModuleAccessPicker
               value={form.moduleAccess}
@@ -604,9 +656,9 @@ const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment
                 teamMembers,
               }))
             }
-            departmentId={form.department}
+            departmentIds={allDepartmentIds}
             excludeId={form.manager}
-            disabled={!form.department || !canManageAssignment}
+            disabled={!form.department || !canEditMembers}
           />
         </div>
 
@@ -648,7 +700,10 @@ const ProjectForm = ({ initial, departments, lockDepartment, canManageAssignment
           </div>
           <div>
             <label className={labelCls}>Progress (%)</label>
-            <input type="number" min="0" max="100" className={inputCls} value={form.progress} onChange={(e) => setForm((f) => ({ ...f, progress: e.target.value }))} />
+            <input type="number" min="0" max="100" className={`${inputCls} ${form.progressAuto ? 'bg-gray-50 text-gray-500 cursor-not-allowed' : ''}`}
+              value={form.progress} disabled={Boolean(form.progressAuto)}
+              onChange={(e) => setForm((f) => ({ ...f, progress: e.target.value }))} />
+            {form.progressAuto && <p className="text-[11px] text-gray-400 mt-1">Calculated from module tasks</p>}
           </div>
         </div>
       </section>
@@ -737,48 +792,32 @@ const Projects = ({ departmentId }) => {
   const [editingProject, setEditingProject] = useState(null);
   const [confirmAction, setConfirmAction] = useState(null); // { type: 'archive'|'restore'|'delete', project }
   const [submitting, setSubmitting] = useState(false);
-  const [importingExcel, setImportingExcel] = useState(false);
 
-  const excelInputRef = useRef(null);
   const requestIdRef = useRef(0);
   const searchDebounceRef = useRef(null);
 
   /* ── permissions (UI hints only — backend is the source of truth) ── */
+  // Mirrors backend/services/projectAccessService.js:
+  //   manage = admin, or head (manager) of the project's owning department
+  //   edit   = manage, or the project's team lead
+  const headsOwningDepartment = (p) =>
+    String(p?.department?.headOf?._id || p?.department?.headOf || '') === String(user?._id || '');
+  const managesProject = (p) => isAdmin || headsOwningDepartment(p);
   const permissions = {
-    // CHANGED: was `isAdmin || isManager` (missed team-lead entirely, and
-    // ignored explicit moduleAccess). Create has no specific project to own
-    // yet, so it's gated purely by the module edit permission — matches the
-    // "Is this user allowed to edit the Project module?" question.
-    canCreate: canEditProjects,
-
-    // Combines the module permission ("can edit Project module") with the
-    // existing project-specific ownership rule ("is this particular project
-    // theirs to manage"). Both must pass — a team-lead with project edit
-    // permission still can't edit someone else's project.
-    canEdit: (p) =>
-      isAdmin ||
-      (
-        canEditProjects &&
-        String(p.manager?._id) === String(user?._id)
-      ),
-
-    // Unchanged — archiving stays a hard admin-only action, independent of
-    // module permission.
-    canArchive: () => isAdmin,
-
-    // Unchanged — deleting stays a hard admin-only action, independent of
-    // module permission.
-    canDelete: () => isAdmin,
-
-    // CHANGED: was `isAdmin || isManager`. Managing department/manager/team
-    // assignment in the form is a project-data-modifying action, so it's
-    // gated the same way as Create.
-    canManageAssignment: canEditProjects,
+    // Creating needs a department to own the project: admin, or a manager
+    // (the backend checks they head the chosen department).
+    canCreate: canEditProjects && (isAdmin || isManager),
+    canEdit: (p) => managesProject(p) || String(p.manager?._id || p.manager) === String(user?._id),
+    canArchive: (p) => managesProject(p),
+    canDelete: (p) => managesProject(p),
+    // Departments / team lead in the create form.
+    canManageAssignment: canEditProjects && (isAdmin || isManager),
+    managesProject,
   };
 
   /* ── load departments once ── */
   useEffect(() => {
-    api.get('/departments').then((res) => setDepartments(unwrap(res, 'departments'))).catch(() => setDepartments([]));
+    api.get('/departments', { params: { status: 'active', page: 1, limit: 100 } }).then((res) => setDepartments(unwrap(res, 'departments'))).catch(() => setDepartments([]));
   }, []);
 
   /* ── debounce search input into an actual filter change ── */
@@ -857,67 +896,6 @@ const Projects = ({ departmentId }) => {
     }
   };
 
-  const handleExcelImport = async (event) => {
-    const file = event.target.files?.[0];
-    // Reset input so the same file can be selected again.
-    event.target.value = '';
-    if (!file) return;
-
-    const extension = file.name.split('.').pop()?.toLowerCase();
-
-    if (!['xlsx', 'xls'].includes(extension)) {
-      toast.error('Please select an Excel .xlsx or .xls file.');
-      return;
-    }
-    setImportingExcel(true);
-    try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      // If Projects.jsx is being used inside Department Details,
-      // optionally send the department context.
-      if (departmentId) {
-        formData.append('departmentId', departmentId);
-      }
-
-      const response = await api.post('/projects/import', formData);
-
-      const result = response?.data || {};
-
-      if (result.success) {
-        const createdCount = result.createdCount ?? 0;
-        const failedCount = result.failedCount ?? 0;
-
-        if (failedCount > 0) {
-          toast.success(
-            `${createdCount} project(s) imported. ${failedCount} row(s) failed.`
-          );
-        } else {
-          toast.success(
-            `${createdCount} project(s) imported successfully.`
-          );
-        }
-        await fetchProjects();
-        // If backend gives row-level errors, log them for debugging.
-        if (Array.isArray(result.errors) && result.errors.length > 0) {
-          console.warn('Excel import row errors:', result.errors);
-        }
-        return;
-      }
-      toast.error(
-        result.message || 'Excel import failed.'
-      );
-    } catch (error) {
-      console.error('Excel import:', error);
-      toast.error(
-        error?.response?.data?.message ||
-        'Could not import Excel file.'
-      );
-    } finally {
-      setImportingExcel(false);
-    }
-  };
-
   const handleUpdate = async (payload) => {
     setSubmitting(true);
     try {
@@ -976,30 +954,17 @@ const Projects = ({ departmentId }) => {
 
   return (
     <div className="space-y-5">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-extrabold text-gray-900 tracking-tight">Projects</h2>
-          <p className="text-sm text-gray-400 mt-0.5">Track and manage project execution across teams</p>
+      {/* Actions */}
+      {permissions.canCreate && (
+        <div className="flex justify-end">
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-4 py-2.5 rounded-xl shadow-sm transition-colors w-full sm:w-auto">
+            <Icon d={IC.plus} size={14} />
+            Create Project
+          </button>
         </div>
-
-        {permissions.canCreate && (
-          <div className="flex items-center gap-1.5">
-            <input ref={excelInputRef} type="file" accept=".xlsx,.xls" onChange={handleExcelImport} className="hidden" />
-            <button type="button" disabled={importingExcel} onClick={() => excelInputRef.current?.click()} className="inline-flex items-center gap-0.5 text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-100 px-1.5 py-1.5 rounded-xl transition-colors disabled:opacity-50">
-              <Icon d={IC.upload} size={14} />
-              {importingExcel ? 'Importing…' : 'Import Excel'}
-            </button>
-
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center justify-center gap-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-4 py-2.5 rounded-xl shadow-sm transition-colors w-full sm:w-auto">
-              <Icon d={IC.plus} size={14} />
-              Create Project
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
@@ -1090,11 +1055,16 @@ const Projects = ({ departmentId }) => {
           <ProjectForm
             departments={departments}
             lockDepartment={!!departmentId}
-            canManageAssignment={permissions.canManageAssignment}
+            canManageAssignment={permissions.managesProject(editingProject)}
+            canEditMembers={permissions.canEdit(editingProject)}
             initial={{
               ...editingProject,
 
               department: editingProject.department?._id || '',
+
+              departments: (editingProject.departments || [])
+                .map((d) => String(d?._id || d))
+                .filter((d) => d !== String(editingProject.department?._id || '')),
 
               manager: editingProject.manager?._id || '',
 
