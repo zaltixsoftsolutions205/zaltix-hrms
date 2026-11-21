@@ -12,7 +12,7 @@ import { bulkDeleteGlobalTableRecords, deleteGlobalTableRecord } from '../../ser
 import { createLeadTable, createField, deleteField, fetchFields, fetchLeadTable, fetchTableById, fetchValues, deleteCellValue, recordRemoved, saveCellValue, updateField } from '../../store/globalTableSlice';
 import { useGlobalTableColumns, classifyStageChange, isStageLocked, normalizeStage, stageLabel } from '../../hooks/useGlobalTableColumns';
 import { useProducts } from '../../hooks/useProducts';
-import { productId } from './productRef';
+import { productId } from './Productref';
 import { NUMERIC_FIELD_TYPES, canon, getTypeMeta, isLeadField, toApiValue } from './fieldTypes';
 import GlobalTableHeader from './GlobalTableHeader';
 import GlobalTableRow, { SELECT_COL_WIDTH } from './GlobalTableRow';

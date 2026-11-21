@@ -163,11 +163,60 @@ const taskSchema = new mongoose.Schema(
       type: Boolean,
       default: true,
     },
+
+    /* =====================================================
+       PROJECT MODULE WORK (Phase 3)
+       kind      task | bug | milestone
+       module    module card on the project's Module Tree
+       plan      plan that groups tasks (progress bar)
+       stage     bug pipeline stage (WorkflowStage scope 'bug')
+       reporter  who reported a bug
+       isPrivate visible only to reporter, assignees, project
+                 lead, department heads and admin
+    ===================================================== */
+    kind: {
+      type: String,
+      enum: ["task", "bug", "milestone"],
+      default: "task",
+    },
+    module: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "ProjectModule",
+      default: null,
+    },
+    plan: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Plan",
+      default: null,
+    },
+    stage: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "WorkflowStage",
+      default: null,
+    },
+    reporter: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
+    isPrivate: {
+      type: Boolean,
+      default: false,
+    },
+    boardOrder: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,
   }
 );
+
+taskSchema.index({ project: 1, kind: 1 });
+taskSchema.index({ module: 1 });
+taskSchema.index({ plan: 1 });
+taskSchema.index({ stage: 1, boardOrder: 1 });
 
 
 

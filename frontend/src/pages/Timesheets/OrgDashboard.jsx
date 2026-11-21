@@ -11,7 +11,7 @@ const OrgDashboard = () => {
   const [filters, setFilters] = useState({ departmentId: '', role: '' });
 
   useEffect(() => {
-    api.get('/admin/departments').then(res => setDepartments(res.data)).catch(() => {});
+    api.get('/admin/departments', { params: { limit: 100 } }).then(res => { const b = res.data; setDepartments(Array.isArray(b) ? b : (b?.departments || [])); }).catch(() => {});
   }, []);
 
   useEffect(() => {

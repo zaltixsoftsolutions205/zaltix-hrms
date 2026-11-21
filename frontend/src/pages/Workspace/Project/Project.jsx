@@ -1,9 +1,12 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { useParams } from 'react-router-dom';
+import { useParams, useSearchParams } from 'react-router-dom';
 import Breadcrumb from '../../../components/UI/Breadcrumb';
 import ProjectInformation from './ProjectInformation';
 import TeamMembers from './TeamMembers';
+import ModuleTree from './ModuleTree';
+import BugSheet from './BugSheet';
+import Timeline from './Timeline';
 
 const NAV_ITEMS = [
   {
@@ -14,10 +17,29 @@ const NAV_ITEMS = [
     key: 'team-members',
     label: 'Team Members',
   },
+  {
+    key: 'module-tree',
+    label: 'Module Tree',
+  },
+  {
+    key: 'bug-sheet',
+    label: 'Bug Sheet',
+  },
+  {
+    key: 'timeline',
+    label: 'Timeline',
+  },
 ];
 
 const ProjectDetails = () => {
-  const [activeTab, setActiveTab] = useState('overview');
+  // ?tab=bug-sheet&module=<id> lets other pages link straight to a tab.
+  const [searchParams, setSearchParams] = useSearchParams();
+  const initialTab = NAV_ITEMS.some((n) => n.key === searchParams.get('tab')) ? searchParams.get('tab') : 'overview';
+  const [activeTab, setActiveTabState] = useState(initialTab);
+  const setActiveTab = (key) => {
+    setActiveTabState(key);
+    setSearchParams(key === 'overview' ? {} : { tab: key }, { replace: true });
+  };
 
   // Get :id from /projects/:id
   const { id: projectId } = useParams();
@@ -37,6 +59,15 @@ const ProjectDetails = () => {
             projectId={projectId}
           />
         );
+
+      case 'module-tree':
+        return <ModuleTree projectId={projectId} />;
+
+      case 'bug-sheet':
+        return <BugSheet projectId={projectId} initialModule={searchParams.get('module') || ''} />;
+
+      case 'timeline':
+        return <Timeline projectId={projectId} />;
 
       default:
         return (

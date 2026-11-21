@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import AssigneeSelect from '../Crm/Assigneeselect';
 import { getTypeMeta, personOptions } from './fieldTypes';
-import { productChoices, productsHint, productId } from './productRef';
+import { productChoices, productsHint, productId } from './Productref';
 import FollowUpInput, { FollowUpCellEditor } from './FollowUpInput';
 
 /**

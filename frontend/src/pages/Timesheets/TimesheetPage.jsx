@@ -492,9 +492,10 @@ const TodayTab = () => {
 
   const fetchHistory = useCallback(async () => {
     try {
-      const res = await api.get('/timesheets/history?days=90');
-      const raw = res.data?.entries || res.data || [];
-      setHistory(Array.isArray(raw) ? raw : []);
+      // { days: [{ entries: [...] }] } -> one flat list of past entries
+      const res = await api.get('/timesheets/daily-history', { params: { days: 90 } });
+      const days = Array.isArray(res.data?.days) ? res.data.days : [];
+      setHistory(days.flatMap((d) => d.entries || []));
     } catch {
       setHistory([]);
     }

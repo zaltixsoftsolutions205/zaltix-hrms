@@ -14,12 +14,38 @@ import {
     ArrowRightLeft,
     Loader2,
     Mail,
+    Phone,
+    CalendarDays,
+    BadgeCheck,
+    Briefcase,
+    Info,
 } from "lucide-react";
 import toast from "react-hot-toast";
 
 // NOTE: adjust these import paths to match your project's actual locations.
 import api from "../../utils/api";
+import { useAuth } from "../../contexts/AuthContext";
 import { DepartmentSelect, EmployeeSelect } from "../../components/UI/Assignmentselects";
+
+/* ------------------------------------------------------------------ */
+/* Role-tree helpers (mirror backend/services/departmentAccessService) */
+/* ------------------------------------------------------------------ */
+
+const normRole = (role) => String(role || "").trim().toLowerCase().replace(/\s+/g, " ");
+const roleLabel = (role) =>
+    String(role || "employee")
+        .split(/[-_\s]+/)
+        .filter(Boolean)
+        .map((w) => w[0].toUpperCase() + w.slice(1))
+        .join(" ");
+/** Empty tree = roles not set up yet = nobody can join; admin/manager always can. */
+const roleAllowedIn = (dept, role) => {
+    const r = normRole(role);
+    if (r === "admin" || r === "manager") return true;
+    const tree = dept?.roleTree || [];
+    return tree.length > 0 && tree.some((n) => n.role === r);
+};
+const asList = (data, key) => (Array.isArray(data) ? data : Array.isArray(data?.[key]) ? data[key] : []);
 
 /* ------------------------------------------------------------------ */
 /* Shared primitives                                                   */
@@ -83,7 +109,7 @@ const Badge = ({ status }) => {
     );
 };
 
-const IconButton = ({ icon: Icon, label, onClick, tone = "violet", disabled = false }) => {
+const IconButton = ({ icon: Icon, label, onClick, tone = "violet", disabled = false, title }) => {
     const tones = {
         violet: "border-violet-200 text-violet-700 hover:bg-violet-50",
         rose: "border-rose-200 text-rose-600 hover:bg-rose-50",
@@ -94,6 +120,7 @@ const IconButton = ({ icon: Icon, label, onClick, tone = "violet", disabled = fa
             type="button"
             onClick={onClick}
             disabled={disabled}
+            title={title}
             className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${tones[tone]}`}
         >
             <Icon className="w-3.5 h-3.5" />
@@ -117,12 +144,105 @@ const DepartmentEmployeeManagement = ({
     onRefresh,
 }) => {
     const headId = department?.headOf?._id || department?.headOf || null;
+    const { user } = useAuth();
+    const canManage = user?.role === "admin" || (headId && String(headId) === String(user?._id || user?.id));
 
     /* ---------------- A. Department Employees ---------------- */
     const [addEmployeeOpen, setAddEmployeeOpen] = useState(false);
     const [newEmployeeId, setNewEmployeeId] = useState("");
     const [savingEmployee, setSavingEmployee] = useState(false);
     const [removingEmployeeId, setRemovingEmployeeId] = useState(null);
+    const [roleFilter, setRoleFilter] = useState("all");
+    const [infoEmployee, setInfoEmployee] = useState(null);
+    const [candidates, setCandidates] = useState([]);
+    const [loadingCandidates, setLoadingCandidates] = useState(false);
+
+    // Move employee to another department
+    const [moveEmployee, setMoveEmployee] = useState(null);
+    const [moveTargets, setMoveTargets] = useState([]);
+    const [moveTargetId, setMoveTargetId] = useState("");
+    const [moving, setMoving] = useState(false);
+
+    const roleCounts = useMemo(() => {
+        const counts = {};
+        employees.forEach((e) => {
+            const r = normRole(e.role || "employee");
+            counts[r] = (counts[r] || 0) + 1;
+        });
+        return counts;
+    }, [employees]);
+
+    const visibleEmployees = useMemo(
+        () => (roleFilter === "all" ? employees : employees.filter((e) => normRole(e.role || "employee") === roleFilter)),
+        [employees, roleFilter]
+    );
+
+    // Candidates for "Add Employee": active, not in another department,
+    // not already here, and their role is in this department's role tree.
+    const openAddEmployee = async () => {
+        const next = !addEmployeeOpen;
+        setAddEmployeeOpen(next);
+        if (!next) return;
+        try {
+            setLoadingCandidates(true);
+            const res = await api.get("/employees", { params: { isActive: true } });
+            const memberIds = new Set(employees.map((e) => String(e._id)));
+            const list = asList(res.data, "employees").filter((u) => {
+                const r = normRole(u.role);
+                const deptId = u.department?._id || u.department || null;
+                return (
+                    r !== "admin" &&
+                    r !== "manager" &&
+                    !memberIds.has(String(u._id)) &&
+                    (!deptId || String(deptId) === String(departmentId)) &&
+                    roleAllowedIn(department, u.role)
+                );
+            });
+            list.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
+            setCandidates(list);
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to load employees");
+        } finally {
+            setLoadingCandidates(false);
+        }
+    };
+
+    const openMove = async (emp) => {
+        setMoveEmployee(emp);
+        setMoveTargetId("");
+        try {
+            const res = await api.get("/departments", { params: { status: "active", page: 1, limit: 100 } });
+            const all = asList(res.data, "departments");
+            setMoveTargets(
+                all.filter((d) => String(d._id) !== String(departmentId)).map((d) => ({
+                    ...d,
+                    allowed: roleAllowedIn(d, emp.role),
+                }))
+            );
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to load departments");
+        }
+    };
+
+    const handleMove = async () => {
+        if (!moveTargetId) {
+            toast.error("Select a department");
+            return;
+        }
+        try {
+            setMoving(true);
+            const res = await api.post(`/departments/${departmentId}/employees/${moveEmployee._id}/move`, {
+                toDepartment: moveTargetId,
+            });
+            toast.success(res.data.message || "Employee moved");
+            setMoveEmployee(null);
+            onRefresh();
+        } catch (err) {
+            toast.error(err.response?.data?.message || "Failed to move employee");
+        } finally {
+            setMoving(false);
+        }
+    };
 
     const handleAddEmployee = async () => {
         if (!newEmployeeId) {
@@ -148,8 +268,9 @@ const DepartmentEmployeeManagement = ({
     };
 
     const handleRemoveEmployee = async (employee) => {
-        if (headId && String(employee._id) === String(headId)) {
-            toast.error("Cannot remove the department head. Change the department head first.");
+        // The manager may leave the list only as the sole employee (stays head).
+        if (headId && String(employee._id) === String(headId) && employees.length > 1) {
+            toast.error("The manager can only be removed from the list when they are the department's only employee.");
             return;
         }
         try {
@@ -316,6 +437,131 @@ const DepartmentEmployeeManagement = ({
 
     return (
         <div className="space-y-6">
+            {/* ==================== Employee info modal ==================== */}
+            <AnimatePresence>
+                {infoEmployee && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                        onClick={() => setInfoEmployee(null)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-md bg-white rounded-2xl shadow-xl"
+                        >
+                            <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
+                                <div className="flex items-center gap-3 min-w-0">
+                                    <Avatar src={infoEmployee.profilePicture} name={infoEmployee.name} />
+                                    <div className="min-w-0">
+                                        <p className="font-semibold text-gray-900 truncate">{infoEmployee.name}</p>
+                                        <p className="text-xs text-gray-500">{infoEmployee.employeeId}</p>
+                                    </div>
+                                </div>
+                                <button type="button" onClick={() => setInfoEmployee(null)} className="text-gray-400 hover:text-gray-600" aria-label="Close">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <dl className="p-5 grid grid-cols-1 gap-3 text-sm">
+                                {[
+                                    [BadgeCheck, "Role", roleLabel(infoEmployee.role)],
+                                    [Briefcase, "Designation", infoEmployee.designation || "—"],
+                                    [Mail, "Email", infoEmployee.email || "—"],
+                                    [Phone, "Phone", infoEmployee.phone || "—"],
+                                    [CalendarDays, "Joined", infoEmployee.joiningDate ? new Date(infoEmployee.joiningDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"],
+                                    [FolderKanban, "Work", `${(employeeProjectStats[infoEmployee._id] || {}).totalProjects || 0} projects · ${(employeeTaskStats[infoEmployee._id] || {}).totalTasks || 0} tasks`],
+                                ].map(([Icon, label, value]) => (
+                                    <div key={label} className="flex items-center gap-3">
+                                        <Icon className="w-4 h-4 text-violet-400 shrink-0" />
+                                        <dt className="w-24 text-gray-400 shrink-0">{label}</dt>
+                                        <dd className="text-gray-800 truncate">{value}</dd>
+                                    </div>
+                                ))}
+                                <div className="flex items-center gap-3">
+                                    <span className={`w-2 h-2 rounded-full ml-1 mr-1 ${infoEmployee.isActive === false ? "bg-gray-300" : "bg-emerald-500"}`} />
+                                    <dt className="w-24 text-gray-400 shrink-0">Status</dt>
+                                    <dd className="text-gray-800">{infoEmployee.isActive === false ? "Inactive" : "Active"}</dd>
+                                </div>
+                            </dl>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
+            {/* ==================== Move employee modal ==================== */}
+            <AnimatePresence>
+                {moveEmployee && (
+                    <motion.div
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+                        onClick={() => !moving && setMoveEmployee(null)}
+                    >
+                        <motion.div
+                            initial={{ opacity: 0, y: 12 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: 12 }}
+                            onClick={(e) => e.stopPropagation()}
+                            className="w-full max-w-md bg-white rounded-2xl shadow-xl p-5 space-y-4"
+                        >
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <h3 className="text-base font-semibold text-gray-900">Move employee</h3>
+                                    <p className="text-sm text-gray-500 mt-0.5">
+                                        {moveEmployee.name} · {roleLabel(moveEmployee.role)}
+                                    </p>
+                                </div>
+                                <button type="button" onClick={() => setMoveEmployee(null)} className="text-gray-400 hover:text-gray-600" aria-label="Close">
+                                    <X className="w-5 h-5" />
+                                </button>
+                            </div>
+                            <label className="block">
+                                <span className="text-xs font-medium text-gray-600">Move to department</span>
+                                <select
+                                    value={moveTargetId}
+                                    onChange={(e) => setMoveTargetId(e.target.value)}
+                                    className="mt-1 w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200"
+                                >
+                                    <option value="">Select department</option>
+                                    {moveTargets.map((d) => (
+                                        <option key={d._id} value={d._id} disabled={!d.allowed}>
+                                            {d.name}{d.allowed ? "" : (d.roleTree || []).length ? ` — role "${roleLabel(moveEmployee.role)}" not allowed` : " — no roles set up yet"}
+                                        </option>
+                                    ))}
+                                </select>
+                            </label>
+                            <p className="text-[11px] text-gray-500">
+                                Only departments whose role tree includes this employee's role can be picked.
+                                {user?.role !== "admin" && " As a manager you can only move to departments you head."}
+                            </p>
+                            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100">
+                                <button
+                                    type="button"
+                                    onClick={() => setMoveEmployee(null)}
+                                    className="px-3 py-2 rounded-lg border border-gray-200 text-sm text-gray-600 hover:bg-gray-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={handleMove}
+                                    disabled={moving || !moveTargetId}
+                                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-violet-600 text-white text-sm font-medium hover:bg-violet-700 disabled:opacity-50"
+                                >
+                                    {moving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRightLeft className="w-4 h-4" />}
+                                    Move
+                                </button>
+                            </div>
+                        </motion.div>
+                    </motion.div>
+                )}
+            </AnimatePresence>
+
             {/* ==================== A. DEPARTMENT EMPLOYEES ==================== */}
             <Card className="p-5">
                 <SectionTitle
@@ -323,13 +569,15 @@ const DepartmentEmployeeManagement = ({
                     title="Department Employees"
                     subtitle={`${employees.length} total`}
                     action={
-                        <button
-                            onClick={() => setAddEmployeeOpen((v) => !v)}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-700 transition-colors"
-                        >
-                            <UserPlus className="w-3.5 h-3.5" />
-                            Add Employee
-                        </button>
+                        canManage && (
+                            <button
+                                onClick={openAddEmployee}
+                                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-violet-600 text-white text-xs font-medium hover:bg-violet-700 transition-colors"
+                            >
+                                <UserPlus className="w-3.5 h-3.5" />
+                                Add Employee
+                            </button>
+                        )
                     }
                 />
 
@@ -343,12 +591,32 @@ const DepartmentEmployeeManagement = ({
                         >
                             <div className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-center rounded-xl border border-violet-100 bg-violet-50/40 p-3">
                                 <div className="flex-1">
-                                    <EmployeeSelect
-                                        mode="department-head"
+                                    <select
                                         value={newEmployeeId}
-                                        onChange={setNewEmployeeId}
-                                        placeholder="Select employee to add"
-                                    />
+                                        onChange={(e) => setNewEmployeeId(e.target.value)}
+                                        disabled={loadingCandidates}
+                                        className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-200"
+                                    >
+                                        <option value="">
+                                            {loadingCandidates
+                                                ? "Loading employees..."
+                                                : candidates.length
+                                                    ? "Select employee to add"
+                                                    : (department?.roleTree || []).length
+                                                        ? "No unassigned employees with an allowed role"
+                                                        : "Set up this department's roles first (Roles & Permissions)"}
+                                        </option>
+                                        {candidates.map((c) => (
+                                            <option key={c._id} value={c._id}>
+                                                {c.name} · {c.employeeId} · {roleLabel(c.role)}
+                                            </option>
+                                        ))}
+                                    </select>
+                                    {(department?.roleTree || []).length > 0 && (
+                                        <p className="text-[11px] text-gray-500 mt-1">
+                                            Allowed roles: {department.roleTree.map((n) => roleLabel(n.role)).join(", ")}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="flex gap-2">
                                     <button
@@ -374,11 +642,30 @@ const DepartmentEmployeeManagement = ({
                     )}
                 </AnimatePresence>
 
+                {Object.keys(roleCounts).length > 1 && (
+                    <div className="flex flex-wrap gap-1.5 mb-3">
+                        {[["all", employees.length], ...Object.entries(roleCounts)].map(([r, n]) => (
+                            <button
+                                key={r}
+                                type="button"
+                                onClick={() => setRoleFilter(r)}
+                                className={`px-2.5 py-1 rounded-full border text-xs font-medium transition-colors ${
+                                    roleFilter === r
+                                        ? "bg-violet-600 text-white border-violet-600"
+                                        : "bg-white text-gray-600 border-gray-200 hover:bg-violet-50"
+                                }`}
+                            >
+                                {r === "all" ? "All" : roleLabel(r)} · {n}
+                            </button>
+                        ))}
+                    </div>
+                )}
+
                 {employees.length === 0 ? (
                     <EmptyState icon={Users} title="No employees in this department yet" />
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        {employees.map((emp) => {
+                        {visibleEmployees.map((emp) => {
                             const isHead = headId && String(emp._id) === String(headId);
                             const tStats = employeeTaskStats[emp._id] || { totalTasks: 0 };
                             const pStats = employeeProjectStats[emp._id] || { totalProjects: 0 };
@@ -399,20 +686,35 @@ const DepartmentEmployeeManagement = ({
                                                 )}
                                             </div>
                                             <p className="text-xs text-gray-400 truncate">
-                                                {emp.employeeId} · {emp.designation || emp.role}
+                                                {emp.employeeId} · {roleLabel(emp.role)}
+                                                {emp.designation ? ` · ${emp.designation}` : ""}
                                             </p>
                                             <p className="text-[11px] text-gray-400 mt-0.5">
                                                 {pStats.totalProjects} projects · {tStats.totalTasks} tasks
                                             </p>
                                         </div>
                                     </div>
-                                    <IconButton
-                                        icon={UserMinus}
-                                        label="Remove"
-                                        tone="rose"
-                                        disabled={isHead || removingEmployeeId === emp._id}
-                                        onClick={() => handleRemoveEmployee(emp)}
-                                    />
+                                    <div className="flex flex-wrap justify-end gap-1.5 shrink-0">
+                                        <IconButton icon={Info} label="Info" tone="gray" onClick={() => setInfoEmployee(emp)} />
+                                        {canManage && (
+                                            <>
+                                                <IconButton
+                                                    icon={ArrowRightLeft}
+                                                    label="Move"
+                                                    disabled={isHead}
+                                                    onClick={() => openMove(emp)}
+                                                />
+                                                <IconButton
+                                                    icon={UserMinus}
+                                                    label="Remove"
+                                                    tone="rose"
+                                                    disabled={(isHead && employees.length > 1) || removingEmployeeId === emp._id}
+                                                    title={isHead && employees.length > 1 ? "The manager can be removed only when they are the only employee" : undefined}
+                                                    onClick={() => handleRemoveEmployee(emp)}
+                                                />
+                                            </>
+                                        )}
+                                    </div>
                                 </div>
                             );
                         })}

@@ -40,10 +40,13 @@ const MODULE_KEYS = [
   'holidays',
 
   // Workspace
-  'overview',
   'department',
   'project',
-  'task',
+  // Project sub-modules (per-user override of the department role tree)
+  'project_module_tree',
+  'project_tasks',
+  'project_bugs',
+  'project_timeline',
 ];
 
 const BASELINE_MODULES = [
@@ -67,8 +70,8 @@ const BASELINE_EDITABLE = [
 
 const ROLE_DEFAULT_MODULES = {
   employee: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',],
-  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task', 'crm', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback', 'analytics',],
-  'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'overview', 'department', 'project', 'task',],
+  manager: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'lead', 'visits', 'registration', 'demos', 'data_updation', 'feedback', 'analytics',],
+  'team-lead': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team',],
   sales: ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center', 'team', 'crm', 'query_management', 'visits', 'lead', 'registration',],
   hr: ['dashboard', 'hr_employees', 'hr_attendance', 'hr_leaves', 'hr_tasks', 'hr_payslips', 'knowledge_center', 'finance', 'announcements', 'holidays', 'profile', 'leaves', 'attendance', 'timesheets', 'crm', 'visits', 'demos', 'data_updation', 'feedback', 'registration', 'analytics'],
   'inside-sales': ['dashboard', 'profile', 'attendance', 'leaves', 'payslips', 'tasks', 'timesheets', 'knowledge_center',
@@ -109,19 +112,11 @@ const editOf = (...keys) => keys.map((module) => ({ module, permission: 'edit' }
 const ROLE_DEFAULT_ACCESS = {
   employee: [],
   manager: [
-    { module: 'overview', permission: 'edit' },
-    { module: 'department', permission: 'edit' },
-    { module: 'project', permission: 'edit' },
-    { module: 'task', permission: 'edit' },
     // Managers see every lead and manage the product tree (crmScopeService)
     { module: 'crm', permission: 'edit' },
     ...editOf(...SALES_PAGE_MODULES),
   ],
   'team-lead': [
-    { module: 'overview', permission: 'view' },
-    { module: 'department', permission: 'view' },
-    { module: 'project', permission: 'view' },
-    { module: 'task', permission: 'edit' },
   ],
   sales: [
     { module: 'crm', permission: 'edit' },
