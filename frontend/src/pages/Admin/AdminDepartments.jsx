@@ -1,9 +1,10 @@
-import { useState, useEffect, useMemo, useRef } from "react"; import { useNavigate } from 'react-router-dom';
+import { useState, useEffect, useMemo } from "react"; import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import api from '../../utils/api';
 import EmptyState from '../../components/UI/EmptyState';
 import CreateDepartmentForm from '../Department/Createdepartmentform';
+import DeleteDepartmentModal from '../Department/DeleteDepartmentModal';
 import GlobalFilters from '../../components/UI/Globalfilters';
 
 const SI = ({ d, d2, d3, size = 16, color }) => (
@@ -54,143 +55,8 @@ const AdminDepartments = () => {
     sort: "newest",
   });
 
-  const fileInputRef = useRef(null);
-
-  const [importing, setImporting] = useState(false);
-  const [exporting, setExporting] = useState(false);
-
-  const handleImport = async (e) => {
-    const file = e.target.files?.[0];
-
-    if (!file) return;
-
-    const allowedTypes = [
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
-    ];
-
-    const extension = file.name
-      .split(".")
-      .pop()
-      .toLowerCase();
-
-    if (!["xlsx", "xls"].includes(extension)) {
-      toast.error("Please select an Excel file.");
-      e.target.value = "";
-      return;
-    }
-
-    try {
-      setImporting(true);
-
-      const formData = new FormData();
-
-      formData.append("file", file);
-
-      const response = await api.post(
-        "/departments/import",
-        formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
-      );
-
-      const summary =
-        response.data?.summary;
-
-      if (summary) {
-        if (summary.failed > 0) {
-          toast.error(
-            `Imported ${summary.created} department(s). ${summary.failed} failed.`
-          );
-        } else {
-          toast.success(
-            `${summary.created} department(s) imported successfully.`
-          );
-        }
-      } else {
-        toast.success(
-          "Departments imported successfully."
-        );
-      }
-
-      await fetchDepartments();
-      // await fetchEmployees();
-
-      if (
-        response.data?.errors?.length
-      ) {
-        console.error(
-          "Department import errors:",
-          response.data.errors
-        );
-      }
-
-    } catch (err) {
-      console.error(
-        "Department import failed:",
-        err
-      );
-
-      toast.error(
-        err.response?.data?.message ||
-        "Department import failed."
-      );
-    } finally {
-      setImporting(false);
-
-      // Allows selecting the same file again.
-      e.target.value = "";
-    }
-  };
-  const handleExport = async () => {
-    try {
-      setExporting(true);
-
-      const response = await api.get(
-        "/departments/export",
-        {
-          responseType: "blob",
-        }
-      );
-
-      const blob = new Blob(
-        [response.data],
-        {
-          type:
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        }
-      );
-
-      const url =
-        window.URL.createObjectURL(blob);
-
-      const link =
-        document.createElement("a");
-
-      link.href = url;
-      link.download = "departments.xlsx";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      window.URL.revokeObjectURL(url);
-      toast.success("Departments exported successfully.");
-    } catch (err) {
-      console.error(
-        "Department export failed:",
-        err
-      );
-
-      toast.error(
-        err.response?.data?.message ||
-        "Department export failed."
-      );
-    } finally {
-      setExporting(false);
-    }
-  };
+  // Department being deleted (opens the delete-preview dialog).
+  const [deleting, setDeleting] = useState(null);
 
   const fetchDepartments = async () => {
     try {
@@ -263,15 +129,10 @@ const AdminDepartments = () => {
   //   fetchEmployees();
   // }, []);
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this department?')) return;
-    try {
-      await api.delete(`/departments/${id}`);
-      toast.success('Deleted!');
-      fetchDepartments();
-    } catch (err) {
-      toast.error(err.response?.data?.message || 'Delete failed');
-    }
+  // Deleting goes through a preview dialog (employees, child departments,
+  // projects) — see DeleteDepartmentModal.
+  const handleDelete = (id) => {
+    setDeleting(departments.find((d) => d._id === id) || { _id: id });
   };
 
   const openCreate = () => {
@@ -338,20 +199,9 @@ const AdminDepartments = () => {
 
   return (
     <div className="w-full max-w-none space-y-6 animate-fade-in">
-      {/* 1. Page Header ------------------------------------------------- */}
-      <div className="page-header">
-        <div>
-          <h2 className="page-title">Departments</h2>
-          <p className="page-subtitle">{departments.length} departments</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <input ref={fileInputRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport}/>
-          <button type="button" onClick={() => fileInputRef.current?.click()} disabled={importing} className="btn-secondary">
-            {importing ? "Importing..." : "Import Excel"}
-          </button>
-          <button type="button" onClick={handleExport} disabled={exporting} className="btn-secondary"> {exporting ? "Exporting..." : "Export Excel"} </button>
-          <button onClick={openCreate} className="btn-primary"> + Create Department </button>
-        </div>
+      {/* 1. Actions ----------------------------------------------------- */}
+      <div className="flex justify-end">
+        <button onClick={openCreate} className="btn-primary"> + Create Department </button>
       </div>
 
       {/* 2. KPI Cards — only fields real getDepartments() data actually supports */}
@@ -458,6 +308,14 @@ const AdminDepartments = () => {
         }}
       />
 
+      <DeleteDepartmentModal
+        department={deleting}
+        onClose={() => setDeleting(null)}
+        onDeleted={() => {
+          setDeleting(null);
+          fetchDepartments();
+        }}
+      />
     </div>
   );
 };

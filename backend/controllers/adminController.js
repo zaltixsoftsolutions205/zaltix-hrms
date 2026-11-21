@@ -9,6 +9,8 @@ const Lead = require('../models/Lead');
 const PurchaseOrder = require('../models/PurchaseOrder');
 const Expense = require('../models/Expense');
 const moment = require('moment');
+const { LEAD_ASSIGNEE_ROLES } = require('../services/leadAssigneeService');
+const { getCrmAnalytics, isValidPeriod: isValidCrmPeriod, WON: CRM_WON, LOST: CRM_LOST } = require('../services/crmAnalyticsService');
 
 
 // Leave Policy CRUD
@@ -100,22 +102,48 @@ exports.getPayrollReport = async (req, res) => {
   }
 };
 
+// Lead totals per sales employee. "Converted" = pipeline stage Lead Won,
+// "not interested" = Lead Lost (the old `status` field is no longer written).
 exports.getCrmReport = async (req, res) => {
   try {
-    const salesEmployees = await User.find({ role: 'sales', isActive: true }).select('_id name employeeId');
-    const report = await Promise.all(
-      salesEmployees.map(async (emp) => {
-        const total = await Lead.countDocuments({ assignedTo: emp._id });
-        const converted = await Lead.countDocuments({ assignedTo: emp._id, status: 'converted' });
-        const notInterested = await Lead.countDocuments({ assignedTo: emp._id, status: 'not-interested' });
-        return { employee: emp, total, converted, notInterested, conversionRate: total > 0 ? Math.round((converted / total) * 100) : 0 };
-      })
-    );
-    const totalLeads = await Lead.countDocuments();
-    const totalConverted = await Lead.countDocuments({ status: 'converted' });
+    const salesEmployees = await User.find({ role: { $in: LEAD_ASSIGNEE_ROLES }, isActive: true }).select('_id name employeeId role');
+    const rows = await Lead.aggregate([
+      { $match: { assignedTo: { $in: salesEmployees.map((e) => e._id) } } },
+      {
+        $group: {
+          _id: '$assignedTo',
+          total: { $sum: 1 },
+          converted: { $sum: { $cond: [{ $in: ['$pipelineStage', CRM_WON] }, 1, 0] } },
+          notInterested: { $sum: { $cond: [{ $in: ['$pipelineStage', CRM_LOST] }, 1, 0] } },
+        },
+      },
+    ]);
+    const byEmp = new Map(rows.map((r) => [String(r._id), r]));
+    const report = salesEmployees.map((emp) => {
+      const r = byEmp.get(String(emp._id)) || { total: 0, converted: 0, notInterested: 0 };
+      return { employee: emp, total: r.total, converted: r.converted, notInterested: r.notInterested, conversionRate: r.total > 0 ? Math.round((r.converted / r.total) * 100) : 0 };
+    });
+    const [totalLeads, totalConverted] = await Promise.all([
+      Lead.countDocuments(),
+      Lead.countDocuments({ pipelineStage: { $in: CRM_WON } }),
+    ]);
     res.json({ report, totalLeads, totalConverted, overallConversionRate: totalLeads > 0 ? Math.round((totalConverted / totalLeads) * 100) : 0 });
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+};
+
+// Admin CRM Analytics page: pipeline, won/lost, team performance for one period.
+exports.getCrmAnalytics = async (req, res) => {
+  const period = req.query.period || 'monthly';
+  if (!isValidCrmPeriod(period)) {
+    return res.status(400).json({ message: 'period must be one of: today, weekly, monthly, yearly' });
+  }
+  try {
+    res.json(await getCrmAnalytics(period));
+  } catch (err) {
+    console.error('getCrmAnalytics failed:', err);
+    res.status(500).json({ message: 'Failed to load CRM analytics' });
   }
 };
 

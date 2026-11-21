@@ -1,13 +1,12 @@
 const express = require("express");
 const router = express.Router();
 
-const { createTask, importTasks, getTasks, getTask, updateTask, deleteTask,getTaskSummary, getMyTasks, updateTaskStatus,} = require("../controllers/taskController");
+const { createTask, getTasks, getTask, updateTask, deleteTask, getTaskSummary, getMyTasks, getProjectKPI, updateTaskStatus, getActiveSelfTask, } = require("../controllers/taskController");
 const { protect } = require("../middleware/auth");
 const { moduleAccess, canModifyTask, } = require("../middleware/roleCheck");
 const { taskAttachmentUpload } = require("../middleware/taskUpload");
 
 // Excel import middleware
-const { uploadTaskExcel, importTasksFromExcel,  } = require("../middleware/taskExcelImport");
 
 
 /*
@@ -93,59 +92,72 @@ router.put("/:id/status", protect, updateTaskStatus);
  *       404:
  *         description: Not found
  */
-router.get("/:id", protect, moduleAccess("tasks", "view"), getTask);
-
-/*
-|--------------------------------------------------------------------------
-| EXCEL IMPORT
-|--------------------------------------------------------------------------
-|
-| POST /api/tasks/import
-|
-| Flow:
-|
-| Request
-|   ↓
-| protect
-|   ↓
-| tasks -> edit permission
-|   ↓
-| uploadTaskExcel
-|   ↓
-| importTasksFromExcel
-|   ↓
-| req.importedTasks
-|   ↓
-| importTasks
-|   ↓
-| createTaskRecord()
-|
-|--------------------------------------------------------------------------
-*/
 /**
  * @swagger
- * /api/tasks/import:
- *   post:
- *     summary: Import tasks
+ * /api/tasks/my:
+ *   get:
+ *     summary: Tasks assigned to the caller (paginated, with a status summary)
  *     tags:
  *       - Tasks
- *     description: "Module access: tasks,edit"
  *     security:
  *       - BearerAuth: []
- *     requestBody:
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
  *     responses:
  *       200:
  *         description: Success
- *       401:
- *         description: Not authorized
+ * /api/tasks/active-self:
+ *   get:
+ *     summary: The caller's in-progress self task (focus), or null
+ *     tags:
+ *       - Tasks
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ * /api/tasks/kpi:
+ *   get:
+ *     summary: Project task KPIs
+ *     tags:
+ *       - Tasks
+ *     description: "Module access: tasks,view"
+ *     security:
+ *       - BearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
+// These must stay above "/:id".
+router.get("/my", protect, getMyTasks);
+router.get("/active-self", protect, getActiveSelfTask);
+router.get("/kpi", protect, moduleAccess("tasks", "view"), getProjectKPI);
+
+router.get("/:id", protect, moduleAccess("tasks", "view"), getTask);
+
+/**
+ * @swagger
+ * /api/tasks/{id}/status:
+ *   put:
+ *     summary: Change a task's status (assignee or manager); bugs change stage on the Bug Sheet
+ *     tags:
+ *       - Tasks
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       400:
+ *         description: Invalid transition, or a bug
  *       403:
  *         description: Forbidden
  */
-router.post("/import", protect, moduleAccess("tasks", "edit"), uploadTaskExcel, importTasksFromExcel, importTasks);
+router.put("/:id/status", protect, updateTaskStatus);
+
 /*
 |--------------------------------------------------------------------------
 | CREATE TASK

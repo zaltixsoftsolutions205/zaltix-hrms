@@ -24,6 +24,7 @@ const seed = async () => {
       email: 'admin@hrms.com',
       password: 'Admin@123',
       role: 'admin',
+      employeeType: null,
       isFirstLogin: false,
     });
     console.log('✅ Admin created: admin@hrms.com / Admin@123');

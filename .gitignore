@@ -1,0 +1,7 @@
+# Duplicate/backup files
+*- Copy.*
+*- Copy (*
+
+# Stray nested copy and local artifacts
+/zaltix-hrms/
+backend/activity-files/

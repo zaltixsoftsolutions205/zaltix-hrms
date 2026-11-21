@@ -358,8 +358,11 @@ const CreateDepartmentForm = ({ open, onClose, onCreated, department, }) => {
             // list to detect the removal.
             // =============================================
 
-            const finalMembers = [...new Set([...(Array.isArray(form.members) ? form.members : []), form.headOf,]),].filter(Boolean).map(String);
-            const payload = { ...form, members: finalMembers, };
+            // Employees are not part of this form: they are added from Employee
+            // Management after the role tree is set up. The code is fixed after
+            // creation, so it is only sent when creating.
+            const { members: _members, code, ...rest } = form;
+            const payload = isEdit ? rest : { ...rest, code };
             let response;
             if (isEdit) {
                 response = await api.put(`/departments/${department._id}`, payload);
@@ -420,7 +423,17 @@ const CreateDepartmentForm = ({ open, onClose, onCreated, department, }) => {
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1"> Department Code </label>
-                            <input type="text" name="code" value={form.code} onChange={handleChange} placeholder="Auto-generated if left blank" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                            {isEdit ? (
+                                <>
+                                    <input type="text" value={form.code || "—"} readOnly disabled aria-readonly="true" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed" />
+                                    <p className="text-[11px] text-gray-400 mt-1">The code is set when the department is created and can't be changed.</p>
+                                </>
+                            ) : (
+                                <>
+                                    <input type="text" name="code" value={form.code} onChange={handleChange} placeholder="Auto-generated if left blank" className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200" />
+                                    <p className="text-[11px] text-gray-400 mt-1">Can't be changed later.</p>
+                                </>
+                            )}
                         </div>
                     </div>
                     {/* ================================================= */}
@@ -518,39 +531,12 @@ const CreateDepartmentForm = ({ open, onClose, onCreated, department, }) => {
                         <label className="block text-sm font-medium text-gray-700 mb-1"> Description </label>
                         <textarea name="description" value={form.description} onChange={handleChange} rows={4} className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-200 resize-none" placeholder="Department description" />
                     </div>
-                    {/* ================================================= */}
-                    {/* Department Members */}
-                    {/* ================================================= */}
-                    <div>
-                        <div className="flex items-center justify-between mb-1">
-                            <label className="block text-sm font-medium text-gray-700">   Department Members </label>
-                            <span className="text-xs text-gray-400"> {form.members.length}{" "} selected </span>
-                        </div>
-                        <div className="border border-gray-200 rounded-lg">
-                            {/* Search */}
-                            <div className="relative p-2 border-b border-gray-100">
-                                <Search className="w-3.5 h-3.5 text-gray-400 absolute left-4 top-1/2 -translate-y-1/2" />
-                                <input type="text" value={memberSearch} onChange={(e) => setMemberSearch(e.target.value)} placeholder="Search employees" className="w-full pl-8 pr-2 py-1.5 text-sm rounded-md border-0 focus:outline-none focus:ring-0" />
-                            </div>
-                            {/* Employee List */}
-                            <div className="max-h-48 overflow-y-auto divide-y divide-gray-50">
-                                {filteredEmployees.length === 0 ? (<p className="text-xs text-gray-400 px-3 py-3"> No available employees.</p>)
-                                    : (filteredEmployees.map((employee) => {
-                                        const employeeId = String(employee._id);
-                                        const isHead = String(form.headOf) === employeeId;
-                                        const checked = form.members.some((id) => String(id) === employeeId);
-                                        return (
-                                            <label key={employee._id} className={`flex items-center gap-2.5 px-3 py-2 text-sm ${isHead ? "bg-violet-50" : "hover:bg-gray-50"} cursor-pointer`}>
-                                                <input type="checkbox" checked={checked} disabled={isHead} onChange={() => toggleMember(employee._id)} className="rounded border-gray-300 text-blue-600 focus:ring-blue-200" />
-                                                <span className="text-gray-700">{employee.name}{employee.employeeId ? ` (${employee.employeeId})` : ""}</span>
-                                                {isHead && (<span className="text-xs text-violet-600 font-medium ml-auto">Head</span>)}
-                                            </label>
-                                        );
-                                    })
-                                    )}
-                            </div>
-                        </div>
-                    </div>
+                    {!isEdit && (
+                        <p className="text-xs text-gray-500 bg-violet-50/60 border border-violet-100 rounded-lg px-3 py-2">
+                            Employees are added after the department is created: set up its roles under
+                            Roles &amp; Permissions, then add employees from Employee Management.
+                        </p>
+                    )}
                     {/* ================================================= */}
                     {/* Actions */}
                     {/* ================================================= */}

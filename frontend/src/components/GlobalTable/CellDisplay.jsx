@@ -2,7 +2,7 @@ import LeadNameCell from '../Crm/LeadNameCell';
 import { formatDate } from '../../utils/helpers';
 import { formatPipelineStage, pipelineBadgeClass } from '../../utils/leadPipeline';
 import { getTypeMeta, isEmptyValue } from './fieldTypes';
-import { productId, productName, productLabelFromOptions } from './productRef';
+import { productId, productName, productLabelFromOptions } from './Productref';
 import { formatFollowUp, isFollowUpOverdue } from '../../utils/followUp';
 
 const dash = <span className="text-violet-200">—</span>;

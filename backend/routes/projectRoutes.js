@@ -4,20 +4,17 @@ const router = express.Router();
 
 const {
     createProject,
-    importProjects,
     getProjects,
     getProject,
     updateProject,
     deleteProject,
     addProjectMember,
     removeProjectMember,
-    archiveProject
+    archiveProject,
+    shiftProjectDepartment,
+    addProjectTeamMember,
+    removeProjectTeamMember
 } = require("../controllers/projectController");
-
-const {
-    uploadProjectExcel,
-    importProjectsFromExcel
-} = require("../middleware/projectImportMiddleware");
 
 const {
     protect
@@ -62,54 +59,6 @@ router.use(protect);
  *         description: Not authorized
  */
 router.post( "/", createProject);
-
-/* ============================================================
-   EXCEL IMPORT
-============================================================ */
-
-/*
- * Excel upload:
- *
- * multipart/form-data
- * field name = "file"
- *
- * Flow:
- *
- * uploadProjectExcel
- *       ↓
- * importProjectsFromExcel
- *       ↓
- * departmentCode → department ObjectId
- * teamLeadEmployeeId → manager ObjectId
- * teamMemberEmployeeIds → ObjectId[]
- *       ↓
- * req.importedProjects
- *       ↓
- * importProjects
- *       ↓
- * createProjectRecord()
- */
-/**
- * @swagger
- * /api/projects/import:
- *   post:
- *     summary: Import projects
- *     tags:
- *       - Projects
- *     security:
- *       - BearerAuth: []
- *     requestBody:
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *     responses:
- *       200:
- *         description: Success
- *       401:
- *         description: Not authorized
- */
-router.post( "/import", uploadProjectExcel, importProjectsFromExcel, importProjects);
 
 /* ============================================================
    GET PROJECTS
@@ -315,5 +264,113 @@ router.delete( "/:id/members/:userId", removeProjectMember);
  *         description: Not found
  */
 router.put( "/:id/archive", archiveProject);
+
+/* ============================================================
+   DEPARTMENT PAGE HELPERS (also mounted under /api/departments)
+============================================================ */
+
+/**
+ * @swagger
+ * /api/projects/{projectId}/department:
+ *   put:
+ *     summary: Move a project to another owning department
+ *     tags:
+ *       - Projects
+ *     description: "Admin, or a manager who heads both departments"
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               departmentId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       403:
+ *         description: Forbidden
+ *       404:
+ *         description: Not found
+ */
+router.put("/:projectId/department", shiftProjectDepartment);
+/**
+ * @swagger
+ * /api/projects/{projectId}/team-members:
+ *   post:
+ *     summary: Add one team member (must belong to one of the project's departments)
+ *     tags:
+ *       - Projects
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               userId:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       400:
+ *         description: Not in a project department
+ *       403:
+ *         description: Forbidden
+ */
+router.post("/:projectId/team-members", addProjectTeamMember);
+/**
+ * @swagger
+ * /api/projects/{projectId}/team-members/{userId}:
+ *   delete:
+ *     summary: Remove one team member
+ *     tags:
+ *       - Projects
+ *     security:
+ *       - BearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: projectId
+ *         required: true
+ *         schema:
+ *           type: string
+ *       - in: path
+ *         name: userId
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ *       403:
+ *         description: Forbidden
+ */
+router.delete("/:projectId/team-members/:userId", removeProjectTeamMember);
+
+/* ============================================================
+   MODULE TREE  (/api/projects/:projectId/modules/...)
+============================================================ */
+router.use("/:projectId/modules", require("./projectModuleRoutes"));
+
+/* ============================================================
+   MODULE WORK: tasks / bugs / milestones, plans, bug stages
+   (/api/projects/:projectId/work/...)
+============================================================ */
+router.use("/:projectId/work", require("./projectWorkRoutes"));
 
 module.exports = router;

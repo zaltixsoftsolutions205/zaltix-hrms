@@ -13,6 +13,7 @@ import {
     Users2,
     AlertCircle,
     X,
+    ShieldCheck,
 } from "lucide-react";
 import toast from "react-hot-toast";
 import Breadcrumb from "../../components/UI/Breadcrumb";
@@ -25,8 +26,9 @@ import api from "../../utils/api";
 // Nothing inside Assignmentselects.jsx is modified — it is reused as-is.
 import { DepartmentSelect, EmployeeSelect } from "../../components/UI/Assignmentselects";
 
-import DepartmentAnalysisTab from "./DepartmentAnalysisTab";
-import DepartmentEmployeeManagement from "./DepartmentEmployeeManagement";
+import DepartmentAnalysisTab from "./Departmentanalysistab";
+import DepartmentEmployeeManagement from "./Departmentemployeemanagement";
+import DepartmentRoleTree from "./DepartmentRoleTree";
 
 /* ------------------------------------------------------------------ */
 /* Small shared primitives (violet/glass HRMS look)                    */
@@ -88,6 +90,7 @@ const DepartmentDetailsSkeleton = () => (
 const TABS = [
     { key: "analysis", label: "Analysis", icon: BarChart3 },
     { key: "management", label: "Employee Management", icon: Users2 },
+    { key: "roles", label: "Roles & Permissions", icon: ShieldCheck },
 ];
 
 const DepartmentDetails = () => {
@@ -186,7 +189,9 @@ const DepartmentDetails = () => {
         e.preventDefault();
         try {
             setSavingDepartment(true);
-            const response = await api.put(`/departments/${id}`, editForm);
+            // The code is fixed after creation; never send it on edit.
+            const { code: _code, ...payload } = editForm;
+            const response = await api.put(`/departments/${id}`, payload);
             if (response.data.success) {
                 toast.success("Department updated successfully");
                 setShowEditForm(false);
@@ -296,11 +301,13 @@ const DepartmentDetails = () => {
                                         </label>
                                         <input
                                             type="text"
-                                            name="code"
-                                            value={editForm.code}
-                                            onChange={handleEditChange}
-                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-violet-200"
+                                            value={editForm.code || "—"}
+                                            readOnly
+                                            disabled
+                                            aria-readonly="true"
+                                            className="w-full px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50 text-gray-500 cursor-not-allowed"
                                         />
+                                        <p className="text-[11px] text-gray-400 mt-1">Set at creation; can't be changed.</p>
                                     </div>
                                 </div>
 
@@ -461,7 +468,7 @@ const DepartmentDetails = () => {
             </motion.div>
 
             {/* ---------------- Tabs (visually separate from header) ---------------- */}
-            <div className="flex items-center gap-1 rounded-xl border border-violet-100 bg-white p-1 w-fit">
+            <div className="flex items-center gap-1 rounded-xl border border-violet-100 bg-white p-1 w-fit max-w-full overflow-x-auto">
                 {TABS.map((tab) => {
                     const Icon = tab.icon;
                     const isActive = activeTab === tab.key;
@@ -507,6 +514,8 @@ const DepartmentDetails = () => {
                             taskStats={taskStats}
                             recentActivity={recentActivity}
                         />
+                    ) : activeTab === "roles" ? (
+                        <DepartmentRoleTree departmentId={id} onSaved={handleRefresh} />
                     ) : (
                         <DepartmentEmployeeManagement
                             departmentId={id}

@@ -1,5 +1,9 @@
 const mongoose = require("mongoose");
 
+// Project-module sub-features a department role can be granted by default.
+const PROJECT_ACCESS_KEYS = ["moduleTree", "tasks", "bugs", "timeline"];
+const PROJECT_ACCESS_LEVELS = ["none", "view", "edit"];
+
 const departmentSchema = new mongoose.Schema(
   {
     name: {
@@ -96,14 +100,63 @@ const departmentSchema = new mongoose.Schema(
       },
     ],
 
+    // ===================================================================
+    // Role tree: which login roles (User.role) this department uses and how
+    // they nest. admin -> manager are fixed roots and are NOT stored here;
+    // a node whose parentRole is null hangs under the manager.
+    // Only employees whose role is in this tree can join the department
+    // (an empty tree means "not configured yet" -> any role allowed).
+    // projectAccess = the role's default permissions for the Project module
+    // inside this department's projects (enforced from the Project phase on).
+    // ===================================================================
+    roleTree: [
+      {
+        _id: false,
+        role: { type: String, required: true, trim: true, lowercase: true },
+        parentRole: { type: String, default: null, trim: true, lowercase: true },
+        order: { type: Number, default: 0 },
+        projectAccess: {
+          moduleTree: { type: String, enum: PROJECT_ACCESS_LEVELS, default: "view" },
+          tasks: { type: String, enum: PROJECT_ACCESS_LEVELS, default: "view" },
+          bugs: { type: String, enum: PROJECT_ACCESS_LEVELS, default: "view" },
+          timeline: { type: String, enum: PROJECT_ACCESS_LEVELS, default: "view" },
+        },
+      },
+    ],
+
     createdBy: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
       required: true,
     },
+
+    // Soft delete: deleted departments stay in the database but are hidden
+    // from every query (see the pre-find hook below).
+    isDeleted: { type: Boolean, default: false },
+    deletedAt: { type: Date, default: null },
+    deletedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User", default: null },
   },
   { timestamps: true }
 );
+
+/*
+ * Hide soft-deleted departments from find / findOne / count / exists unless a
+ * query opts in with `.setOptions({ withDeleted: true })` or filters on
+ * isDeleted itself.
+ */
+function excludeDeleted() {
+  if (this.getOptions().withDeleted) return;
+  const filter = this.getFilter();
+  if (Object.prototype.hasOwnProperty.call(filter, "isDeleted")) return;
+  this.where({ isDeleted: { $ne: true } });
+}
+departmentSchema.pre(
+  ["find", "findOne", "findOneAndUpdate", "countDocuments", "updateMany", "updateOne"],
+  excludeDeleted
+);
+
+departmentSchema.statics.PROJECT_ACCESS_KEYS = PROJECT_ACCESS_KEYS;
+departmentSchema.statics.PROJECT_ACCESS_LEVELS = PROJECT_ACCESS_LEVELS;
 
 
 

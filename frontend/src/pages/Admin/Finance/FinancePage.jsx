@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useAuth } from '../../../contexts/AuthContext';
+import { canAccessEdit } from '../../../constants/modules';
 import {
   LayoutDashboard, FileText, CreditCard, TrendingUp, Shield, BookOpen,
   Wallet, ClipboardList, Users, DollarSign, BarChart3, Settings,
@@ -131,7 +132,8 @@ function FinFilterBar({ month, year, onMonthChange, onYearChange }) {
 /* ─── Main page ─── */
 const FinancePage = () => {
   const { user } = useAuth();
-  const canAdd     = user?.role === 'hr';
+  // HR, or anyone with Finance edit access (admin included), can add income / expenses.
+  const canAdd     = user?.role === 'hr' || canAccessEdit(user, 'finance');
   const canApprove = user?.role === 'admin';
 
   const [activeTab, setActiveTab] = useState('dashboard');

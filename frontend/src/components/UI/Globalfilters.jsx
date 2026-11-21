@@ -169,6 +169,15 @@ const getId = (value) => {
 const getDepartmentId = (entity) =>
   getId(entity?.department);
 
+// A project can span several departments (owning `department` + `departments`).
+const getProjectDepartmentIds = (project) => [
+  ...new Set(
+    [project?.department, ...(project?.departments || [])]
+      .map(getId)
+      .filter(Boolean)
+  ),
+];
+
 const getManagerId = (project) =>
   getId(project?.manager);
 
@@ -391,7 +400,7 @@ function getConstraintsFromSingleFilter(key, id, datasets) {
 
       projectIds: new Set(
         projects
-          .filter((p) => getDepartmentId(p) === id)
+          .filter((p) => getProjectDepartmentIds(p).includes(id))
           .map((p) => p._id)
       ),
 
@@ -425,9 +434,6 @@ function getConstraintsFromSingleFilter(key, id, datasets) {
 
     if (!project) return empty;
 
-    const deptId =
-      getDepartmentId(project);
-
     const memberIds =
       getTeamMemberIds(project);
 
@@ -435,9 +441,7 @@ function getConstraintsFromSingleFilter(key, id, datasets) {
       getManagerId(project);
 
     return {
-      departmentIds: deptId
-        ? new Set([deptId])
-        : new Set(),
+      departmentIds: new Set(getProjectDepartmentIds(project)),
 
       projectIds: new Set([id]),
 
@@ -563,9 +567,7 @@ function getConstraintsFromSingleFilter(key, id, datasets) {
 
     const projectsByDept =
       projects.filter((p) =>
-        departmentIds.has(
-          getDepartmentId(p)
-        )
+        getProjectDepartmentIds(p).some((d) => departmentIds.has(d))
       );
 
     const projectIds = new Set(
@@ -637,8 +639,8 @@ function getConstraintsFromSingleFilter(key, id, datasets) {
     const departmentIds =
       new Set(
         relatedProjects
-          .map((p) =>
-            getDepartmentId(p)
+          .flatMap((p) =>
+            getProjectDepartmentIds(p)
           )
           .filter(Boolean)
       );

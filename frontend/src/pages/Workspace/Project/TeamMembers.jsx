@@ -294,26 +294,32 @@ const ProgressSection = ({ rows }) => (
 /* ════════════════════════════════════════════════════════════════
    ADD MEMBER MODAL
 ════════════════════════════════════════════════════════════════ */
-const AddMemberModal = ({ open, onClose, departmentId, excludeIds, onConfirm, submitting }) => {
+/** Active employees of every project department, merged and de-duplicated. */
+const loadDepartmentEmployees = async (departmentIds) => {
+  const results = await Promise.all(
+    departmentIds.map((department) => api.get('/employees', { params: { department, isActive: true } }))
+  );
+  const byId = new Map();
+  results.forEach((res) => unwrap(res, 'employees').forEach((e) => byId.set(String(e._id), e)));
+  return [...byId.values()].sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+};
+
+const AddMemberModal = ({ open, onClose, departmentIds, excludeIds, onConfirm, submitting }) => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [selected, setSelected] = useState([]);
+  const deptKey = (departmentIds || []).join(',');
 
   useEffect(() => {
     if (!open) { setSelected([]); setSearch(''); return; }
-    if (!departmentId) { setEmployees([]); return; }
+    if (!deptKey) { setEmployees([]); return; }
     setLoading(true);
-    api.get('/employees', { params: { department: departmentId } })
-      .then((res) => {
-        console.log('EMPLOYEE RESPONSE:', res.data);
-        const list = unwrap(res, 'employees');
-        console.log('EMPLOYEES:', list);
-        setEmployees(list);
-      })
-      .catch(() => { setEmployees([]); toast.error('Could not load employees for this department.'); })
+    loadDepartmentEmployees(deptKey.split(','))
+      .then(setEmployees)
+      .catch(() => { setEmployees([]); toast.error('Could not load employees for the project departments.'); })
       .finally(() => setLoading(false));
-  }, [open, departmentId]);
+  }, [open, deptKey]);
 
   const available = useMemo(
     () => employees.filter((e) => !excludeIds.includes(e._id) && e.name?.toLowerCase().includes(search.toLowerCase())),
@@ -345,7 +351,9 @@ const AddMemberModal = ({ open, onClose, departmentId, excludeIds, onConfirm, su
               <Avatar name={e.name} />
               <div className="min-w-0">
                 <p className="text-xs font-semibold text-gray-700 truncate">{e.name}</p>
-                <p className="text-[11px] text-gray-400 truncate">{e.employeeId || e.email}</p>
+                <p className="text-[11px] text-gray-400 truncate">
+                  {e.employeeId || e.email}{e.department?.name ? ` · ${e.department.name}` : ''}
+                </p>
               </div>
             </label>
           ))}
@@ -373,20 +381,21 @@ const AddMemberModal = ({ open, onClose, departmentId, excludeIds, onConfirm, su
 /* ════════════════════════════════════════════════════════════════
    CHANGE / SHIFT MEMBER MODAL
 ════════════════════════════════════════════════════════════════ */
-const ChangeMemberModal = ({ open, onClose, currentMember, departmentId, excludeIds, onConfirm, submitting }) => {
+const ChangeMemberModal = ({ open, onClose, currentMember, departmentIds, excludeIds, onConfirm, submitting }) => {
   const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(false);
   const [replacementId, setReplacementId] = useState('');
+  const deptKey = (departmentIds || []).join(',');
 
   useEffect(() => {
     if (!open) { setReplacementId(''); return; }
-    if (!departmentId) { setEmployees([]); return; }
+    if (!deptKey) { setEmployees([]); return; }
     setLoading(true);
-    api.get('/employees', { params: { department: departmentId } })
-      .then((res) => setEmployees(unwrap(res, 'employees')))
-      .catch(() => { setEmployees([]); toast.error('Could not load employees for this department.'); })
+    loadDepartmentEmployees(deptKey.split(','))
+      .then(setEmployees)
+      .catch(() => { setEmployees([]); toast.error('Could not load employees for the project departments.'); })
       .finally(() => setLoading(false));
-  }, [open, departmentId]);
+  }, [open, deptKey]);
 
   const options = useMemo(
     () => employees.filter((e) => !excludeIds.includes(e._id) && e._id !== currentMember?._id),
@@ -416,7 +425,7 @@ const ChangeMemberModal = ({ open, onClose, currentMember, departmentId, exclude
             disabled={loading}
             className="w-full text-sm bg-white border border-gray-100 rounded-xl px-3 py-2.5 focus:outline-none focus:ring-2 focus:ring-violet-100 focus:border-violet-200 transition-colors">
             <option value="">{loading ? 'Loading employees…' : 'Select employee'}</option>
-            {options.map((e) => <option key={e._id} value={e._id}>{e.name}</option>)}
+            {options.map((e) => <option key={e._id} value={e._id}>{e.name}{e.department?.name ? ` · ${e.department.name}` : ''}</option>)}
           </select>
         </div>
 
@@ -472,6 +481,8 @@ const TeamMembers = ({ projectId: projectIdProp }) => {
   const [addOpen, setAddOpen] = useState(false);
   const [changeTarget, setChangeTarget] = useState(null);
   const [removeTarget, setRemoveTarget] = useState(null);
+  // From GET /projects/:id — admin, the department manager or the team lead.
+  const [canEdit, setCanEdit] = useState(false);
 
   const fetchTasks = useCallback(async (id) => {
     try {
@@ -492,13 +503,11 @@ const TeamMembers = ({ projectId: projectIdProp }) => {
     setStatus('loading');
     setErrorMessage('');
     try {
-      console.log('PROJECT ID:', projectId);
       const res = await api.get(`/projects/${projectId}`);
-      console.log('PROJECT RESPONSE:', res.data);
       const normalized = normalizeProject(res);
       if (!normalized) throw new Error('Unexpected response shape from the server.');
-      console.log('PROJECT:', normalized);
       setProject(normalized);
+      setCanEdit(Boolean(res.data?.permissions?.canEdit));
 
       const fetchedTasks = await fetchTasks(projectId);
       setTasks(fetchedTasks);
@@ -516,7 +525,13 @@ const TeamMembers = ({ projectId: projectIdProp }) => {
   /* ── derived data ── */
   const manager = project?.manager || null;
   const members = useMemo(() => project?.teamMembers || [], [project]);
-  const departmentId = project?.department?._id || project?.department || null;
+  // Members can come from any of the project's departments.
+  const departmentIds = useMemo(() => {
+    const ids = [project?.department, ...(project?.departments || [])]
+      .filter(Boolean)
+      .map((d) => String(d?._id || d));
+    return [...new Set(ids)];
+  }, [project]);
 
   const tasksByAssignee = useMemo(() => {
     const map = new Map();
@@ -618,12 +633,14 @@ const TeamMembers = ({ projectId: projectIdProp }) => {
       <Card animate={false}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-sm font-bold text-gray-900">Project Members</h3>
-          <button
-            onClick={() => setAddOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-3.5 py-2 rounded-xl transition-colors">
-            <Icon d={IC.plus} size={13} />
-            Add Member
-          </button>
+          {canEdit && (
+            <button
+              onClick={() => setAddOpen(true)}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-white bg-violet-600 hover:bg-violet-700 px-3.5 py-2 rounded-xl transition-colors">
+              <Icon d={IC.plus} size={13} />
+              Add Member
+            </button>
+          )}
         </div>
 
         {memberRows.length === 0 ? (
@@ -635,7 +652,7 @@ const TeamMembers = ({ projectId: projectIdProp }) => {
                 key={row.id}
                 member={row.member}
                 stats={row.stats}
-                canManage
+                canManage={canEdit}
                 onChange={setChangeTarget}
                 onRemove={setRemoveTarget}
               />
@@ -668,7 +685,7 @@ const TeamMembers = ({ projectId: projectIdProp }) => {
       <AddMemberModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        departmentId={departmentId}
+        departmentIds={departmentIds}
         excludeIds={excludeIdsForAdd}
         onConfirm={handleAddMembers}
         submitting={submitting}
@@ -677,7 +694,7 @@ const TeamMembers = ({ projectId: projectIdProp }) => {
         open={!!changeTarget}
         currentMember={changeTarget}
         onClose={() => setChangeTarget(null)}
-        departmentId={departmentId}
+        departmentIds={departmentIds}
         excludeIds={excludeIdsForAdd}
         onConfirm={handleChangeMember}
         submitting={submitting}

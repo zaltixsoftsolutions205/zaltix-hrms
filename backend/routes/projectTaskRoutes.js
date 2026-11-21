@@ -4,7 +4,6 @@ const router = express.Router();
 const {
   createTask,
   getTasks,
-  importTasks,
   getTask,
   getMyTasks,
   getProjectTasks,
@@ -26,10 +25,6 @@ const {
   sendTaskReminder,
   deleteTask,
 } = require('../controllers/taskController');
-const {
-  uploadTaskExcel,
-  importTasksFromExcel,
-} = require('../middleware/taskExcelImport');
 
 const { protect } = require('../middleware/auth');
 const { roleCheck, moduleAccess } = require('../middleware/roleCheck');
@@ -87,7 +82,6 @@ router.post('/bulk/priority', hrTasksEdit, bulkUpdatePriority);
 router.get('/', hrTasksView, getTasks);
 router.get('/:id', hrTasksView, getTask);
 
-router.post('/import',hrTasksEdit, uploadTaskExcel,importTasksFromExcel, importTasks);
 router.post('/', hrTasksEdit, createTask);
 router.put('/:id', hrTasksEdit, updateTask);
 router.delete('/:id', hrTasksEdit, deleteTask);

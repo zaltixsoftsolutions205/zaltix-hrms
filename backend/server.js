@@ -230,8 +230,6 @@ app.use('/api/global-tables', require('./routes/globalTableRoutes'));
 app.use('/api/global-table-fields', require('./routes/globalTableFieldRoutes'));
 app.use('/api/global-table-values', require('./routes/globalTableValueRoutes'));
 
-//  workspace server apis
-app.use("/api/workspace", require("./routes/workspaceRoutes"));
 app.use("/api/workflow-stages", require("./routes/workflowStageRoutes"));
 
 

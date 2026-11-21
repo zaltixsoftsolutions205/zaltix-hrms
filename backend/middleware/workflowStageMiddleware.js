@@ -51,7 +51,7 @@ const canManageWorkflowStage = async (req, res, next) => {
         }
 
         const project = await Project.findById(projectId)
-            .select("manager department teamMembers isActive");
+            .select("manager department departments teamMembers isActive");
 
         if (!project) {
             return res.status(404).json({
@@ -92,16 +92,15 @@ const canManageWorkflowStage = async (req, res, next) => {
         /*
          * Department Manager
          */
+        // Head of any of the project's departments
         if (req.user.role === "manager") {
-            const department = await Department.findById(
-                project.department
-            ).select("headOf");
+            const projectDepartments = [project.department, ...(project.departments || [])].filter(Boolean);
+            const headsOne = await Department.exists({
+                _id: { $in: projectDepartments },
+                headOf: req.user._id,
+            });
 
-            if (
-                department &&
-                department.headOf &&
-                department.headOf.toString() === userId
-            ) {
+            if (headsOne) {
                 req.workflowProject = project;
                 return next();
             }

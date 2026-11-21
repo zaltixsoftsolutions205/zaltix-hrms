@@ -262,11 +262,21 @@ const projectSchema = new mongoose.Schema(
       trim: true,
     },
 
+    // Owning department: its manager (head) runs the project.
     department: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Department",
       required: true,
     },
+
+    // Every participating department (always includes `department`).
+    // The team lead and members must belong to one of these.
+    departments: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Department",
+      },
+    ],
 
     manager: {
       type: mongoose.Schema.Types.ObjectId,
@@ -314,6 +324,13 @@ const projectSchema = new mongoose.Schema(
       min: 0,
       max: 100,
     },
+    // true once the project has module tasks: progress is then calculated
+    // from them (services/workItemService.recalcProjectProgress) and can't be
+    // typed in by hand.
+    progressAuto: {
+      type: Boolean,
+      default: false,
+    },
     attachments: [
       {
         type: String,
@@ -352,6 +369,26 @@ const projectSchema = new mongoose.Schema(
 projectSchema.index({ manager: 1 });
 
 projectSchema.index({ department: 1 });
+
+projectSchema.index({ departments: 1 });
+
+/* =========================================================
+   departments[] always contains the owning department, once
+========================================================= */
+
+projectSchema.pre("validate", function (next) {
+  const ids = [this.department, ...(this.departments || [])]
+    .filter(Boolean)
+    .map((d) => String(d._id || d));
+  const unique = [...new Set(ids)];
+  if (
+    unique.length !== (this.departments || []).length ||
+    unique.some((id, i) => String((this.departments[i] && (this.departments[i]._id || this.departments[i])) || "") !== id)
+  ) {
+    this.departments = unique;
+  }
+  next();
+});
 
 projectSchema.index({ "customFields.key": 1 });
 

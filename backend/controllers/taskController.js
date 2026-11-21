@@ -4,6 +4,7 @@ const User = require('../models/User');
 const Project = require('../models/Project');
 const Department = require('../models/Department');
 const notificationService = require('../services/notificationService');
+const { privateClauseForUser, canSeeTask } = require('../services/workItemService');
 
 /* ============================================================
  * CONSTANTS
@@ -143,10 +144,11 @@ const validateAssignedUser = async (userId) => {
   return { valid: true, user };
 };
 
-/** Confirms the given department matches the project's own department. */
+/** Confirms the given department is one of the project's departments. */
 const validateProjectDepartment = (project, departmentId) => {
   if (!project?.department) return { valid: true }; // project has no fixed department, skip
-  if (project.department.toString() !== departmentId.toString()) {
+  const projectDepts = [project.department, ...(project.departments || [])].map((d) => String(d._id || d));
+  if (!projectDepts.includes(String(departmentId._id || departmentId))) {
     return { valid: false, message: 'Selected project does not belong to the selected department.' };
   }
   return { valid: true };
@@ -310,6 +312,16 @@ const getRoleTaskVisibility = async (user) => {
  * Either way, visibility can only ever shrink what GlobalFilters already
  * asked for — never expand it.
  */
+/**
+ * Hide private module items (Task.isPrivate) from users who are not the
+ * reporter / creator / an assignee / the project lead / a department head.
+ */
+const withPrivacy = async (filters, user) => {
+  const clause = await privateClauseForUser(user);
+  if (!clause.$or) return filters;
+  return { ...filters, $and: [...(filters.$and || []), clause] };
+};
+
 const applyVisibilityRestriction = (filters, restriction) => {
   if (!restriction) return filters;
 
@@ -970,159 +982,6 @@ const createTask = async (req, res) => {
     return sendError(res, 400, error.message || "Failed to create task.");
   }
 };
-/* ============================================================
- * IMPORT TASKS FROM EXCEL
- * ------------------------------------------------------------
- * POST /api/tasks/import
- *
- * The Excel middleware has already converted:
- *
- * Department Code
- *      ↓
- * department ObjectId
- *
- * Project Code
- *      ↓
- * project ObjectId
- *
- * Employee ID
- *      ↓
- * assignedTo ObjectId
- *
- * Therefore this controller only calls createTaskRecord().
- * ============================================================ */
-
-const importTasks = async (req, res) => {
-
-  try {
-    if (!requireUser(req, res)) {
-      return;
-    }
-    const rows = req.importedTasks;
-
-    /* =====================================================
-       1. CHECK IMPORT DATA
-    ===================================================== */
-    if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json({ success: false, message: "No valid task rows were found.", });
-    }
-    /* =====================================================
-       2. PROCESS EACH ROW
-    ===================================================== */
-    const createdTasks = [];
-    const errors = [];
-    for (let index = 0; index < rows.length; index++) {
-      const row = rows[index];
-      try {
-        const task = await createTaskRecord({
-          data: row,
-          createdBy: req.user._id,
-          currentUser: req.user,
-        });
-        createdTasks.push(task);
-      } catch (error) {
-        errors.push({
-          row: index + 2,
-          title: row.title || "",
-          taskCode: row.taskCode || null,
-          message: error.message || "Failed to create task.",
-        });
-      }
-    }
-    /* =====================================================
-       3. ALL ROWS FAILED
-    ===================================================== */
-    if (createdTasks.length === 0) {
-      return res.status(400).json({
-        success: false,
-        message: "No tasks were imported.",
-        createdCount: 0,
-        failedCount: errors.length,
-        errors,
-      });
-    }
-
-    /* =====================================================
-       4. POPULATE CREATED TASKS
-    ===================================================== */
-
-    const taskIds =
-      createdTasks.map(
-        task => task._id
-      );
-
-    const populatedTasks =
-      await Task.find({
-
-        _id: {
-          $in: taskIds
-        }
-
-      })
-        .populate(
-          "project",
-          "name projectCode"
-        )
-        .populate(
-          "department",
-          "name code"
-        )
-        .populate(
-          "assignedBy",
-          "name email employeeId"
-        )
-        .populate(
-          "assignees.user",
-          "name email employeeId"
-        )
-        .sort({
-          createdAt: -1
-        });
-
-    /* =====================================================
-       5. RESPONSE
-    ===================================================== */
-
-    return res.status(201).json({
-
-      success: true,
-
-      message:
-        errors.length > 0
-          ? "Excel import completed with some row errors."
-          : "Excel import completed successfully.",
-
-      createdCount:
-        populatedTasks.length,
-
-      failedCount:
-        errors.length,
-
-      tasks:
-        populatedTasks,
-
-      errors,
-
-    });
-
-  } catch (error) {
-
-    console.error(
-      "Import Tasks:",
-      error
-    );
-
-    return res.status(500).json({
-
-      success: false,
-
-      message:
-        error.message ||
-        "Excel task import failed.",
-
-    });
-  }
-};
 /**
  * @desc    Get All Tasks
  * @route   GET /api/tasks
@@ -1141,6 +1000,7 @@ const getTasks = async (req, res) => {
 
     let filters = await buildTaskFilters(req.query);
     filters = applyVisibilityRestriction(filters, visibility.restriction);
+    filters = await withPrivacy(filters, req.user);
 
     const sort = buildSortOption(sortBy, sortOrder);
     const result = await paginateTasks(filters, { page, limit, sort });
@@ -1176,6 +1036,7 @@ const getTaskSummary = async (req, res) => {
       filters,
       visibility.restriction
     );
+    filters = await withPrivacy(filters, req.user);
 
     // -----------------------------------------------------
     // 3. Current date/time
@@ -1276,6 +1137,9 @@ const getTask = async (req, res) => {
     if (visibility.denied || !isTaskWithinVisibility(task, visibility.restriction)) {
       return sendError(res, 403, 'You do not have permission to view this task.');
     }
+    if (!(await canSeeTask(req.user, task))) {
+      return sendError(res, 404, 'Task not found.');
+    }
 
     return res.status(200).json({ success: true, task });
   } catch (error) {
@@ -1311,6 +1175,7 @@ const getProjectTasks = async (req, res) => {
 
     let filters = { project: projectId, isActive: { $ne: false } };
     filters = applyVisibilityRestriction(filters, visibility.restriction);
+    filters = await withPrivacy(filters, req.user);
 
     const [tasks, statusCounts] = await Promise.all([
       populateTask(Task.find(filters).sort({ deadline: 1, priority: -1 })),
@@ -1338,6 +1203,33 @@ const getProjectTasks = async (req, res) => {
  * @route   GET /api/tasks/my
  * @access  Private
  */
+/**
+ * @desc    The caller's current focus: their most recently updated self task
+ *          that is in progress (null when there is none).
+ * @route   GET /api/tasks/active-self
+ * @access  Private
+ */
+const getActiveSelfTask = async (req, res) => {
+  try {
+    if (!requireUser(req, res)) return;
+    const task = await Task.findOne({
+      taskType: 'self',
+      status: 'in-progress',
+      isActive: { $ne: false },
+      $or: [{ 'assignees.user': req.user._id }, { createdBy: req.user._id }],
+    })
+      .sort({ updatedAt: -1 })
+      .select('title taskCode status progress deadline startDate estimatedHours updatedAt')
+      .lean();
+    const active = task
+      ? { ...task, startedAt: task.startDate || task.updatedAt, duration: task.estimatedHours ? Math.round(task.estimatedHours * 60) : null }
+      : null;
+    return res.status(200).json({ success: true, active });
+  } catch (error) {
+    return sendServerError(res, 'Get Active Self Task', error);
+  }
+};
+
 const getMyTasks = async (req, res) => {
   try {
     if (!requireUser(req, res)) return;
@@ -1404,6 +1296,10 @@ const updateTaskStatus = async (req, res) => {
 
     if (!canManageTask(task, req.user, { allowAssignee: true })) {
       return sendError(res, 403, 'You are not authorized to update this task.');
+    }
+    // A bug's status follows its Bug Sheet stage; change it there instead.
+    if (task.kind === 'bug') {
+      return sendError(res, 400, 'Move bugs between stages on the project Bug Sheet.');
     }
 
     const transitionCheck = validateStatusTransition(task.status, status);
@@ -1683,7 +1579,7 @@ const updateTask = async (req, res) => {
     const id = req.task?._id || requireValidTaskId(req, res);
     if (!id) return;
 
-    let task = await Task.findById(id).populate('project', 'name teamMembers department manager');
+    let task = await Task.findById(id).populate('project', 'name teamMembers department departments manager');
     if (!task) return sendError(res, 404, 'Task not found.');
 
     const {
@@ -2472,8 +2368,8 @@ const getCompletedTasks = async (req, res) => {
 };
 
 module.exports = {
+  getActiveSelfTask,
   createTask,
-  importTasks,
   createTaskRecord,
   getTasks,
   getTask,

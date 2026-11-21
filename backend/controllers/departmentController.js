@@ -1,11 +1,12 @@
+const mongoose = require("mongoose");
 const Department = require("../models/Department");
 const User = require("../models/User");
 const Project = require("../models/Project");
 const Task = require("../models/Task");
 const { sanitizeModuleAccess } = require("../constants/modules");
+const { promote, releaseIfUnused } = require("../services/rolePromotionService");
+const { ROOT_ROLES, normalizeRole, canManageDepartment, isRoleAllowed, sanitizeRoleTree, } = require("../services/departmentAccessService");
 
-const multer = require("multer");
-const XLSX = require("xlsx");
 /* ------------------------------------------------------------------ */
 /* Shared helpers                                                      */
 /* ------------------------------------------------------------------ */
@@ -40,6 +41,25 @@ const isManagerRole = (role) => String(role || "").toLowerCase() === "manager";
  * head to "manager") are handled separately, deliberately, wherever
  * headOf is assigned.
  */
+/**
+ * Ids (as strings) of the departments in `ids` that still exist (not deleted).
+ * A user whose department was deleted or no longer exists counts as unassigned,
+ * so they can be added to another department.
+ */
+/** Why a role can't join `dept` (used when isRoleAllowed is false). */
+const roleBlockedMessage = (dept, role) => (
+    (dept.roleTree || []).length
+        ? `Role "${role}" is not part of ${dept.name || "this department"}'s role tree. Add the role under Roles & Permissions first.`
+        : `${dept.name || "This department"} has no roles set up yet. Set up its roles first (Roles & Permissions).`
+);
+
+const liveDepartmentIds = async (ids) => {
+    const unique = [...new Set(ids.filter(Boolean).map(String))];
+    if (!unique.length) return new Set();
+    const rows = await Department.find({ _id: { $in: unique } }).select("_id").lean();
+    return new Set(rows.map((d) => String(d._id)));
+};
+
 const assignUsersToDepartment = async (userIds, departmentId) => {
     if (!Array.isArray(userIds) || !userIds.length) return;
     await User.updateMany(
@@ -202,500 +222,6 @@ const buildTaskStats = (tasks) => {
 
     return stats;
 };
-
-const upload = multer({
-    storage: multer.memoryStorage(),
-    limits: {
-        fileSize: 10 * 1024 * 1024,
-    },
-    fileFilter: (req, file, cb) => {
-        const allowedExtensions = [".xlsx", ".xls"];
-        const extension = require("path")
-            .extname(file.originalname)
-            .toLowerCase();
-
-        if (!allowedExtensions.includes(extension)) {
-            return cb(
-                new Error("Only .xlsx and .xls Excel files are allowed.")
-            );
-        }
-
-        cb(null, true);
-    },
-});
-
-const importDepartments = async (req, res) => {
-    try {
-        if (!req.file) {
-            return res.status(400).json({
-                success: false,
-                message: "Please upload an Excel file.",
-            });
-        }
-
-        const workbook = XLSX.read(req.file.buffer, {
-            type: "buffer",
-        });
-
-        const sheetName = workbook.SheetNames[0];
-
-        if (!sheetName) {
-            return res.status(400).json({
-                success: false,
-                message: "Excel file does not contain a worksheet.",
-            });
-        }
-
-        const worksheet = workbook.Sheets[sheetName];
-
-        const rows = XLSX.utils.sheet_to_json(worksheet, {
-            defval: "",
-            raw: false,
-        });
-
-        if (!rows.length) {
-            return res.status(400).json({
-                success: false,
-                message: "Excel file is empty.",
-            });
-        }
-
-        const results = {
-            total: rows.length,
-            created: 0,
-            failed: 0,
-            errors: [],
-        };
-
-        for (let index = 0; index < rows.length; index++) {
-            const row = rows[index];
-
-            const rowNumber = index + 2;
-
-            try {
-                const name = String(
-                    row["Department Name"] || ""
-                ).trim();
-
-                const code = String(
-                    row["Department Code"] || ""
-                ).trim().toUpperCase();
-
-                const description = String(
-                    row["Description"] || ""
-                ).trim();
-
-                const status = String(
-                    row["Status"] || "active"
-                ).trim().toLowerCase();
-
-                const headEmployeeId = String(
-                    row["Head Employee ID"] || ""
-                ).trim();
-
-                const parentCode = String(
-                    row["Parent Department Code"] || ""
-                ).trim().toUpperCase();
-
-                const memberEmployeeIds = String(
-                    row["Member Employee IDs"] || ""
-                )
-                    .split(",")
-                    .map((id) => id.trim())
-                    .filter(Boolean);
-
-                // ---------------------------------------------
-                // Required fields
-                // ---------------------------------------------
-
-                if (!name) {
-                    throw new Error(
-                        "Department Name is required."
-                    );
-                }
-
-                if (!["active", "inactive"].includes(status)) {
-                    throw new Error(
-                        "Status must be active or inactive."
-                    );
-                }
-
-                // ---------------------------------------------
-                // Duplicate department name
-                // ---------------------------------------------
-
-                const existingName = await Department.findOne({
-                    name,
-                });
-
-                if (existingName) {
-                    throw new Error(
-                        `Department "${name}" already exists.`
-                    );
-                }
-
-                // ---------------------------------------------
-                // Department code
-                // ---------------------------------------------
-
-                if (code) {
-                    const existingCode =
-                        await Department.findOne({ code });
-
-                    if (existingCode) {
-                        throw new Error(
-                            `Department code "${code}" already exists.`
-                        );
-                    }
-                }
-
-                // ---------------------------------------------
-                // Find department head
-                // ---------------------------------------------
-
-                let departmentHead = null;
-
-                if (headEmployeeId) {
-                    departmentHead = await User.findOne({
-                        employeeId: headEmployeeId,
-                    }).select(
-                        "_id name email employeeId role isActive department"
-                    );
-
-                    if (!departmentHead) {
-                        throw new Error(
-                            `Head employee "${headEmployeeId}" was not found.`
-                        );
-                    }
-
-                    if (!departmentHead.isActive) {
-                        throw new Error(
-                            `Head employee "${headEmployeeId}" is inactive.`
-                        );
-                    }
-                }
-
-                // ---------------------------------------------
-                // Find parent department
-                // ---------------------------------------------
-
-                let parentDepartment = null;
-
-                if (parentCode) {
-                    parentDepartment =
-                        await Department.findOne({
-                            code: parentCode,
-                        });
-
-                    if (!parentDepartment) {
-                        throw new Error(
-                            `Parent department "${parentCode}" was not found.`
-                        );
-                    }
-                }
-
-                // ---------------------------------------------
-                // Find members
-                // ---------------------------------------------
-
-                let memberUsers = [];
-
-                if (memberEmployeeIds.length) {
-                    memberUsers = await User.find({
-                        employeeId: {
-                            $in: memberEmployeeIds,
-                        },
-                        isActive: true,
-                    }).select(
-                        "_id name employeeId role department isActive"
-                    );
-
-                    if (
-                        memberUsers.length !==
-                        memberEmployeeIds.length
-                    ) {
-                        const foundIds = new Set(
-                            memberUsers.map(
-                                (user) => user.employeeId
-                            )
-                        );
-
-                        const missingIds =
-                            memberEmployeeIds.filter(
-                                (employeeId) =>
-                                    !foundIds.has(employeeId)
-                            );
-
-                        throw new Error(
-                            `Member employee(s) not found or inactive: ${missingIds.join(", ")}`
-                        );
-                    }
-                }
-
-                // ---------------------------------------------
-                // Remove head from normal members
-                // ---------------------------------------------
-
-                const headId = departmentHead
-                    ? String(departmentHead._id)
-                    : null;
-
-                const normalMembers =
-                    memberUsers.filter(
-                        (user) =>
-                            String(user._id) !== headId
-                    );
-
-                // ---------------------------------------------
-                // Validate department conflicts
-                // ---------------------------------------------
-
-                const conflictingMembers =
-                    normalMembers.filter(
-                        (user) =>
-                            !isManagerRole(user.role) &&
-                            user.department
-                    );
-
-                if (conflictingMembers.length) {
-                    throw new Error(
-                        `Employee(s) already belong to another department: ${conflictingMembers
-                            .map((user) => user.employeeId)
-                            .join(", ")}`
-                    );
-                }
-
-                // ---------------------------------------------
-                // Create department
-                // ---------------------------------------------
-
-                const department =
-                    await Department.create({
-                        name,
-                        ...(code ? { code } : {}),
-                        description,
-                        status,
-                        headOf:
-                            departmentHead?._id || null,
-                        parentDepartment:
-                            parentDepartment?._id || null,
-                        createdBy: req.user._id,
-                    });
-
-                // ---------------------------------------------
-                // Promote head
-                // ---------------------------------------------
-
-                if (departmentHead) {
-                    await User.findByIdAndUpdate(
-                        departmentHead._id,
-                        {
-                            $set: {
-                                role: "manager",
-                            },
-                        },
-                        {
-                            runValidators: true,
-                        }
-                    );
-                }
-
-                // ---------------------------------------------
-                // Assign normal members
-                // ---------------------------------------------
-
-                const normalMemberIds =
-                    normalMembers
-                        .filter(
-                            (user) =>
-                                !isManagerRole(user.role)
-                        )
-                        .map((user) => user._id);
-
-                await assignUsersToDepartment(
-                    normalMemberIds,
-                    department._id
-                );
-
-                results.created++;
-
-            } catch (rowError) {
-                results.failed++;
-
-                results.errors.push({
-                    row: rowNumber,
-                    department:
-                        row["Department Name"] || "",
-                    code:
-                        row["Department Code"] || "",
-                    message: rowError.message,
-                });
-            }
-        }
-
-        return res.status(200).json({
-            success: true,
-            message:
-                results.failed > 0
-                    ? "Department import completed with some errors."
-                    : "All departments imported successfully.",
-            summary: {
-                total: results.total,
-                created: results.created,
-                failed: results.failed,
-            },
-            errors: results.errors,
-        });
-
-    } catch (error) {
-        console.error(
-            "Import Departments:",
-            error
-        );
-
-        return res.status(500).json({
-            success: false,
-            message: "Failed to import departments.",
-        });
-    }
-};
-
-const exportDepartments = async (req, res) => {
-    try {
-        const departments =
-            await Department.find({})
-                .populate(
-                    "headOf",
-                    "employeeId name"
-                )
-                .populate(
-                    "parentDepartment",
-                    "code name"
-                )
-                .sort({ createdAt: -1 });
-
-        const departmentIds =
-            departments.map((department) => department._id);
-
-        const members = await User.find({
-            department: {
-                $in: departmentIds,
-            },
-        }).select(
-            "employeeId department"
-        );
-
-        const membersByDepartment = new Map();
-
-        members.forEach((member) => {
-            const departmentId =
-                String(member.department);
-
-            if (!membersByDepartment.has(departmentId)) {
-                membersByDepartment.set(
-                    departmentId,
-                    []
-                );
-            }
-
-            membersByDepartment
-                .get(departmentId)
-                .push(member.employeeId);
-        });
-
-        const rows = departments.map((department) => {
-            const departmentId =
-                String(department._id);
-
-            return {
-                "Department Name":
-                    department.name || "",
-
-                "Department Code":
-                    department.code || "",
-
-                "Description":
-                    department.description || "",
-
-                "Status":
-                    department.status || "active",
-
-                "Head Employee ID":
-                    department.headOf?.employeeId || "",
-
-                "Head Name":
-                    department.headOf?.name || "",
-
-                "Parent Department Code":
-                    department.parentDepartment?.code || "",
-
-                "Parent Department Name":
-                    department.parentDepartment?.name || "",
-
-                "Member Employee IDs":
-                    (
-                        membersByDepartment.get(
-                            departmentId
-                        ) || []
-                    ).join(","),
-            };
-        });
-
-        const worksheet =
-            XLSX.utils.json_to_sheet(rows);
-
-        const workbook =
-            XLSX.utils.book_new();
-
-        XLSX.utils.book_append_sheet(
-            workbook,
-            worksheet,
-            "Departments"
-        );
-
-        worksheet["!cols"] = [
-            { wch: 25 },
-            { wch: 18 },
-            { wch: 35 },
-            { wch: 12 },
-            { wch: 20 },
-            { wch: 25 },
-            { wch: 25 },
-            { wch: 25 },
-            { wch: 50 },
-        ];
-
-        const buffer =
-            XLSX.write(workbook, {
-                type: "buffer",
-                bookType: "xlsx",
-            });
-
-        res.setHeader(
-            "Content-Type",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        );
-
-        res.setHeader(
-            "Content-Disposition",
-            'attachment; filename="departments.xlsx"'
-        );
-
-        return res.send(buffer);
-
-    } catch (error) {
-        console.error(
-            "Export Departments:",
-            error
-        );
-
-        return res.status(500).json({
-            success: false,
-            message: "Failed to export departments.",
-        });
-    }
-};
-
 /**
  * @desc    Create Department
  * @route   POST /api/departments
@@ -766,7 +292,11 @@ const createDepartment = async (req, res) => {
         // department - we do NOT silently move them.
         //
         const headIdStr = headOf ? String(headOf) : null;
-        const normalMemberIds = [...new Set((Array.isArray(members) ? members : []).filter(Boolean).map(String)),].filter((id) => id !== headIdStr);
+        // Employees are NOT added while creating a department: they are added
+        // later from Employee Management, once the role tree decides which
+        // roles may join. Only the head (manager) is set here.
+        void members;
+        const normalMemberIds = [];
 
         let normalMemberUsers = [];
         if (normalMemberIds.length) {
@@ -782,7 +312,8 @@ const createDepartment = async (req, res) => {
             // department. Managers are exempt (they can be members/
             // heads of several departments simultaneously).
             // =====================================================
-            const alreadyAssigned = normalMemberUsers.some((user) => !isManagerRole(user.role) && user.department);
+            const liveDepts = await liveDepartmentIds(normalMemberUsers.map((u) => u.department));
+            const alreadyAssigned = normalMemberUsers.some((user) => !isManagerRole(user.role) && user.department && liveDepts.has(String(user.department)));
 
             if (alreadyAssigned) {
                 return res.status(400).json({ success: false, message: "One or more selected employees already belong to another department.", });
@@ -814,7 +345,7 @@ const createDepartment = async (req, res) => {
         // User.department.
         //
         if (headOf) {
-            await User.findByIdAndUpdate(headOf, { $set: { role: "manager", moduleAccess: sanitizedModuleAccess, }, }, { new: true, runValidators: true, });
+            await promote(headOf, { role: "manager", moduleAccess: sanitizedModuleAccess, reason: "department-head" });
         }
         // =========================
         // 10. Assign NORMAL MEMBERS only
@@ -943,11 +474,15 @@ const getDepartments = async (req, res) => {
         // Find the department(s) containing this project.
         //
         if (project) {
-            const projectDoc = await Project.findById(project).select("department");
+            const projectDoc = await Project.findById(project).select("department departments");
             if (!projectDoc) {
                 return res.status(200).json({ success: true, count: 0, total: 0, page: Number(page), pages: 0, departments: [], });
             }
-            query._id = projectDoc.department;
+            const projectDeptIds = [projectDoc.department, ...(projectDoc.departments || [])].filter(Boolean);
+            // Keep an existing restriction (e.g. a manager's headed departments).
+            query._id = query._id
+                ? { $in: projectDeptIds.filter((d) => [].concat(query._id.$in || query._id).map(String).includes(String(d))) }
+                : { $in: projectDeptIds };
         }
 
         // ---------------------------------------------------------
@@ -994,7 +529,8 @@ const getDepartments = async (req, res) => {
         // ---------------------------------------------------------
         // Query
         // ---------------------------------------------------------
-        const departments = await Department.find(query).populate("headOf", "name email employeeId role").populate("parentDepartment", "name code").populate("createdBy", "name").sort({ createdAt: -1, }).skip((pageNumber - 1) * pageLimit).limit(pageLimit);
+        // List is open to every signed-in user (dropdowns): no personal data here.
+        const departments = await Department.find(query).populate("headOf", "name employeeId role").populate("parentDepartment", "name code").populate("createdBy", "name").sort({ createdAt: -1, }).skip((pageNumber - 1) * pageLimit).limit(pageLimit);
         const total = await Department.countDocuments(query);
         return res.status(200).json({ success: true, count: departments.length, total, page: pageNumber, pages: Math.ceil(total / pageLimit), departments, });
     } catch (error) {
@@ -1023,8 +559,8 @@ const getDepartment = async (req, res) => {
                 .populate("parentDepartment", "name code")
                 .populate("createdBy", "name")
                 .populate("leadPositions.user", "name email employeeId role designation profilePicture"),
-            User.find({ department: id }).select("employeeId name email role designation profilePicture isActive joiningDate"),
-            Project.find({ department: id })
+            User.find({ department: id }).select("employeeId name email phone role designation profilePicture isActive joiningDate employeeType"),
+            Project.find({ departments: id })
                 .populate("manager", "name employeeId email")
                 .populate("teamMembers", "name employeeId email profilePicture")
                 .select("projectCode name status priority progress manager teamMembers department startDate endDate"),
@@ -1099,7 +635,10 @@ const getDepartment = async (req, res) => {
             ]),
             Project.aggregate([
                 { $match: { department: { $ne: null } } },
-                { $group: { _id: "$department", total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } }, }, },
+                // A project counts for every department it belongs to.
+                { $addFields: { _depts: { $cond: [{ $gt: [{ $size: { $ifNull: ["$departments", []] } }, 0] }, "$departments", ["$department"]] } } },
+                { $unwind: "$_depts" },
+                { $group: { _id: "$_depts", total: { $sum: 1 }, completed: { $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] } }, }, },
             ]),
             Task.aggregate([
                 { $match: { department: { $ne: null } } },
@@ -1190,15 +729,10 @@ const updateDepartment = async (req, res) => {
         // =====================================================
         // 2. Duplicate department code
         // =====================================================
-        if (code) {
-            const normalizedCode = code.trim().toUpperCase();
-            if (normalizedCode !== department.code) {
-                const existing = await Department.findOne({ code: normalizedCode, _id: { $ne: id }, });
-                if (existing) {
-                    return res.status(400).json({ success: false, message: "Department code already exists.", });
-                }
-                department.code = normalizedCode;
-            }
+        // The department code is set once, at creation, and cannot change.
+        if (code !== undefined && code !== null && String(code).trim() !== "" &&
+            String(code).trim().toUpperCase() !== String(department.code || "")) {
+            return res.status(400).json({ success: false, message: "The department code cannot be changed after creation." });
         }
         // =====================================================
         // 3. Validate new Department Head
@@ -1257,22 +791,14 @@ const updateDepartment = async (req, res) => {
             // Remove old manager role only if
             // the old head is no longer head of
             // another department.
+            // Give the old head their previous role / access back if they
+            // no longer head or lead anything (never wipes access).
             if (oldHeadId) {
-                const otherDepartment = await Department.findOne({ _id: { $ne: id, }, headOf: oldHeadId, });
-                if (!otherDepartment) {
-                    await User.findByIdAndUpdate(
-                        oldHeadId,
-                        { $set: { role: "employee", moduleAccess: [], }, },
-                        { runValidators: true, }
-                    );
-                }
+                await releaseIfUnused(oldHeadId, { ignoreDepartment: id });
             }
             // Promote new head
             if (newHeadId) {
-                await User.findByIdAndUpdate(newHeadId,
-                    { $set: { role: "manager", moduleAccess: sanitizedModuleAccess, }, },
-                    { runValidators: true, }
-                );
+                await promote(newHeadId, { role: "manager", moduleAccess: sanitizedModuleAccess, reason: "department-head" });
             }
             department.headOf = headOf || null;
         }
@@ -1282,11 +808,7 @@ const updateDepartment = async (req, res) => {
         else if (newHeadId) {
             // Update manager permissions
             // even when the same manager remains.
-            await User.findByIdAndUpdate(
-                newHeadId,
-                { $set: { role: "manager", moduleAccess: sanitizedModuleAccess, }, },
-                { runValidators: true, }
-            );
+            await promote(newHeadId, { role: "manager", moduleAccess: sanitizedModuleAccess, reason: "department-head" });
         }
         // =====================================================
         // 8. Synchronize Department Members
@@ -1313,7 +835,9 @@ const updateDepartment = async (req, res) => {
         // is tracked exclusively via Department.headOf, never via
         // User.department.
         // =====================================================
-        if (Array.isArray(members) || headOf !== undefined) {
+        // Membership only changes when the caller sends an explicit member list.
+        // (Changing the head alone must never remove the other employees.)
+        if (Array.isArray(members)) {
             // Desired membership from the frontend
             let nextMemberIds = Array.isArray(members)
                 ? [...new Set(members.filter(Boolean).map(String))]
@@ -1338,7 +862,7 @@ const updateDepartment = async (req, res) => {
                 incomingUsers = await User.find({
                     _id: { $in: incomingNonHeadIds },
                     isActive: true,
-                }).select("_id role department");
+                }).select("_id name role department");
 
                 if (incomingUsers.length !== incomingNonHeadIds.length) {
                     return res.status(404).json({
@@ -1373,15 +897,29 @@ const updateDepartment = async (req, res) => {
             // Do not silently move an employee who already
             // belongs to a different department.
             // =====================================================
+            const liveDepts = await liveDepartmentIds(normalToAdd.map((uid) => userMap.get(uid)?.department));
             const conflictingAdds = normalToAdd.filter((uid) => {
                 const user = userMap.get(uid);
-                return user?.department && String(user.department) !== String(department._id);
+                return user?.department && String(user.department) !== String(department._id) && liveDepts.has(String(user.department));
             });
 
             if (conflictingAdds.length) {
                 return res.status(400).json({
                     success: false,
                     message: "One or more selected employees already belong to another department.",
+                });
+            }
+
+            // Only roles in the department's role tree may join.
+            const roleBlocked = normalToAdd
+                .map((uid) => userMap.get(uid))
+                .filter((user) => user && !isRoleAllowed(department, user.role));
+            if (roleBlocked.length) {
+                return res.status(400).json({
+                    success: false,
+                    message: (department.roleTree || []).length
+                        ? `Role not in this department's role tree: ${roleBlocked.map((u) => `${u.name || u._id} (${u.role})`).join(", ")}`
+                        : roleBlockedMessage(department, roleBlocked[0].role),
                 });
             }
 
@@ -1429,63 +967,177 @@ const updateDepartment = async (req, res) => {
  * @route   DELETE /api/departments/:id
  * @access  Private (Admin)
  */
-const deleteDepartment = async (req, res) => {
-
+/**
+ * What deleting a department would affect, so the admin can choose targets.
+ * @route   GET /api/departments/:id/delete-preview
+ * @access  Private (Admin)
+ */
+const getDeleteDepartmentPreview = async (req, res) => {
     try {
-
-        const { id } = req.params;
-
-        const department = await Department.findById(id);
-
+        const department = await Department.findById(req.params.id).populate("headOf", "name employeeId");
         if (!department) {
-            return res.status(404).json({
-                success: false,
-                message: "Department not found."
-            });
+            return res.status(404).json({ success: false, message: "Department not found." });
         }
+        const [employees, children, ownedProjects, sharedProjects, targets] = await Promise.all([
+            User.find({ department: department._id }).select("name employeeId role").sort({ name: 1 }).lean(),
+            Department.find({ parentDepartment: department._id }).select("name code").lean(),
+            Project.find({ department: department._id }).select("name projectCode").lean(),
+            Project.find({ department: { $ne: department._id }, departments: department._id }).select("name projectCode").lean(),
+            Department.find({ _id: { $ne: department._id }, status: "active" }).select("name code roleTree").sort({ name: 1 }),
+        ]);
 
-        // Check child departments
-        const childDepartment = await Department.findOne({
-            parentDepartment: id
-        });
-
-        if (childDepartment) {
-            return res.status(400).json({
-                success: false,
-                message: "Cannot delete department. It has child departments."
-            });
-        }
-
-        // Check employees assigned
-        const employeeCount = await User.countDocuments({
-            department: id
-        });
-
-        if (employeeCount > 0) {
-            return res.status(400).json({
-                success: false,
-                message: `Cannot delete department. ${employeeCount} employee(s) are assigned.`
-            });
-        }
-
-        await Department.findByIdAndDelete(id);
+        // Employees of this department who are on those projects: after the move
+        // their project access follows the new department's role tree.
+        const projectIds = [...ownedProjects, ...sharedProjects].map((p) => p._id);
+        const affectedMembers = projectIds.length && employees.length
+            ? await Project.aggregate([
+                { $match: { _id: { $in: projectIds } } },
+                { $project: { people: { $setUnion: [["$manager"], { $ifNull: ["$teamMembers", []] }] } } },
+                { $unwind: "$people" },
+                { $match: { people: { $in: employees.map((e) => e._id) } } },
+                { $group: { _id: "$people" } },
+            ])
+            : [];
 
         return res.status(200).json({
             success: true,
-            message: "Department deleted successfully."
+            department: { _id: department._id, name: department.name, head: department.headOf || null, parentDepartment: department.parentDepartment || null },
+            employees,
+            childDepartments: children,
+            ownedProjects,
+            sharedProjects,
+            employeesInProjects: affectedMembers.length,
+            targets: targets.map((t) => ({
+                _id: t._id,
+                name: t.name,
+                code: t.code,
+                // How many of this department's employees the target's role tree accepts.
+                acceptsCount: employees.filter((e) => isRoleAllowed(t, e.role || "employee")).length,
+            })),
         });
-
     } catch (error) {
+        console.error("Delete Department Preview:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
 
-        console.error("Delete Department:", error);
+/**
+ * Soft-delete a department.
+ * @route   DELETE /api/departments/:id
+ * @access  Private (Admin)
+ * @body    { moveEmployeesTo?: departmentId, newProjectOwner?: departmentId }
+ *
+ *  1. Employees whose role is allowed in `moveEmployeesTo` move there; the
+ *     rest (or everyone, without a target) become unassigned.
+ *  2. The head goes back to "employee" if they head no other department
+ *     (same rule as changing the head in updateDepartment).
+ *  3. Child departments move up to this department's parent.
+ *  4. Projects it owns move to `newProjectOwner`; other projects drop it.
+ *  5. The department is kept with isDeleted=true (name / code freed for reuse).
+ */
+const deleteDepartment = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { moveEmployeesTo, newProjectOwner } = req.body || {};
 
-        return res.status(500).json({
-            success: false,
-            message: "Server Error"
+        const department = await Department.findById(id);
+        if (!department) {
+            return res.status(404).json({ success: false, message: "Department not found." });
+        }
+
+        const loadTarget = async (targetId, label) => {
+            if (!targetId) return null;
+            if (String(targetId) === String(id)) throw new Error(`${label} must be a different department.`);
+            if (!mongoose.isValidObjectId(targetId)) throw new Error(`${label} is not valid.`);
+            const target = await Department.findOne({ _id: targetId, status: "active" });
+            if (!target) throw new Error(`${label} was not found or is inactive.`);
+            return target;
+        };
+        let employeeTarget;
+        let projectTarget;
+        try {
+            employeeTarget = await loadTarget(moveEmployeesTo, "The department to move employees to");
+            projectTarget = await loadTarget(newProjectOwner, "The new owning department");
+        } catch (e) {
+            return res.status(400).json({ success: false, message: e.message });
+        }
+
+        const ownedCount = await Project.countDocuments({ department: id });
+        if (ownedCount && !projectTarget) {
+            return res.status(400).json({
+                success: false,
+                message: `This department owns ${ownedCount} project(s). Choose the department that takes them over.`,
+                ownedProjects: ownedCount,
+            });
+        }
+
+        // 1. Head first, so the move below checks their final role
+        if (department.headOf) {
+            await releaseIfUnused(department.headOf, { ignoreDepartment: id });
+        }
+
+        // 2. Employees
+        const employees = await User.find({ department: id }).select("_id role");
+        const movableIds = employeeTarget
+            ? employees.filter((e) => isRoleAllowed(employeeTarget, e.role || "employee")).map((e) => e._id)
+            : [];
+        const movableSet = new Set(movableIds.map(String));
+        const unassignIds = employees.filter((e) => !movableSet.has(String(e._id))).map((e) => e._id);
+        if (movableIds.length) await assignUsersToDepartment(movableIds, employeeTarget._id);
+        if (unassignIds.length) await removeUsersFromDepartment(unassignIds, department._id);
+
+        // 3. Child departments move up a level
+        const children = await Department.updateMany(
+            { parentDepartment: department._id },
+            { $set: { parentDepartment: department.parentDepartment || null } }
+        );
+
+        // 4. Projects
+        let reowned = 0;
+        if (projectTarget) {
+            const owned = await Project.find({ department: id });
+            for (const project of owned) {
+                project.departments = [...new Set([
+                    String(projectTarget._id),
+                    ...(project.departments || []).map(String).filter((d) => d !== String(id)),
+                ])];
+                // Field-level update: older rows may miss unrelated required fields.
+                await Project.updateOne({ _id: project._id }, { $set: { department: projectTarget._id, departments: project.departments } });
+                reowned += 1;
+            }
+        }
+        const pulled = await Project.updateMany({ departments: department._id }, { $pull: { departments: department._id } });
+
+        // 5. Soft delete (free the unique name / code for reuse)
+        // Field-level update so departments created without `createdBy`
+        // (old Excel import) don't fail full-document validation.
+        const stamp = Date.now().toString(36);
+        await Department.updateOne({ _id: department._id }, {
+            $set: {
+                name: `${department.name} ~deleted-${stamp}`,
+                ...(department.code ? { code: `${department.code}~DEL-${stamp}` } : {}),
+                isDeleted: true,
+                deletedAt: new Date(),
+                deletedBy: req.user._id,
+                status: "inactive",
+            },
         });
 
+        return res.status(200).json({
+            success: true,
+            message: "Department deleted.",
+            summary: {
+                employeesMoved: movableIds.length,
+                employeesUnassigned: unassignIds.length,
+                childDepartmentsMoved: children.modifiedCount || 0,
+                projectsReowned: reowned,
+                projectsUpdated: pulled.modifiedCount || 0,
+            },
+        });
+    } catch (error) {
+        console.error("Delete Department:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
     }
-
 };
 
 /**
@@ -1562,9 +1214,15 @@ const getDepartmentEmployees = async (req, res) => {
         if (!department) {
             return res.status(404).json({ success: false, message: "Department not found." });
         }
-        const employees = await User.find({ department: id }).select(
-            "employeeId name email role designation profilePicture isActive joiningDate"
-        );
+        const filter = { department: id };
+        if (req.query.role) {
+            // Case-insensitive exact match: roles may be custom ("Tech Emp").
+            const escaped = String(req.query.role).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+            filter.role = new RegExp(`^${escaped}$`, "i");
+        }
+        const employees = await User.find(filter).select(
+            "employeeId name email phone role designation profilePicture isActive joiningDate employeeType"
+        ).sort({ name: 1 });
         return res.status(200).json({ success: true, count: employees.length, employees });
     } catch (error) {
         console.error("Get Department Employees:", error);
@@ -1591,6 +1249,9 @@ const addDepartmentEmployee = async (req, res) => {
         if (!department) {
             return res.status(404).json({ success: false, message: "Department not found." });
         }
+        if (!canManageDepartment(req.user, department)) {
+            return res.status(403).json({ success: false, message: "Only admin or this department's manager can add employees." });
+        }
 
         const user = await User.findById(employeeId).select("_id name role isActive department");
         if (!user) {
@@ -1598,6 +1259,12 @@ const addDepartmentEmployee = async (req, res) => {
         }
         if (!user.isActive) {
             return res.status(400).json({ success: false, message: "Employee must be active." });
+        }
+        if (!isRoleAllowed(department, user.role)) {
+            return res.status(400).json({
+                success: false,
+                message: roleBlockedMessage(department, user.role),
+            });
         }
 
         // Managers are exempt from the department-membership check (see
@@ -1607,7 +1274,7 @@ const addDepartmentEmployee = async (req, res) => {
             return res.status(200).json({ success: true, message: "Manager added as department head/lead elsewhere; no membership change needed." });
         }
 
-        if (user.department && String(user.department) !== String(id)) {
+        if (user.department && String(user.department) !== String(id) && (await liveDepartmentIds([user.department])).size) {
             return res.status(400).json({ success: false, message: "Employee already belongs to another department." });
         }
 
@@ -1636,12 +1303,21 @@ const removeDepartmentEmployee = async (req, res) => {
         if (!department) {
             return res.status(404).json({ success: false, message: "Department not found." });
         }
+        if (!canManageDepartment(req.user, department)) {
+            return res.status(403).json({ success: false, message: "Only admin or this department's manager can remove employees." });
+        }
 
+        // The manager (head) can leave the employee list only when they are
+        // its sole member. They stay the head: headOf, role and access are
+        // untouched — only their User.department is cleared.
         if (department.headOf && String(department.headOf) === String(employeeId)) {
-            return res.status(400).json({
-                success: false,
-                message: "Cannot remove the department head. Change the department head first.",
-            });
+            const memberCount = await User.countDocuments({ department: department._id });
+            if (memberCount > 1) {
+                return res.status(400).json({
+                    success: false,
+                    message: "The manager can only be removed from the employee list when they are the department's only employee.",
+                });
+            }
         }
 
         const user = await User.findById(employeeId).select("_id department");
@@ -1673,7 +1349,7 @@ const getDepartmentProjects = async (req, res) => {
         if (!department) {
             return res.status(404).json({ success: false, message: "Department not found." });
         }
-        const projects = await Project.find({ department: id })
+        const projects = await Project.find({ departments: id })
             .populate("manager", "name employeeId email")
             .populate("teamMembers", "name employeeId email profilePicture")
             .select("projectCode name status priority progress manager teamMembers department startDate endDate");
@@ -1843,7 +1519,190 @@ const unassignDepartmentLead = async (req, res) => {
     }
 };
 
+/* ==================================================================== */
+/* Role & Permission management (department role tree)                   */
+/* ==================================================================== */
+
+// Roles always offered in the "add role" picker, besides roles already in use.
+const KNOWN_ROLES = ["team-lead", "employee", "sales", "inside-sales", "product-executive", "hr", "technical_associate", "bda"];
+
+/** Member count per normalized role for one department. */
+const countMembersByRole = async (departmentId) => {
+    const rows = await User.aggregate([
+        { $match: { department: new mongoose.Types.ObjectId(String(departmentId)) } },
+        { $group: { _id: { $toLower: { $trim: { input: { $ifNull: ["$role", "employee"] } } } }, count: { $sum: 1 } } },
+    ]);
+    return Object.fromEntries(rows.map((r) => [r._id, r.count]));
+};
+
+const roleTreeResponse = async (department, user) => {
+    await department.populate("headOf", "name employeeId email profilePicture");
+    return {
+        success: true,
+        department: { _id: department._id, name: department.name, code: department.code },
+        head: department.headOf || null,
+        roleTree: department.roleTree || [],
+        memberCounts: await countMembersByRole(department._id),
+        canManage: canManageDepartment(user, department),
+    };
+};
+
+/**
+ * @desc    Get a department's role tree (+ member count per role)
+ * @route   GET /api/departments/:id/role-tree
+ * @access  Private
+ */
+const getDepartmentRoleTree = async (req, res) => {
+    try {
+        const department = await Department.findById(req.params.id);
+        if (!department) {
+            return res.status(404).json({ success: false, message: "Department not found." });
+        }
+        return res.status(200).json(await roleTreeResponse(department, req.user));
+    } catch (error) {
+        console.error("Get Department Role Tree:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
+ * @desc    Replace a department's role tree
+ * @route   PUT /api/departments/:id/role-tree
+ * @access  Private (Admin / this department's manager)
+ * @body    { roleTree: [{ role, parentRole, order, projectAccess: { moduleTree, tasks, bugs, timeline } }] }
+ */
+const updateDepartmentRoleTree = async (req, res) => {
+    try {
+        const department = await Department.findById(req.params.id);
+        if (!department) {
+            return res.status(404).json({ success: false, message: "Department not found." });
+        }
+        if (!canManageDepartment(req.user, department)) {
+            return res.status(403).json({ success: false, message: "Only admin or this department's manager can change its roles." });
+        }
+
+        const { tree, error } = sanitizeRoleTree(req.body.roleTree);
+        if (error) {
+            return res.status(400).json({ success: false, message: error });
+        }
+
+        // Roles must be real: a preset or a role some employee already has.
+        const known = new Set([...KNOWN_ROLES, ...(await User.distinct("role"))].map((r) => normalizeRole(r)));
+        const unknown = tree.filter((n) => !known.has(n.role)).map((n) => n.role);
+        if (unknown.length) {
+            return res.status(400).json({
+                success: false,
+                message: `Unknown role(s): ${unknown.join(", ")}. Set the role on an employee first (Employee form → Role).`,
+            });
+        }
+
+        // A role cannot be dropped while members of the department still have it.
+        if (tree.length) {
+            const allowed = new Set(tree.map((n) => n.role));
+            const members = await User.find({ department: department._id }).select("name role");
+            const stranded = members.filter((m) => {
+                const r = normalizeRole(m.role || "employee");
+                return !ROOT_ROLES.includes(r) && !allowed.has(r) && String(m._id) !== String(department.headOf);
+            });
+            if (stranded.length) {
+                return res.status(409).json({
+                    success: false,
+                    message: "Some employees still have a role that is not in the new tree. Move them or keep their role.",
+                    employees: stranded.map((m) => ({ _id: m._id, name: m.name, role: m.role })),
+                });
+            }
+        }
+
+        // Only roleTree is written and validated (older rows may miss createdBy).
+        await Department.updateOne({ _id: department._id }, { $set: { roleTree: tree } }, { runValidators: true });
+        const saved = await Department.findById(department._id);
+        return res.status(200).json({ ...(await roleTreeResponse(saved, req.user)), message: "Roles saved." });
+    } catch (error) {
+        console.error("Update Department Role Tree:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
+ * @desc    Roles that can be added to a role tree (in use + known presets)
+ * @route   GET /api/departments/roles/options
+ * @access  Private
+ */
+const getRoleOptions = async (req, res) => {
+    try {
+        const inUse = await User.distinct("role");
+        const roles = new Set();
+        [...KNOWN_ROLES, ...inUse].forEach((r) => {
+            const n = normalizeRole(r);
+            if (n && !ROOT_ROLES.includes(n)) roles.add(n);
+        });
+        return res.status(200).json({ success: true, roles: [...roles].sort() });
+    } catch (error) {
+        console.error("Get Role Options:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
+/**
+ * @desc    Move an employee from this department to another one
+ * @route   POST /api/departments/:id/employees/:employeeId/move
+ * @access  Private (Admin, or a manager who heads both departments)
+ * @body    { toDepartment: "DEPARTMENT_ID" }
+ */
+const moveDepartmentEmployee = async (req, res) => {
+    try {
+        const { id, employeeId } = req.params;
+        const { toDepartment } = req.body;
+
+        if (!toDepartment) {
+            return res.status(400).json({ success: false, message: "toDepartment is required." });
+        }
+        if (String(toDepartment) === String(id)) {
+            return res.status(400).json({ success: false, message: "Employee is already in this department." });
+        }
+
+        const [source, target] = await Promise.all([Department.findById(id), Department.findById(toDepartment)]);
+        if (!source || !target) {
+            return res.status(404).json({ success: false, message: "Department not found." });
+        }
+        if (!canManageDepartment(req.user, source) || !canManageDepartment(req.user, target)) {
+            return res.status(403).json({ success: false, message: "You can only move employees between departments you manage." });
+        }
+        if (target.status === "inactive") {
+            return res.status(400).json({ success: false, message: "Target department is inactive." });
+        }
+        if (source.headOf && String(source.headOf) === String(employeeId)) {
+            return res.status(400).json({ success: false, message: "Cannot move the department head. Change the department head first." });
+        }
+
+        const user = await User.findById(employeeId).select("_id name role department");
+        if (!user) {
+            return res.status(404).json({ success: false, message: "Employee not found." });
+        }
+        if (!user.department || String(user.department) !== String(id)) {
+            return res.status(400).json({ success: false, message: "Employee does not belong to this department." });
+        }
+        if (!isRoleAllowed(target, user.role)) {
+            return res.status(400).json({
+                success: false,
+                message: roleBlockedMessage(target, user.role),
+            });
+        }
+
+        await assignUsersToDepartment([employeeId], target._id);
+        return res.status(200).json({ success: true, message: `${user.name} moved to ${target.name}.` });
+    } catch (error) {
+        console.error("Move Department Employee:", error);
+        return res.status(500).json({ success: false, message: "Server Error" });
+    }
+};
+
 module.exports = {
+    getDeleteDepartmentPreview,
+    getDepartmentRoleTree,
+    updateDepartmentRoleTree,
+    getRoleOptions,
+    moveDepartmentEmployee,
     createDepartment,
     getDepartments,
     getDepartment,
@@ -1851,8 +1710,6 @@ module.exports = {
     deleteDepartment,
     addDepartmentMember,
     removeDepartmentMember,
-    importDepartments,
-    exportDepartments,
     // New — Department Details page (Employee Management tab)
     getDepartmentEmployees,
     addDepartmentEmployee,

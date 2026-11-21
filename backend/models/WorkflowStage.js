@@ -13,6 +13,13 @@ const workflowStageSchema = new mongoose.Schema(
             required: true,
         },
 
+        // 'task' = project workflow stages, 'bug' = Bug Sheet pipeline stages
+        scope: {
+            type: String,
+            enum: ["task", "bug"],
+            default: "task",
+        },
+
         description: {
             type: String,
             trim: true,
@@ -75,3 +82,5 @@ workflowStageSchema.index({
     project: 1,
     isActive: 1,
 });
+
+module.exports = mongoose.models.WorkflowStage || mongoose.model("WorkflowStage", workflowStageSchema);

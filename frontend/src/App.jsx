@@ -79,8 +79,9 @@ import HRKnowledgeCenter from './pages/HR/HRKnowledgeCenter';
 import KnowledgeCenter from './pages/KnowledgeCenter/KnowledgeCenter';
 import Projects from './pages/Workspace/Projects';
 import ProjectDetails from './pages/Workspace/Project/Project';
+import ModuleWorkspace from './pages/Workspace/Project/ModuleWorkspace';
 // Department Details Page
-import DepartmentDetails from "./pages/Department/DepartmentDetails";
+import DepartmentDetails from "./pages/Department/Departmentdetails";
 
 // sale and crm pages 
 import Lead from './pages/CRM/lead';
@@ -145,7 +146,9 @@ const AppRoutes = () => {
         <Route path="/field-sales/expense-claims" element={<Navigate to="/expense-claims" replace />} />
         <Route path="/crm/leads/:leadId" element={<ProtectedRoute module="crm"><LeadDetailPage /></ProtectedRoute>} />
         <Route path="/crm/products/:productId" element={<ProtectedRoute module="crm"><ProtectedRoute roles={['admin', 'hr', 'manager']}><ProductDetailPage /></ProtectedRoute></ProtectedRoute>} />
-        <Route path="/projects/:id" element={<ProtectedRoute roles={['admin', 'manager', 'team-lead', 'hr']}><ProjectDetails /></ProtectedRoute>} />
+        {/* Any signed-in user; the API decides (project lead, members via their department's role tree, department heads, HR, admin). */}
+        <Route path="/projects/:id" element={<ProtectedRoute><ProjectDetails /></ProtectedRoute>} />
+        <Route path="/projects/:id/modules/:moduleId" element={<ProtectedRoute><ModuleWorkspace /></ProtectedRoute>} />
         <Route path="/queries" element={<ProtectedRoute module="query_management"><QueryManagement /></ProtectedRoute>} />
 
         {/* HR Routes */}

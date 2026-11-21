@@ -381,7 +381,19 @@ const ProjectInformation = ({ projectId: projectIdProp }) => {
           </div>
 
           <Field label="Client">{project.client || 'Not specified'}</Field>
-          <Field label="Department">{project.department?.name || 'Not assigned'}</Field>
+          <Field label="Owning Department">{project.department?.name || 'Not assigned'}</Field>
+
+          {(project.departments || []).length > 1 && (
+            <Field label="All Departments">
+              <span className="inline-flex flex-wrap gap-1">
+                {project.departments.map((d) => (
+                  <span key={d?._id || d} className="px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 text-[11px] font-medium border border-violet-100">
+                    {d?.name || '—'}
+                  </span>
+                ))}
+              </span>
+            </Field>
+          )}
 
           <Field label="Team Lead">{project.manager?.name || 'Unassigned'}</Field>
           <Field label="Start Date">{formatDate(project.startDate)}</Field>

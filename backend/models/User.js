@@ -20,7 +20,7 @@ const userSchema = new mongoose.Schema(
     isFirstLogin: { type: Boolean, default: true },
     isActive: { type: Boolean, default: true },
     profilePicture: { type: String, default: '' },
-    employeeType: { type: String, enum: ["fresher", "experienced", "intern"], required: true },
+    employeeType: { type: String, enum: ["fresher", "experienced", "intern"], required: false },
     internship: {
       startDate: Date,
       endDate: Date,
@@ -52,6 +52,22 @@ const userSchema = new mongoose.Schema(
         },
       ],
       default: [],
+    },
+    // What this user had before becoming a department head ("manager") or a
+    // project lead ("team-lead"), so it can be given back when they no longer
+    // head or lead anything. See services/rolePromotionService.js.
+    promotedFrom: {
+      type: {
+        _id: false,
+        role: { type: String },
+        moduleAccess: {
+          type: [{ _id: false, module: String, permission: { type: String, enum: ['view', 'edit'] } }],
+          default: [],
+        },
+        reason: { type: String, enum: ['department-head', 'project-lead'] },
+        at: { type: Date },
+      },
+      default: null,
     },
     // CRM data scope for sales / inside-sales / product-executive. Only leaf
     // ProductLocation nodes ("Mandals") are stored, grouped under the product
